@@ -1,0 +1,562 @@
+{
+  "recipes": {
+    "soft_drinks": [
+      {
+        "item": "ውኃ 2 LITER",
+        "price": 70,
+        "ingredients": [
+          {
+            "ingredient": "ውኃ",
+            "qty": 2,
+            "unit": "liter"
+          }
+        ]
+      },
+      {
+        "item": "ውኃ 1 LITER",
+        "price": 60,
+        "ingredients": [
+          {
+            "ingredient": "ውኃ",
+            "qty": 1,
+            "unit": "liter"
+          }
+        ]
+      },
+      {
+        "item": "ውኃ ½ LITER",
+        "price": 50,
+        "ingredients": [
+          {
+            "ingredient": "ውኃ",
+            "qty": 1,
+            "unit": "liter"
+          }
+        ]
+      },
+      {
+        "item": "ለስላሳ",
+        "price": 80,
+        "ingredients": [
+          {
+            "ingredient": "ለስላሳ",
+            "qty": 1,
+            "unit": "bottle"
+          }
+        ]
+      },
+      {
+        "item": "አምቦ ውሃ",
+        "price": 80,
+        "ingredients": [
+          {
+            "ingredient": "አምቦ ውሃ",
+            "qty": 1,
+            "unit": "bottle"
+          }
+        ]
+      },
+      {
+        "item": "አልኮል ነፃ",
+        "price": 100,
+        "ingredients": [
+          {
+            "ingredient": "Alcohol-free drink",
+            "qty": 1,
+            "unit": "bottle"
+          }
+        ]
+      },
+      {
+        "item": "RED BULL",
+        "price": 900,
+        "ingredients": [
+          {
+            "ingredient": "Red Bull",
+            "qty": 1,
+            "unit": "can"
+          }
+        ]
+      }
+    ],
+    "hot_drinks": [
+      {
+        "item": "ቡና",
+        "price": 50,
+        "ingredients": [
+          {
+            "ingredient": "ቡና",
+            "qty": 1,
+            "unit": "cup"
+          }
+        ]
+      },
+      {
+        "item": "ቡና በቅቤ",
+        "price": 120,
+        "ingredients": [
+          {
+            "ingredient": "ቡና",
+            "qty": 1,
+            "unit": "cup"
+          },
+          {
+            "ingredient": "ቅቤ (Butter)",
+            "qty": 1,
+            "unit": "serving"
+          }
+        ]
+      },
+      {
+        "item": "ሻይ",
+        "price": 40,
+        "ingredients": [
+          {
+            "ingredient": "ሻይ (Tea)",
+            "qty": 1,
+            "unit": "cup"
+          }
+        ]
+      }
+    ],
+    "wines": [
+      {
+        "item": "RIFT VALLEY",
+        "price": 1800,
+        "ingredients": [{"ingredient": "Rift Valley Wine", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "ACACIA",
+        "price": 1700,
+        "ingredients": [{"ingredient": "Acacia Wine", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "AXUMITE",
+        "price": 1000,
+        "ingredients": [{"ingredient": "Axumite Wine", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "GUDER",
+        "price": 900,
+        "ingredients": [{"ingredient": "Guder Wine", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "AWASH",
+        "price": 900,
+        "ingredients": [{"ingredient": "Awash Wine", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "AWASH ተከሽኖ",
+        "price": 1100,
+        "ingredients": [{"ingredient": "Awash Wine", "qty": 1, "unit": "bottle"}, {"ingredient": "Spices", "qty": 1, "unit": "serving"}]
+      }
+    ],
+    "beers_and_drafts": [
+      {
+        "item": "ቢራ",
+        "price": 100,
+        "ingredients": [{"ingredient": "Beer", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "ስፔሻል ቢራ",
+        "price": 120,
+        "ingredients": [{"ingredient": "Special Beer", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "ሲንግል",
+        "price": 60,
+        "ingredients": [{"ingredient": "Draft Beer (Single)", "qty": 1, "unit": "glass"}]
+      },
+      {
+        "item": "ጃምቦ",
+        "price": 80,
+        "ingredients": [{"ingredient": "Draft Beer (Jumbo)", "qty": 1, "unit": "glass"}]}
+    ],
+    "shots": [
+      {
+        "item": "AMARULA SHOT",
+        "price": 350,
+        "ingredients": [{"ingredient": "Amarula", "qty": 1, "unit": "shot"}]
+      },
+      {
+        "item": "TEQUILA SHOT",
+        "price": 300,
+        "ingredients": [{"ingredient": "Tequila", "qty": 1, "unit": "shot"}]
+      },
+      {
+        "item": "JÄGERMEISTER SHOT",
+        "price": 250,
+        "ingredients": [{"ingredient": "Jägermeister", "qty": 1, "unit": "shot"}]
+      },
+      {
+        "item": "FERNET BRANCA SHOT",
+        "price": 350,
+        "ingredients": [{"ingredient": "Fernet Branca", "qty": 1, "unit": "shot"}]
+      },
+      {
+        "item": "ሀበሻ አረቄ SHOT",
+        "price": 60,
+        "ingredients": [{"ingredient": "Habesha Areke", "qty": 1, "unit": "shot"}]
+      },
+      {
+        "item": "አስመራ ዘቢብ SHOT",
+        "price": 70,
+        "ingredients": [{"ingredient": "Asmera Zebib", "qty": 1, "unit": "shot"}]
+      }
+    ],
+    "game_over": [
+      {
+        "item": "DOCTOR'S ORDERS APÉRITIF",
+        "price": 500,
+        "ingredients": [{"ingredient": "Mixed Spirits", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "MINI DOUBLE DITCH",
+        "price": 700,
+        "ingredients": [{"ingredient": "Mixed Spirits", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "MINI MARATHON",
+        "price": 800,
+        "ingredients": [{"ingredient": "Mixed Spirits", "qty": 1, "unit": "serving"}]
+      }
+    ],
+    "bottles": [
+      {
+        "item": "GORDON'S GIN",
+        "price": 8500,
+        "ingredients": [{"ingredient": "Gordon's Gin", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "RED LABEL",
+        "price": 9000,
+        "ingredients": [{"ingredient": "Red Label", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "GOLD LABEL",
+        "price": 20000,
+        "ingredients": [{"ingredient": "Gold Label", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "DOUBLE BLACK",
+        "price": 19000,
+        "ingredients": [{"ingredient": "Double Black", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "BLACK LABEL ( ባለ ቪ )",
+        "price": 14000,
+        "ingredients": [{"ingredient": "Black Label (With V)", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "BLACK LABEL ( ያለ ቪ )",
+        "price": 15000,
+        "ingredients": [{"ingredient": "Black Label (Without V)", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "STOLICHNAYA (1ML)",
+        "price": 7000,
+        "ingredients": [{"ingredient": "Stolichnaya", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "STOLICHNAYA (75ML)",
+        "price": 6000,
+        "ingredients": [{"ingredient": "Stolichnaya", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "STOLICHNAYA (37ML)",
+        "price": 5000,
+        "ingredients": [{"ingredient": "Stolichnaya", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "JÄGERMEISTER",
+        "price": 10000,
+        "ingredients": [{"ingredient": "Jägermeister", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "CHIVAS",
+        "price": 16000,
+        "ingredients": [{"ingredient": "Chivas", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "JACK DANIEL",
+        "price": 16000,
+        "ingredients": [{"ingredient": "Jack Daniel's", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "CAPITAN MORGAN",
+        "price": 9500,
+        "ingredients": [{"ingredient": "Captain Morgan", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "AMARULA",
+        "price": 14000,
+        "ingredients": [{"ingredient": "Amarula", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "ABSOLUTE VODKA",
+        "price": 8000,
+        "ingredients": [{"ingredient": "Absolut Vodka", "qty": 1, "unit": "bottle"}]
+        },
+      {
+        "item": "HENDRICKS GIN",
+        "price": 17000,
+        "ingredients": [{"ingredient": "Hendrick's Gin", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "9 PM",
+        "price": 2500,
+        "ingredients": [{"ingredient": "9 PM Liquor", "qty": 1, "unit": "bottle"}]
+      },
+      {
+        "item": "SWAGGER",
+        "price": 2500,
+        "ingredients": [{"ingredient": "Swagger Liquor", "qty": 1, "unit": "bottle"}]
+      }
+    ],
+    "fasting_foods": [
+      {
+        "item": "ፍርፍር",
+        "price": 300,
+        "ingredients": [{"ingredient": "Injera", "qty": 1, "unit": "serving"}, {"ingredient": "Sauce", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ድርቆሽ ፍርፍር",
+        "price": 300,
+        "ingredients": [{"ingredient": "Dirkosh (Dried Injera)", "qty": 1, "unit": "serving"}, {"ingredient": "Sauce", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ዳቦ ፍርፍር",
+        "price": 250,
+        "ingredients": [{"ingredient": "Bread", "qty": 1, "unit": "serving"}, {"ingredient": "Sauce", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ፓስታ በስጎ",
+        "price": 300,
+        "ingredients": [{"ingredient": "Pasta", "qty": 1, "unit": "serving"}, {"ingredient": "Tomato Sauce", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ፓስታ በአትክልት",
+        "price": 400,
+        "ingredients": [{"ingredient": "Pasta", "qty": 1, "unit": "serving"}, {"ingredient": "Vegetables", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ተጋቢኖ",
+        "price": 350,
+        "ingredients": [{"ingredient": "Shiro", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ሽሮ ፈሰስ",
+        "price": 300,
+        "ingredients": [{"ingredient": "Thin Shiro", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ምስር",
+        "price": 300,
+        "ingredients": [{"ingredient": "Lentils", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ጎመን ጥብስ",
+        "price": 350,
+        "ingredients": [{"ingredient": "Collard Greens", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "አገልግል ( ግማሽ )",
+        "price": 400,
+        "ingredients": [{"ingredient": "Mixed Fasting Dishes", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "አገልግል ( ሙሉ )",
+        "price": 800,
+        "ingredients": [{"ingredient": "Mixed Fasting Dishes", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ቲማቲም ቃሪያ",
+        "price": 300,
+        "ingredients": [{"ingredient": "Tomato", "qty": 1, "unit": "serving"}, {"ingredient": "Jalapeno", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ቲማቲም ለብለብ",
+        "price": 300,
+        "ingredients": [{"ingredient": "Tomato", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ቲማቲም ስልስ",
+        "price": 300,
+        "ingredients": [{"ingredient": "Tomato Sauce", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ሃፍ ሃፍ",
+        "price": 500,
+        "ingredients": [
+          {"ingredient": "ፍርፍር", "qty": 1, "unit": "serving"},
+          {"ingredient": "ምስር", "qty": 1, "unit": "serving"},
+          {"ingredient": "ፓስታ", "qty": 1, "unit": "serving"},
+          {"ingredient": "ጎመን", "qty": 1, "unit": "serving"},
+          {"ingredient": "ሽሮ", "qty": 1, "unit": "serving"}
+        ]
+      }
+    ],
+    "kitfo": [
+      {
+        "item": "አምቢር ስፔሻል ክትፎ",
+        "price": 3500,
+        "ingredients": [
+          {"ingredient": "ክትፎ", "qty": 1, "unit": "serving"},
+          {"ingredient": "3 አይነት አይብ (3 types of cheese)", "qty": 1, "unit": "serving"},
+        {"ingredient": "ጎመን (Collard Greens)", "qty": 1, "unit": "serving"}
+        ]
+      },
+      {
+        "item": "አምቢር ኖርማል ክትፎ",
+        "price": 2500,
+        "ingredients": [
+          {"ingredient": "ክትፎ", "qty": 1, "unit": "serving"},
+          {"ingredient": "አይብ (Cheese)", "qty": 1, "unit": "serving"},
+          {"ingredient": "ጎመን (Collard Greens)", "qty": 1, "unit": "serving"}
+        ]
+      },
+      {
+        "item": "ጎመን ክትፎ ( ከአይብ ጋር )",
+        "price": 2300,
+        "ingredients": [
+          {"ingredient": "ጎመን ክትፎ", "qty": 1, "unit": "serving"},
+          {"ingredient": "አይብ (Cheese)", "qty": 1, "unit": "serving"}
+        ]
+      },
+      {
+        "item": "ቅቅል ክትፎ",
+        "price": 4000,
+        "ingredients": [
+          {"ingredient": "ቅቅል ክትፎ", "qty": 1, "unit": "serving"},
+          {"ingredient": "አይብ (Cheese)", "qty": 1, "unit": "serving"},
+          {"ingredient": "ጎመን (Collard Greens)", "qty": 1, "unit": "serving"}
+        ]
+      }
+    ],
+    "lunch_and_dinner": [
+      {
+        "item": "ቅቅል",
+        "price": 800,
+        "ingredients": [{"ingredient": "Meat (Boiled)", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ጥብስ",
+        "price": 800,
+        "ingredients": [{"ingredient": "Meat (Fried)", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ጥብስ በአዋዜ",
+        "price": 800,
+        "ingredients": [{"ingredient": "Meat (Fried)", "qty": 1, "unit": "serving"}, {"ingredient": "Awaze", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ቀይ ወጥ ( የበግ )",
+        "price": 800,
+        "ingredients": [{"ingredient": "Sheep Meat", "qty": 1, "unit": "serving"}, {"ingredient": "Red Stew", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ጎመን በስጋ ( የበግ )",
+        "price": 700,
+        "ingredients": [{"ingredient": "Sheep Meat", "qty": 1, "unit": "serving"}, {"ingredient": "Collard Greens", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ጭቅና ጥብስ",
+        "price": 1200,
+        "ingredients": [{"ingredient": "Chikna Meat (Fried)", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ጭቅና ጥብስ በአዋዜ",
+        "price": 1200,
+        "ingredients": [{"ingredient": "Chikna Meat (Fried)", "qty": 1, "unit": "serving"}, {"ingredient": "Awaze", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ቦዘና ሽሮ",
+        "price": 700,
+        "ingredients": [{"ingredient": "Shiro", "qty": 1, "unit": "serving"}, {"ingredient": "Meat bits", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ሃፍ ሃፍ",
+        "price": 900,
+        "ingredients": [
+          {"ingredient": "ቅቅል", "qty": 1, "unit": "serving"},
+          {"ingredient": "ጥብስ", "qty": 1, "unit": "serving"},
+          {"ingredient": "ቀይ ወጥ", "qty": 1, "unit": "serving"},
+          {"ingredient": "ጎመን በስጋ", "qty": 1, "unit": "serving"},
+          {"ingredient": "ቦዘና ሽሮ", "qty": 1, "unit": "serving"}
+        ]
+      }
+    ],
+    "breakfast": [
+      {
+        "item": "አምቢር ስፔሻል ቁርስ",
+        "price": 1100,
+        "ingredients": [
+          {"ingredient": "ቋንጣ ፍርፍር በቀይ", "qty": 1, "unit": "serving"},
+          {"ingredient": "ቋንጣ ፍርፍር በአልጫ", "qty": 1, "unit": "serving"},
+          {"ingredient": "ክትፎ", "qty": 1, "unit": "serving"},
+          {"ingredient": "እንቁላል ፍርፍር", "qty": 1, "unit": "serving"}
+        ]
+      },
+      {
+        "item": "ዱለት",
+        "price": 600,
+        "ingredients": [{"ingredient": "Dulet", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ቋንጣ ፍርፍር",
+        "price": 600,
+        "ingredients": [{"ingredient": "Quanta (Dried Meat)", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ስጋ ፍርፍር",
+        "price": 600,
+        "ingredients": [{"ingredient": "Meat", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ጥብስ ፍርፍር",
+        "price": 700,
+        "ingredients": [{"ingredient": "Fried Meat", "qty": 1, "unit": "serving"}, {"ingredient": "Injera", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ጥብስ",
+        "price": 800,
+        "ingredients": [{"ingredient": "Fried Meat", "qty": 1, "unit": "serving"}]
+      },
+      {
+        "item": "ኖርማል ፉል",
+        "price": 500,
+        "ingredients": [{"ingredient": "Fava Beans", "qty": 1, "unit": "serving"}, {"ingredient": "Bread", "qty": 1, "unit": "piece"}]
+      },
+      {
+        "item": "ስፔሻል ፉል ( በክትፎ )",
+        "price": 1000,
+        "ingredients": [
+          {"ingredient": "Fava Beans", "qty": 1, "unit": "serving"},
+          {"ingredient": "ክትፎ (Kitfo)", "qty": 1, "unit": "serving"}
+        ]
+      }
+    ],
+    "double_shot_drinks": [
+      {
+        "item": "BLACK LABEL",
+        "price": 700,
+        "ingredients": [{"ingredient": "Black Label", "qty": 2, "unit": "shot"}]
+      },
+      {
+        "item": "GORDON GIN",
+        "price": 450,
+        "ingredients": [{"ingredient": "Gordon's Gin", "qty": 2, "unit": "shot"}]
+      },
+      {
+        "item": "STOLICHNAYA",
+        "price": 350,
+        "ingredients": [{"ingredient": "Stolichnaya", "qty": 2, "unit": "shot"}]
+      },
+      {
+        "item": "MARATHON GIN",
+        "price": 200,
+        "ingredients": [{"ingredient": "Marathon Gin", "qty": 2, "unit": "shot"}]
+      }
+    ]
+  }
+}

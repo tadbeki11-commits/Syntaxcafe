@@ -1,0 +1,206 @@
+import api from '@/application';
+import toast from 'react-hot-toast';
+import { syncTasks, type SyncTask, type SyncTaskResult } from './tasks';
+
+export type SyncStatusCallback = (status: {
+  online: boolean;
+  syncing: boolean;
+  unsyncedCount: number;
+}) => void;
+
+/**
+ * Tasks that run automatically (e.g. right after login). Limited to the data
+ * the app needs to be usable offline: authentication (users/roles).
+ * Everything else — menu, orders, payments, inventory, tables, organizations,
+ * stock locations/transfers — is only pushed/pulled on an explicit manual
+ * "Sync" button press.
+ */
+export const AUTO_SYNC_TASKS: readonly string[] = [
+  'users_pull',
+  'roles_pull',
+  'menu_items_pull',
+  'settings_pull',
+];
+
+class SimpleSyncEngine {
+  private online: boolean =
+    typeof navigator !== 'undefined' ? navigator.onLine : true;
+  private syncing = false;
+  private readonly listeners = new Set<SyncStatusCallback>();
+
+  constructor() {
+    this.setupListeners();
+  }
+
+  subscribe(callback: SyncStatusCallback): () => void {
+    this.listeners.add(callback);
+    void this.emitStatusFor(callback);
+    return () => {
+      this.listeners.delete(callback);
+    };
+  }
+
+  notifyListeners(): void {
+    void this.emitStatus();
+  }
+
+  async getUnsyncedCount(): Promise<number> {
+    const counts = await Promise.all(
+      syncTasks
+        .map((task) => task.countUnsynced?.())
+        .map(async (counter) => {
+          try {
+            return (await counter) ?? 0;
+          } catch (error) {
+            console.error('[sync] Failed to count unsynced records', error);
+            return 0;
+          }
+        }),
+    );
+    return counts.reduce((acc, value) => acc + value, 0);
+  }
+
+  isAppOnline(): boolean {
+    return this.online;
+  }
+
+  isSyncingInProgress(): boolean {
+    return this.syncing;
+  }
+
+  async sync(targetTasks?: readonly string[]): Promise<boolean> {
+    // Claim the sync lock synchronously so rapid double-clicks can't both slip
+    // through before the (awaited) connection check sets `syncing`.
+    if (this.syncing) {
+      // console.log('[sync] A sync cycle is already running.');
+      return false;
+    }
+    this.syncing = true;
+    this.notifyListeners();
+
+    const results: SyncTaskResult[] = [];
+
+    try {
+      const online = await this.verifyConnection();
+      if (!online) {
+        console.warn('[sync] Cannot start sync while offline.');
+        return false;
+      }
+
+      const tasksToRun = targetTasks
+        ? syncTasks.filter((task) => targetTasks.includes(task.name))
+        : syncTasks;
+
+      for (const task of tasksToRun) {
+        await this.runTask(task, results);
+      }
+
+      const pushed = results.reduce((sum, result) => sum + result.pushed, 0);
+      if (pushed > 0) {
+        toast.success(`Synced ${pushed} change${pushed === 1 ? '' : 's'}.`, {
+          id: 'sync-success',
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[sync] Failed to complete sync cycle', error);
+      toast.error('Sync failed. Please try again.');
+      return false;
+    } finally {
+      this.syncing = false;
+      this.notifyListeners();
+    }
+  }
+
+  notifyOnlineState(online: boolean): void {
+    if (typeof window !== 'undefined') {
+      (window as any).isSyncOnline = online;
+    }
+  }
+
+  async verifyConnection(): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      this.setOnline(false);
+      return false;
+    }
+
+    try {
+      const response = await api.health();
+      const reachable =
+        response?.status === 200 || response?.data?.status === 'success';
+      this.setOnline(reachable);
+      return reachable;
+    } catch (error) {
+      console.warn('[sync] Health probe failed', error);
+      this.setOnline(false);
+      return false;
+    }
+  }
+
+  private async runTask(task: SyncTask, results: SyncTaskResult[]): Promise<void> {
+    try {
+      if (task.push) {
+        const pushed = await task.push();
+        results.push({ name: task.name, pushed });
+      }
+    } catch (error) {
+      console.error(`[sync] Push task "${task.name}" failed`, error);
+    }
+
+    try {
+      if (task.pull) {
+        await task.pull();
+      }
+    } catch (error) {
+      console.error(`[sync] Pull task "${task.name}" failed`, error);
+    }
+  }
+
+  private setupListeners(): void {
+    if (typeof window === 'undefined') return;
+    window.addEventListener('online', () => this.setOnline(true));
+    window.addEventListener('offline', () => this.setOnline(false));
+  }
+
+  private setOnline(next: boolean): void {
+    if (this.online === next) return;
+    this.online = next;
+    if (next) {
+      toast.success('You are back online.', { id: 'sync-online' });
+    } else {
+      toast.error('You are offline. Sync is paused.', { id: 'sync-offline' });
+    }
+    this.notifyOnlineState(next);
+    this.notifyListeners();
+  }
+
+  private async emitStatus(): Promise<void> {
+    const unsyncedCount = await this.getUnsyncedCount();
+    const snapshot = {
+      online: this.online,
+      syncing: this.syncing,
+      unsyncedCount,
+    };
+
+    this.listeners.forEach((listener) => {
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.error('[sync] Listener error', error);
+      }
+    });
+  }
+
+  private async emitStatusFor(listener: SyncStatusCallback): Promise<void> {
+    const unsyncedCount = await this.getUnsyncedCount();
+    try {
+      listener({ online: this.online, syncing: this.syncing, unsyncedCount });
+    } catch (error) {
+      console.error('[sync] Listener error', error);
+    }
+  }
+}
+
+export const syncEngine = new SimpleSyncEngine();
+export default syncEngine;

@@ -1,0 +1,721 @@
+{
+  "recipes": {
+    "በርገር": [
+      {
+        "item": "እስፔሻል በርገር",
+        "price": 650,
+        "ingredients": [
+          { "ingredient": "ቲማቲም", "qty": 1, "unit": "portion" },
+          { "ingredient": "ሰላጣ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ማዮኔዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የተጠበሰ ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "slice" },
+          { "ingredient": "እንቁላል", "qty": 1, "unit": "piece" }
+        ]
+      },
+      {
+        "item": "ቺዝ በርገር",
+        "price": 590,
+        "ingredients": [
+          { "ingredient": "ቲማቲም", "qty": 1, "unit": "portion" },
+          { "ingredient": "ሰላጣ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ማዮኔዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የተጠበሰ ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "slice" }
+        ]
+      },
+      {
+        "item": "ቢፍ በርገር",
+        "price": 550,
+        "ingredients": [
+          { "ingredient": "ቲማቲም", "qty": 1, "unit": "portion" },
+          { "ingredient": "ሰላጣ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ማዮኔዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የተጠበሰ ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቢፍ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ኖርማል በርገር",
+        "price": 500,
+        "ingredients": [
+          { "ingredient": "ቲማቲም", "qty": 1, "unit": "portion" },
+          { "ingredient": "ሰላጣ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ማዮኔዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የተጠበሰ ስጋ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "የፆም በርገር",
+        "price": 400,
+        "ingredients": [
+          { "ingredient": "የፆም ድብልቅ አትክልቶች", "qty": 1, "unit": "portion" }
+        ]
+      }
+    ],
+    "ሸዋርማ": [
+      {
+        "item": "እስፔሻል ሸዋርማ",
+        "price": 680,
+        "ingredients": [
+          { "ingredient": "የእስፔሻል ሸዋርማ ድብልቅ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ኖርማል ሸዋርማ",
+        "price": 610,
+        "ingredients": [
+          { "ingredient": "የኖርማል ሸዋርማ ድብልቅ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ቦረቆ",
+        "price": 680,
+        "ingredients": [
+          { "ingredient": "የቦረቆ ድብልቅ", "qty": 1, "unit": "portion" }
+        ]
+      }
+    ],
+    "ትኩስ ነገር": [
+      {
+        "item": "ሻይ",
+        "price": 50,
+        "ingredients": [
+          { "ingredient": "ሻይ ቅጠል", "qty": 1, "unit": "bag" },
+          { "ingredient": "ውሀ", "qty": 200, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "ሎሚ ሻይ",
+        "price": 60,
+        "ingredients": [
+          { "ingredient": "ሻይ ቅጠል", "qty": 1, "unit": "bag" },
+          { "ingredient": "ሎሚ", "qty": 1, "unit": "slice" },
+          { "ingredient": "ውሀ", "qty": 200, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "ለውዝ ሻይ",
+        "price": 110,
+        "ingredients": [
+          { "ingredient": "ሻይ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ለውዝ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ቀረፋ ሻይ",
+        "price": 60,
+        "ingredients": [
+          { "ingredient": "ሻይ ቅጠል", "qty": 1, "unit": "bag" },
+          { "ingredient": "ቀረፋ", "qty": 1, "unit": "pinch" }
+        ]
+      },
+      {
+        "item": "ሻይ ቡና እስፔሻል",
+        "price": 85,
+        "ingredients": [
+          { "ingredient": "የሻይ እና ቡና ድብልቅ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "እስፔሻል ሻይ",
+        "price": 150,
+        "ingredients": [
+          { "ingredient": "የእስፔሻል ሻይ ቅመሞች", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ማኪያቶ",
+        "price": 90,
+        "ingredients": [
+          { "ingredient": "ቡና", "qty": 1, "unit": "shot" },
+          { "ingredient": "ወተት", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "ወተት",
+        "price": 110,
+        "ingredients": [
+          { "ingredient": "ወተት", "qty": 250, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "የፆም ማኪያቶ",
+        "price": 130,
+        "ingredients": [
+          { "ingredient": "ቡና", "qty": 1, "unit": "shot" },
+          { "ingredient": "የፆም ወተት", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "አስቲም ቡና",
+        "price": 65,
+        "ingredients": [
+          { "ingredient": "ቡና", "qty": 1, "unit": "cup" }
+        ]
+      },
+      {
+        "item": "ብርቱካን ሻይ",
+        "price": 110,
+        "ingredients": [
+          { "ingredient": "ሻይ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የብርቱካን ጣዕም", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "አናናስ ሻይ",
+        "price": 110,
+        "ingredients": [
+          { "ingredient": "ሻይ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የአናናስ ጣዕም", "qty": 1, "unit": "portion" }
+        ]
+      }
+    ],
+    "ፒዛ": [
+      {
+        "item": "አቢያ ፒዛ",
+        "price": 850,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የተጠበሰ ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "አትክልት", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺክን", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቢፍ", "qty": 1, "unit": "portion" },
+          { "ingredient": "እንቁላል", "qty": 1, "unit": "piece" },
+          { "ingredient": "ቋሊሳ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "እስፔሻል ፒዛ",
+        "price": 790,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የተጠበሰ ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቋሊሳ", "qty": 1, "unit": "portion" },
+          { "ingredient": "እንቁላል", "qty": 1, "unit": "piece" },
+          { "ingredient": "ቢፍ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ቢፍ ፒዛ",
+        "price": 690,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የተጠበሰ ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቋሊሳ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ፔፐሮኒ ፒዛ",
+        "price": 660,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቋሊሳ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቢፍ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ማርጋሪታ ፒዛ",
+        "price": 650,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቋሊሳ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ቺክን ፒዛ",
+        "price": 750,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺክን", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቋሊሳ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ቱና እስፔሻል ፒዛ",
+        "price": 810,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "እንቁላል", "qty": 1, "unit": "piece" }
+        ]
+      },
+      {
+        "item": "ቱና የፆም ፒዛ",
+        "price": 630,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቋሊሳ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ቱና በቺዝ ፒዛ",
+        "price": 710,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቺዝ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቋሊሳ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "አትክልት ፒዛ",
+        "price": 500,
+        "ingredients": [
+          { "ingredient": "ቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የተጠበሰ አትክልት", "qty": 1, "unit": "portion" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" },
+          { "ingredient": "ቅመም", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ላዛኛ",
+        "price": 800,
+        "ingredients": [
+          { "ingredient": "የላዛኛ ፓስታ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ሶስ እና ቺዝ", "qty": 1, "unit": "portion" }
+        ]
+      }
+    ],
+    "ሳንድዊች": [
+      {
+        "item": "ክለብ ሳንድዊች",
+        "price": 520,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 3, "unit": "piece" },
+          { "ingredient": "የክለብ ሳንድዊች ድብልቅ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ቺክን ክለብ ሳንድዊች",
+        "price": 550,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 3, "unit": "piece" },
+          { "ingredient": "ቺክን", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ቱና ክለብ ሳንድዊች",
+        "price": 530,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 3, "unit": "piece" },
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "እንቁላል ሳንድዊች",
+        "price": 320,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 2, "unit": "piece" },
+          { "ingredient": "እንቁላል", "qty": 2, "unit": "piece" }
+        ]
+      },
+      {
+        "item": "ቺክን ሳንድዊች",
+        "price": 390,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 2, "unit": "piece" },
+          { "ingredient": "ቺክን", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "አትክልት ሳንድዊች",
+        "price": 300,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 2, "unit": "piece" },
+          { "ingredient": "አትክልት", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ችብስ",
+        "price": 200,
+        "ingredients": [
+          { "ingredient": "ድንች", "qty": 1, "unit": "portion" },
+          { "ingredient": "ዘይት", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "ሳምቡሳ",
+        "price": 120,
+        "ingredients": [
+          { "ingredient": "የሳምቡሳ ሊጥ", "qty": 1, "unit": "piece" },
+          { "ingredient": "የውስጥ ማሟያ", "qty": 1, "unit": "portion" }
+        ]
+      }
+    ],
+    "ቁርስ": [
+      {
+        "item": "እንቁላል ፍርፍር",
+        "price": 290,
+        "ingredients": [
+          { "ingredient": "እንቁላል", "qty": 2, "unit": "piece" },
+          { "ingredient": "እንጀራ/ዳቦ", "qty": 1, "unit": "piece" }
+        ]
+      },
+      {
+        "item": "የፆም ፍርፍር",
+        "price": 280,
+        "ingredients": [
+          { "ingredient": "እንጀራ", "qty": 1, "unit": "piece" },
+          { "ingredient": "የቲማቲም ሶስ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "እንቁላል በአቮካዶ",
+        "price": 320,
+        "ingredients": [
+          { "ingredient": "እንቁላል", "qty": 2, "unit": "piece" },
+          { "ingredient": "አቮካዶ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "እንቁላል በስጋ",
+        "price": 380,
+        "ingredients": [
+          { "ingredient": "እንቁላል", "qty": 2, "unit": "piece" },
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ፉል ኖርማል",
+        "price": 280,
+        "ingredients": [
+          { "ingredient": "ባቄላ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ዘይት/ቅቤ", "qty": 1, "unit": "tbsp" }
+        ]
+      },
+      {
+        "item": "ፉል እስፔሻል",
+        "price": 350,
+        "ingredients": [
+          { "ingredient": "ባቄላ", "qty": 1, "unit": "portion" },
+          { "ingredient": "እንቁላል", "qty": 1, "unit": "piece" },
+          { "ingredient": "እርጎ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ፉል በአቮካዶ",
+        "price": 320,
+        "ingredients": [
+          { "ingredient": "ባቄላ", "qty": 1, "unit": "portion" },
+          { "ingredient": "አቮካዶ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ፈጢራ እስፔሻል",
+        "price": 350,
+        "ingredients": [
+          { "ingredient": "ሊጥ", "qty": 1, "unit": "portion" },
+          { "ingredient": "እንቁላል", "qty": 1, "unit": "piece" },
+          { "ingredient": "ማር", "qty": 1, "unit": "tbsp" }
+        ]
+      },
+      {
+        "item": "ፈጢራ ኖርማል",
+        "price": 280,
+        "ingredients": [
+          { "ingredient": "ሊጥ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ጨጨብሳ እስፔሻል",
+        "price": 360,
+        "ingredients": [
+          { "ingredient": "ቂጣ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ንጥር ቅቤ", "qty": 1, "unit": "tbsp" },
+          { "ingredient": "ማር/እንቁላል", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ጨጨብሳ ኖርማል",
+        "price": 310,
+        "ingredients": [
+          { "ingredient": "ቂጣ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ንጥር ቅቤ", "qty": 1, "unit": "tbsp" }
+        ]
+      },
+      {
+        "item": "ፈታ እስፔሻል",
+        "price": 350,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የቲማቲም ሶስ", "qty": 1, "unit": "portion" },
+          { "ingredient": "እርጎ/እንቁላል", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ፈታ ኖርማል",
+        "price": 300,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 1, "unit": "portion" },
+          { "ingredient": "የቲማቲም ሶስ", "qty": 1, "unit": "portion" }
+        ]
+      }
+    ],
+    "ጁስ": [
+      {
+        "item": "እስፔሻል ጁስ",
+        "price": 220,
+        "ingredients": [
+          { "ingredient": "የተደባለቁ ፍራፍሬዎች", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ሚክስ ጁስ",
+        "price": 195,
+        "ingredients": [
+          { "ingredient": "የተደባለቁ ፍራፍሬዎች", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "አቮካዶ ጁስ",
+        "price": 185,
+        "ingredients": [
+          { "ingredient": "አቮካዶ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ፓፓያ ጁስ",
+        "price": 185,
+        "ingredients": [
+          { "ingredient": "ፓፓያ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ማንጎ ጁስ",
+        "price": 185,
+        "ingredients": [
+          { "ingredient": "ማንጎ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ሚክስ ሼክ",
+        "price": 270,
+        "ingredients": [
+          { "ingredient": "የተደባለቁ ፍራፍሬዎች", "qty": 1, "unit": "portion" },
+          { "ingredient": "ወተት", "qty": 1, "unit": "cup" }
+        ]
+      },
+      {
+        "item": "አስሙዝ ሼክ",
+        "price": 270,
+        "ingredients": [
+          { "ingredient": "ፍራፍሬዎች", "qty": 1, "unit": "portion" },
+          { "ingredient": "በረዶ/ወተት", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ችኮሌት ሼክ",
+        "price": 270,
+        "ingredients": [
+          { "ingredient": "ችኮሌት", "qty": 1, "unit": "portion" },
+          { "ingredient": "ወተት", "qty": 1, "unit": "cup" }
+        ]
+      },
+      {
+        "item": "ፓፓያ ሼክ",
+        "price": 270,
+        "ingredients": [
+          { "ingredient": "ፓፓያ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ወተት", "qty": 1, "unit": "cup" }
+        ]
+      },
+      {
+        "item": "አቮካዶ ሼክ",
+        "price": 270,
+        "ingredients": [
+          { "ingredient": "አቮካዶ", "qty": 1, "unit": "portion" },
+          { "ingredient": "ወተት", "qty": 1, "unit": "cup" }
+        ]
+      },
+      {
+        "item": "ሙዝ በወተት",
+        "price": 270,
+        "ingredients": [
+          { "ingredient": "ሙዝ", "qty": 1, "unit": "piece" },
+          { "ingredient": "ወተት", "qty": 1, "unit": "cup" }
+        ]
+      },
+      {
+        "item": "ተፈጣሪ ጁስ (በፓፓያ ወይም በሙዝ)",
+        "price": 270,
+        "ingredients": [
+          { "ingredient": "ፓፓያ ወይም ሙዝ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ተፈጣሪ ጁስ በስትሮበሪ",
+        "price": 310,
+        "ingredients": [
+          { "ingredient": "ስትሮበሪ", "qty": 1, "unit": "portion" }
+        ]
+      }
+    ],
+    "ቴካዌ": [
+      {
+        "item": "ስላስ",
+        "price": 60,
+        "ingredients": [
+          { "ingredient": "ሲረፕ", "qty": 1, "unit": "portion" },
+          { "ingredient": "በረዶ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ውሀ 1 ሊትር",
+        "price": 50,
+        "ingredients": [
+          { "ingredient": "ውሀ", "qty": 1, "unit": "liter" }
+        ]
+      },
+      {
+        "item": "ውሀ 1/2 ሊትር",
+        "price": 45,
+        "ingredients": [
+          { "ingredient": "ውሀ", "qty": 500, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "ስትሮበሪ ጭማቂ",
+        "price": 200,
+        "ingredients": [
+          { "ingredient": "ስትሮበሪ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "አናናስ ጭማቂ",
+        "price": 200,
+        "ingredients": [
+          { "ingredient": "አናናስ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ብርቱካን ጭማቂ",
+        "price": 200,
+        "ingredients": [
+          { "ingredient": "ብርቱካን", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "አይስ ክሬም",
+        "price": 100,
+        "ingredients": [
+          { "ingredient": "አይስ ክሬም", "qty": 1, "unit": "scoop" }
+        ]
+      },
+      {
+        "item": "አይስ ስትሮበሪ",
+        "price": 290,
+        "ingredients": [
+          { "ingredient": "የስትሮበሪ አይስ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "አይስ ቸኮሌት",
+        "price": 290,
+        "ingredients": [
+          { "ingredient": "የቸኮሌት አይስ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ፒዛ ቦክስ",
+        "price": 50,
+        "ingredients": []
+      },
+      {
+        "item": "በርገር ቦክስ",
+        "price": 40,
+        "ingredients": []
+      },
+      {
+        "item": "የጁስ ካፕ",
+        "price": 25,
+        "ingredients": []
+      },
+      {
+        "item": "የትኩስ ነገር ካፕ",
+        "price": 20,
+        "ingredients": []
+      },
+      {
+        "item": "የችብስ ቴካዌ",
+        "price": 30,
+        "ingredients": []
+      }
+    ],
+    "ኤክስትራ": [
+      {
+        "item": "ቱና",
+        "price": 300,
+        "ingredients": [
+          { "ingredient": "ቱና", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ማዮኔዝ",
+        "price": 120,
+        "ingredients": [
+          { "ingredient": "ማዮኔዝ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "እንቁላል",
+        "price": 90,
+        "ingredients": [
+          { "ingredient": "እንቁላል", "qty": 1, "unit": "piece" }
+        ]
+      },
+      {
+        "item": "ስጋ",
+        "price": 50,
+        "ingredients": [
+          { "ingredient": "ስጋ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ይጠ/ከችፕ",
+        "price": 35,
+        "ingredients": [
+          { "ingredient": "ከችፕ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "አቮካዶ",
+        "price": 35,
+        "ingredients": [
+          { "ingredient": "አቮካዶ", "qty": 1, "unit": "portion" }
+        ]
+      },
+      {
+        "item": "ዳቦ",
+        "price": 20,
+        "ingredients": [
+          { "ingredient": "ዳቦ", "qty": 1, "unit": "piece" }
+        ]
+      }
+    ]
+  }
+}

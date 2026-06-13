@@ -1,0 +1,694 @@
+{
+  "recipes": {
+    "fried_chicken": [
+      {
+        "item": "2 Pcs Meal",
+        "ingredients": [
+          { "ingredient": "Chicken Pieces", "qty": 2, "unit": "piece" },
+          { "ingredient": "Flour", "qty": 80, "unit": "g" },
+          { "ingredient": "Egg", "qty": 1, "unit": "piece" },
+          { "ingredient": "Breadcrumbs", "qty": 60, "unit": "g" },
+          { "ingredient": "Oil", "qty": 200, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 5, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 3, "unit": "g" },
+          { "ingredient": "Garlic Powder", "qty": 3, "unit": "g" }
+        ]
+      },
+      {
+        "item": "3 Pcs Meal",
+        "ingredients": [
+          { "ingredient": "Chicken Pieces", "qty": 3, "unit": "piece" },
+          { "ingredient": "Flour", "qty": 120, "unit": "g" },
+          { "ingredient": "Egg", "qty": 1, "unit": "piece" },
+          { "ingredient": "Breadcrumbs", "qty": 90, "unit": "g" },
+          { "ingredient": "Oil", "qty": 300, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 6, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 4, "unit": "g" },
+          { "ingredient": "Garlic Powder", "qty": 4, "unit": "g" }
+        ]
+      },
+      {
+        "item": "5 Pcs Meal",
+        "ingredients": [
+          { "ingredient": "Chicken Pieces", "qty": 5, "unit": "piece" },
+          { "ingredient": "Flour", "qty": 200, "unit": "g" },
+          { "ingredient": "Egg", "qty": 2, "unit": "piece" },
+          { "ingredient": "Breadcrumbs", "qty": 150, "unit": "g" },
+          { "ingredient": "Oil", "qty": 500, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 8, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 5, "unit": "g" },
+          { "ingredient": "Garlic Powder", "qty": 5, "unit": "g" }
+        ]
+      },
+      {
+        "item": "9 Pcs Meal",
+        "ingredients": [
+          { "ingredient": "Chicken Pieces", "qty": 9, "unit": "piece" },
+          { "ingredient": "Flour", "qty": 360, "unit": "g" },
+          { "ingredient": "Egg", "qty": 3, "unit": "piece" },
+          { "ingredient": "Breadcrumbs", "qty": 270, "unit": "g" },
+          { "ingredient": "Oil", "qty": 800, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 12, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 8, "unit": "g" },
+          { "ingredient": "Garlic Powder", "qty": 8, "unit": "g" }
+        ]
+      },
+      {
+        "item": "14 Pcs Meal",
+        "ingredients": [
+          { "ingredient": "Chicken Pieces", "qty": 14, "unit": "piece" },
+          { "ingredient": "Flour", "qty": 560, "unit": "g" },
+          { "ingredient": "Egg", "qty": 4, "unit": "piece" },
+          { "ingredient": "Breadcrumbs", "qty": 420, "unit": "g" },
+          { "ingredient": "Oil", "qty": 1200, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 18, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 10, "unit": "g" },
+          { "ingredient": "Garlic Powder", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "18 Pcs Meal",
+        "ingredients": [
+          { "ingredient": "Chicken Pieces", "qty": 18, "unit": "piece" },
+          { "ingredient": "Flour", "qty": 720, "unit": "g" },
+          { "ingredient": "Egg", "qty": 5, "unit": "piece" },
+          { "ingredient": "Breadcrumbs", "qty": 540, "unit": "g" },
+          { "ingredient": "Oil", "qty": 1500, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 22, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 12, "unit": "g" },
+          { "ingredient": "Garlic Powder", "qty": 12, "unit": "g" }
+        ]
+      },
+      {
+        "item": "20 Pcs Meal",
+        "ingredients": [
+          { "ingredient": "Chicken Pieces", "qty": 20, "unit": "piece" },
+          { "ingredient": "Flour", "qty": 800, "unit": "g" },
+          { "ingredient": "Egg", "qty": 6, "unit": "piece" },
+          { "ingredient": "Breadcrumbs", "qty": 600, "unit": "g" },
+          { "ingredient": "Oil", "qty": 1800, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 25, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 14, "unit": "g" },
+          { "ingredient": "Garlic Powder", "qty": 14, "unit": "g" }
+        ]
+      }
+    ],
+    "burger": [
+      {
+        "item": "Chicken Filet",
+        "ingredients": [
+          { "ingredient": "Chicken Fillet", "qty": 150, "unit": "g" },
+          { "ingredient": "Burger Bun", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 20, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Mayonnaise", "qty": 20, "unit": "g" },
+          { "ingredient": "Oil", "qty": 30, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 3, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Classic Sandwich",
+        "ingredients": [
+          { "ingredient": "Chicken Fillet", "qty": 130, "unit": "g" },
+          { "ingredient": "Burger Bun", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 20, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Onion", "qty": 20, "unit": "g" },
+          { "ingredient": "Mayonnaise", "qty": 20, "unit": "g" },
+          { "ingredient": "Mustard", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Zinger Chily",
+        "ingredients": [
+          { "ingredient": "Spicy Chicken Fillet", "qty": 150, "unit": "g" },
+          { "ingredient": "Burger Bun", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 20, "unit": "g" },
+          { "ingredient": "Chili Sauce", "qty": 25, "unit": "g" },
+          { "ingredient": "Mayonnaise", "qty": 15, "unit": "g" },
+          { "ingredient": "Green Chili", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Twister",
+        "ingredients": [
+          { "ingredient": "Chicken Fillet", "qty": 130, "unit": "g" },
+          { "ingredient": "Tortilla Wrap", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 25, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Garlic Sauce", "qty": 20, "unit": "g" },
+          { "ingredient": "Capsicum", "qty": 20, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Beef Burger",
+        "ingredients": [
+          { "ingredient": "Beef Patty", "qty": 150, "unit": "g" },
+          { "ingredient": "Burger Bun", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 20, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Onion", "qty": 20, "unit": "g" },
+          { "ingredient": "Ketchup", "qty": 20, "unit": "g" },
+          { "ingredient": "Mustard", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Cheese Burger",
+        "ingredients": [
+          { "ingredient": "Beef Patty", "qty": 150, "unit": "g" },
+          { "ingredient": "Burger Bun", "qty": 1, "unit": "piece" },
+          { "ingredient": "Cheese Slice", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 20, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Onion", "qty": 20, "unit": "g" },
+          { "ingredient": "Ketchup", "qty": 20, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Captain Hot",
+        "ingredients": [
+          { "ingredient": "Spicy Chicken Fillet", "qty": 150, "unit": "g" },
+          { "ingredient": "Burger Bun", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 20, "unit": "g" },
+          { "ingredient": "Jalapeno", "qty": 15, "unit": "g" },
+          { "ingredient": "Hot Sauce", "qty": 25, "unit": "g" },
+          { "ingredient": "Mayonnaise", "qty": 15, "unit": "g" }
+        ]
+      },
+      {
+        "item": "MAF Special Burger",
+        "ingredients": [
+          { "ingredient": "Beef Patty", "qty": 180, "unit": "g" },
+          { "ingredient": "Chicken Fillet", "qty": 100, "unit": "g" },
+          { "ingredient": "Burger Bun", "qty": 1, "unit": "piece" },
+          { "ingredient": "Cheese Slice", "qty": 2, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 25, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Onion", "qty": 20, "unit": "g" },
+          { "ingredient": "Special Sauce", "qty": 30, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Chips",
+        "ingredients": [
+          { "ingredient": "Potato", "qty": 250, "unit": "g" },
+          { "ingredient": "Oil", "qty": 300, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 5, "unit": "g" }
+        ]
+      }
+    ],
+    "breakfast": [
+      {
+        "item": "Fetira",
+        "ingredients": [
+          { "ingredient": "Flour", "qty": 180, "unit": "g" },
+          { "ingredient": "Butter", "qty": 30, "unit": "g" },
+          { "ingredient": "Egg", "qty": 1, "unit": "piece" },
+          { "ingredient": "Salt", "qty": 3, "unit": "g" },
+          { "ingredient": "Water", "qty": 80, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Kibda",
+        "ingredients": [
+          { "ingredient": "Liver", "qty": 200, "unit": "g" },
+          { "ingredient": "Onion", "qty": 60, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 70, "unit": "g" },
+          { "ingredient": "Green Chili", "qty": 15, "unit": "g" },
+          { "ingredient": "Oil", "qty": 30, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 4, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 3, "unit": "g" },
+          { "ingredient": "Berbere", "qty": 5, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Egg Firfir",
+        "ingredients": [
+          { "ingredient": "Egg", "qty": 2, "unit": "piece" },
+          { "ingredient": "Injera", "qty": 1, "unit": "piece" },
+          { "ingredient": "Onion", "qty": 40, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 50, "unit": "g" },
+          { "ingredient": "Oil", "qty": 20, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 3, "unit": "g" },
+          { "ingredient": "Green Chili", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Special Full",
+        "ingredients": [
+          { "ingredient": "Egg", "qty": 2, "unit": "piece" },
+          { "ingredient": "Bread", "qty": 2, "unit": "piece" },
+          { "ingredient": "Butter", "qty": 20, "unit": "g" },
+          { "ingredient": "Honey", "qty": 20, "unit": "g" },
+          { "ingredient": "Jam", "qty": 20, "unit": "g" },
+          { "ingredient": "Cheese", "qty": 30, "unit": "g" },
+          { "ingredient": "Milk", "qty": 100, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Normal Full",
+        "ingredients": [
+          { "ingredient": "Egg", "qty": 2, "unit": "piece" },
+          { "ingredient": "Bread", "qty": 2, "unit": "piece" },
+          { "ingredient": "Butter", "qty": 20, "unit": "g" },
+          { "ingredient": "Jam", "qty": 20, "unit": "g" },
+          { "ingredient": "Tea", "qty": 1, "unit": "piece" }
+        ]
+      },
+      {
+        "item": "Chicken Wrap",
+        "ingredients": [
+          { "ingredient": "Chicken Fillet", "qty": 120, "unit": "g" },
+          { "ingredient": "Tortilla Wrap", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 20, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Mayonnaise", "qty": 20, "unit": "g" },
+          { "ingredient": "Capsicum", "qty": 20, "unit": "g" },
+          { "ingredient": "Salt", "qty": 3, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Egg Sandwich",
+        "ingredients": [
+          { "ingredient": "Egg", "qty": 2, "unit": "piece" },
+          { "ingredient": "Bread", "qty": 2, "unit": "piece" },
+          { "ingredient": "Butter", "qty": 15, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Salt", "qty": 2, "unit": "g" }
+        ]
+      }
+    ],
+    "chicken_with_rice": [
+      {
+        "item": "Chicken Mendi Full",
+        "ingredients": [
+          { "ingredient": "Whole Chicken", "qty": 1200, "unit": "g" },
+          { "ingredient": "Rice", "qty": 500, "unit": "g" },
+          { "ingredient": "Onion", "qty": 150, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 200, "unit": "g" },
+          { "ingredient": "Garlic", "qty": 20, "unit": "g" },
+          { "ingredient": "Ginger", "qty": 15, "unit": "g" },
+          { "ingredient": "Mendi Spice Mix", "qty": 30, "unit": "g" },
+          { "ingredient": "Oil", "qty": 60, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Chicken Mendi Half",
+        "ingredients": [
+          { "ingredient": "Half Chicken", "qty": 600, "unit": "g" },
+          { "ingredient": "Rice", "qty": 300, "unit": "g" },
+          { "ingredient": "Onion", "qty": 80, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 100, "unit": "g" },
+          { "ingredient": "Garlic", "qty": 10, "unit": "g" },
+          { "ingredient": "Ginger", "qty": 8, "unit": "g" },
+          { "ingredient": "Mendi Spice Mix", "qty": 15, "unit": "g" },
+          { "ingredient": "Oil", "qty": 30, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 6, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Chicken Wing",
+        "ingredients": [
+          { "ingredient": "Chicken Wings", "qty": 500, "unit": "g" },
+          { "ingredient": "Rice", "qty": 300, "unit": "g" },
+          { "ingredient": "Garlic", "qty": 15, "unit": "g" },
+          { "ingredient": "Spice Mix", "qty": 15, "unit": "g" },
+          { "ingredient": "Oil", "qty": 50, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 6, "unit": "g" },
+          { "ingredient": "Lemon", "qty": 1, "unit": "piece" }
+        ]
+      },
+      {
+        "item": "Roasted Chicken",
+        "ingredients": [
+          { "ingredient": "Whole Chicken", "qty": 1000, "unit": "g" },
+          { "ingredient": "Rice", "qty": 300, "unit": "g" },
+          { "ingredient": "Garlic", "qty": 20, "unit": "g" },
+          { "ingredient": "Rosemary", "qty": 5, "unit": "g" },
+          { "ingredient": "Lemon", "qty": 1, "unit": "piece" },
+          { "ingredient": "Oil", "qty": 40, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 8, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 5, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Felafel",
+        "ingredients": [
+          { "ingredient": "Chickpeas", "qty": 150, "unit": "g" },
+          { "ingredient": "Onion", "qty": 40, "unit": "g" },
+          { "ingredient": "Garlic", "qty": 10, "unit": "g" },
+          { "ingredient": "Parsley", "qty": 15, "unit": "g" },
+          { "ingredient": "Cumin", "qty": 5, "unit": "g" },
+          { "ingredient": "Oil", "qty": 200, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 4, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Special Shawrma",
+        "ingredients": [
+          { "ingredient": "Chicken Fillet", "qty": 150, "unit": "g" },
+          { "ingredient": "Tortilla Wrap", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 25, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 40, "unit": "g" },
+          { "ingredient": "Onion", "qty": 30, "unit": "g" },
+          { "ingredient": "Garlic Sauce", "qty": 30, "unit": "g" },
+          { "ingredient": "Capsicum", "qty": 20, "unit": "g" },
+          { "ingredient": "Shawarma Spice", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Normal Shawrma",
+        "ingredients": [
+          { "ingredient": "Chicken Fillet", "qty": 120, "unit": "g" },
+          { "ingredient": "Tortilla Wrap", "qty": 1, "unit": "piece" },
+          { "ingredient": "Lettuce", "qty": 20, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 30, "unit": "g" },
+          { "ingredient": "Garlic Sauce", "qty": 20, "unit": "g" },
+          { "ingredient": "Shawarma Spice", "qty": 8, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Grilled Chicken",
+        "ingredients": [
+          { "ingredient": "Chicken", "qty": 500, "unit": "g" },
+          { "ingredient": "Rice", "qty": 300, "unit": "g" },
+          { "ingredient": "Garlic", "qty": 15, "unit": "g" },
+          { "ingredient": "Lemon", "qty": 1, "unit": "piece" },
+          { "ingredient": "Olive Oil", "qty": 30, "unit": "ml" },
+          { "ingredient": "Thyme", "qty": 5, "unit": "g" },
+          { "ingredient": "Salt", "qty": 6, "unit": "g" },
+          { "ingredient": "Black Pepper", "qty": 4, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Crispy Plate",
+        "ingredients": [
+          { "ingredient": "Chicken Pieces", "qty": 2, "unit": "piece" },
+          { "ingredient": "Potato", "qty": 200, "unit": "g" },
+          { "ingredient": "Flour", "qty": 100, "unit": "g" },
+          { "ingredient": "Egg", "qty": 1, "unit": "piece" },
+          { "ingredient": "Breadcrumbs", "qty": 80, "unit": "g" },
+          { "ingredient": "Oil", "qty": 400, "unit": "ml" },
+          { "ingredient": "Salt", "qty": 5, "unit": "g" }
+        ]
+      }
+    ],
+    "pizza": [
+      {
+        "item": "Tuna Pizza",
+        "ingredients": [
+          { "ingredient": "Pizza Dough", "qty": 250, "unit": "g" },
+          { "ingredient": "Tomato Sauce", "qty": 80, "unit": "g" },
+          { "ingredient": "Mozzarella", "qty": 100, "unit": "g" },
+          { "ingredient": "Tuna", "qty": 120, "unit": "g" },
+          { "ingredient": "Onion", "qty": 30, "unit": "g" },
+          { "ingredient": "Black Olive", "qty": 20, "unit": "g" },
+          { "ingredient": "Capsicum", "qty": 25, "unit": "g" }
+        ]
+      },
+      {
+        "item": "MAF Special Pizza",
+        "ingredients": [
+          { "ingredient": "Pizza Dough", "qty": 280, "unit": "g" },
+          { "ingredient": "Tomato Sauce", "qty": 90, "unit": "g" },
+          { "ingredient": "Mozzarella", "qty": 120, "unit": "g" },
+          { "ingredient": "Chicken Fillet", "qty": 100, "unit": "g" },
+          { "ingredient": "Beef", "qty": 80, "unit": "g" },
+          { "ingredient": "Capsicum", "qty": 30, "unit": "g" },
+          { "ingredient": "Onion", "qty": 30, "unit": "g" },
+          { "ingredient": "Mushroom", "qty": 40, "unit": "g" },
+          { "ingredient": "Black Olive", "qty": 20, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Vegetable Pizza",
+        "ingredients": [
+          { "ingredient": "Pizza Dough", "qty": 250, "unit": "g" },
+          { "ingredient": "Tomato Sauce", "qty": 80, "unit": "g" },
+          { "ingredient": "Mozzarella", "qty": 100, "unit": "g" },
+          { "ingredient": "Capsicum", "qty": 40, "unit": "g" },
+          { "ingredient": "Onion", "qty": 30, "unit": "g" },
+          { "ingredient": "Mushroom", "qty": 50, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 50, "unit": "g" },
+          { "ingredient": "Black Olive", "qty": 20, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Stuffed Margarita",
+        "ingredients": [
+          { "ingredient": "Pizza Dough", "qty": 280, "unit": "g" },
+          { "ingredient": "Tomato Sauce", "qty": 90, "unit": "g" },
+          { "ingredient": "Mozzarella", "qty": 150, "unit": "g" },
+          { "ingredient": "Tomato", "qty": 60, "unit": "g" },
+          { "ingredient": "Fresh Basil", "qty": 10, "unit": "g" },
+          { "ingredient": "Olive Oil", "qty": 15, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Chicken Pizza",
+        "ingredients": [
+          { "ingredient": "Pizza Dough", "qty": 250, "unit": "g" },
+          { "ingredient": "Tomato Sauce", "qty": 80, "unit": "g" },
+          { "ingredient": "Mozzarella", "qty": 100, "unit": "g" },
+          { "ingredient": "Chicken Fillet", "qty": 150, "unit": "g" },
+          { "ingredient": "Capsicum", "qty": 30, "unit": "g" },
+          { "ingredient": "Onion", "qty": 25, "unit": "g" },
+          { "ingredient": "Garlic", "qty": 10, "unit": "g" }
+        ]
+      }
+    ],
+    "juice": [
+      {
+        "item": "MAF Special Juice",
+        "ingredients": [
+          { "ingredient": "Mango", "qty": 80, "unit": "g" },
+          { "ingredient": "Avocado", "qty": 60, "unit": "g" },
+          { "ingredient": "Papaya", "qty": 60, "unit": "g" },
+          { "ingredient": "Banana", "qty": 50, "unit": "g" },
+          { "ingredient": "Sugar", "qty": 20, "unit": "g" },
+          { "ingredient": "Milk", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Mixed Juice",
+        "ingredients": [
+          { "ingredient": "Mixed Seasonal Fruit", "qty": 250, "unit": "g" },
+          { "ingredient": "Sugar", "qty": 20, "unit": "g" },
+          { "ingredient": "Water", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Watermelon Juice",
+        "ingredients": [
+          { "ingredient": "Watermelon", "qty": 350, "unit": "g" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Papaya Juice",
+        "ingredients": [
+          { "ingredient": "Papaya", "qty": 250, "unit": "g" },
+          { "ingredient": "Sugar", "qty": 15, "unit": "g" },
+          { "ingredient": "Water", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Avocado Juice",
+        "ingredients": [
+          { "ingredient": "Avocado", "qty": 200, "unit": "g" },
+          { "ingredient": "Milk", "qty": 100, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 20, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Pineapple Juice",
+        "ingredients": [
+          { "ingredient": "Pineapple", "qty": 300, "unit": "g" },
+          { "ingredient": "Sugar", "qty": 15, "unit": "g" },
+          { "ingredient": "Water", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Orange Juice",
+        "ingredients": [
+          { "ingredient": "Orange", "qty": 3, "unit": "piece" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Strawberry Juice",
+        "ingredients": [
+          { "ingredient": "Strawberry", "qty": 200, "unit": "g" },
+          { "ingredient": "Sugar", "qty": 20, "unit": "g" },
+          { "ingredient": "Water", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Strawberry Shake",
+        "ingredients": [
+          { "ingredient": "Strawberry", "qty": 150, "unit": "g" },
+          { "ingredient": "Milk", "qty": 150, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 25, "unit": "g" },
+          { "ingredient": "Ice Cream", "qty": 50, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Banana Shake",
+        "ingredients": [
+          { "ingredient": "Banana", "qty": 2, "unit": "piece" },
+          { "ingredient": "Milk", "qty": 150, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 20, "unit": "g" },
+          { "ingredient": "Ice Cream", "qty": 50, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Lemon Juice",
+        "ingredients": [
+          { "ingredient": "Lemon", "qty": 2, "unit": "piece" },
+          { "ingredient": "Water", "qty": 200, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 25, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Mango Juice",
+        "ingredients": [
+          { "ingredient": "Mango", "qty": 250, "unit": "g" },
+          { "ingredient": "Sugar", "qty": 15, "unit": "g" },
+          { "ingredient": "Water", "qty": 50, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Fruit Punch",
+        "ingredients": [
+          { "ingredient": "Mango", "qty": 60, "unit": "g" },
+          { "ingredient": "Pineapple", "qty": 60, "unit": "g" },
+          { "ingredient": "Orange", "qty": 60, "unit": "g" },
+          { "ingredient": "Strawberry", "qty": 40, "unit": "g" },
+          { "ingredient": "Passion Fruit Syrup", "qty": 30, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 20, "unit": "g" },
+          { "ingredient": "Water", "qty": 50, "unit": "ml" }
+        ]
+      }
+    ],
+    "hot_drinks_beverages": [
+      {
+        "item": "Tea",
+        "ingredients": [
+          { "ingredient": "Tea Bag", "qty": 1, "unit": "piece" },
+          { "ingredient": "Water", "qty": 200, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Special Tea",
+        "ingredients": [
+          { "ingredient": "Tea Bag", "qty": 1, "unit": "piece" },
+          { "ingredient": "Milk", "qty": 100, "unit": "ml" },
+          { "ingredient": "Water", "qty": 100, "unit": "ml" },
+          { "ingredient": "Cardamom", "qty": 2, "unit": "g" },
+          { "ingredient": "Cinnamon", "qty": 1, "unit": "g" },
+          { "ingredient": "Sugar", "qty": 15, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Milk",
+        "ingredients": [
+          { "ingredient": "Milk", "qty": 250, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Coffee",
+        "ingredients": [
+          { "ingredient": "Ground Coffee", "qty": 10, "unit": "g" },
+          { "ingredient": "Water", "qty": 200, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Spris",
+        "ingredients": [
+          { "ingredient": "Espresso", "qty": 30, "unit": "ml" },
+          { "ingredient": "Mixed Juice", "qty": 150, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Macchiato",
+        "ingredients": [
+          { "ingredient": "Espresso", "qty": 30, "unit": "ml" },
+          { "ingredient": "Milk Foam", "qty": 30, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Green Tea",
+        "ingredients": [
+          { "ingredient": "Green Tea Bag", "qty": 1, "unit": "piece" },
+          { "ingredient": "Water", "qty": 200, "unit": "ml" },
+          { "ingredient": "Honey", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Kerkede Tea",
+        "ingredients": [
+          { "ingredient": "Dried Hibiscus", "qty": 10, "unit": "g" },
+          { "ingredient": "Water", "qty": 200, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 15, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Ment Tea",
+        "ingredients": [
+          { "ingredient": "Fresh Mint", "qty": 10, "unit": "g" },
+          { "ingredient": "Tea Bag", "qty": 1, "unit": "piece" },
+          { "ingredient": "Water", "qty": 200, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Hot Chocolate",
+        "ingredients": [
+          { "ingredient": "Cocoa Powder", "qty": 20, "unit": "g" },
+          { "ingredient": "Milk", "qty": 200, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 20, "unit": "g" },
+          { "ingredient": "Whipped Cream", "qty": 20, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Cappuccino",
+        "ingredients": [
+          { "ingredient": "Espresso", "qty": 60, "unit": "ml" },
+          { "ingredient": "Steamed Milk", "qty": 60, "unit": "ml" },
+          { "ingredient": "Milk Foam", "qty": 60, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 10, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Amboo Water",
+        "ingredients": [
+          { "ingredient": "Sparkling Water", "qty": 500, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Small Water",
+        "ingredients": [
+          { "ingredient": "Still Water", "qty": 300, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Soft Drinks Plastic",
+        "ingredients": [
+          { "ingredient": "Soft Drink", "qty": 500, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Soft Drinks Glass",
+        "ingredients": [
+          { "ingredient": "Soft Drink", "qty": 250, "unit": "ml" }
+        ]
+      }
+    ]
+  }
+}

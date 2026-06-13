@@ -1,0 +1,240 @@
+{
+  "recipes": {
+    "basic_coffee": [
+      {
+        "item": "Americano",
+        "price": 160,
+        "ingredients": [
+          { "ingredient": "Espresso Shot", "qty": 2, "unit": "shot" },
+          { "ingredient": "Hot Water", "qty": 180, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Cappuccino",
+        "price": 180,
+        "ingredients": [
+          { "ingredient": "Espresso Shot", "qty": 1, "unit": "shot" },
+          { "ingredient": "Steamed Milk", "qty": 60, "unit": "ml" },
+          { "ingredient": "Milk Foam", "qty": 60, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Macchiato",
+        "price": 110,
+        "ingredients": [
+          { "ingredient": "Espresso Shot", "qty": 1, "unit": "shot" },
+          { "ingredient": "Milk Foam", "qty": 2, "unit": "tsp" }
+        ]
+      },
+      {
+        "item": "Espresso",
+        "price": 110,
+        "ingredients": [
+          { "ingredient": "Ground Coffee Beans", "qty": 18, "unit": "g" },
+          { "ingredient": "Water", "qty": 60, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Latte",
+        "price": 180,
+        "ingredients": [
+          { "ingredient": "Espresso Shot", "qty": 1, "unit": "shot" },
+          { "ingredient": "Steamed Milk", "qty": 240, "unit": "ml" },
+          { "ingredient": "Milk Foam", "qty": 1, "unit": "layer" }
+        ]
+      }
+    ],
+    "cold_coffee": [
+      {
+        "item": "Iced Coffe",
+        "price": 180,
+        "ingredients": [
+          { "ingredient": "Brewed Coffee", "qty": 200, "unit": "ml" },
+          { "ingredient": "Ice Cubes", "qty": 6, "unit": "piece" },
+          { "ingredient": "Sugar Syrup", "qty": 15, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Iced Latte",
+        "price": 180,
+        "ingredients": [
+          { "ingredient": "Espresso Shot", "qty": 2, "unit": "shot" },
+          { "ingredient": "Cold Milk", "qty": 180, "unit": "ml" },
+          { "ingredient": "Ice Cubes", "qty": 6, "unit": "piece" }
+        ]
+      }
+    ],
+    "tea_and_non_coffee": [
+      {
+        "item": "Tea",
+        "price": 60,
+        "ingredients": [
+          { "ingredient": "Black Tea Leaves", "qty": 1, "unit": "tsp" },
+          { "ingredient": "Water", "qty": 200, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 2, "unit": "tsp" }
+        ]
+      },
+      {
+        "item": "Green Tea",
+        "price": 75,
+        "ingredients": [
+          { "ingredient": "Green Tea Bag", "qty": 1, "unit": "piece" },
+          { "ingredient": "Hot Water", "qty": 200, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Hot Chocolate",
+        "price": 150,
+        "ingredients": [
+          { "ingredient": "Cocoa Powder", "qty": 2, "unit": "tbsp" },
+          { "ingredient": "Whole Milk", "qty": 250, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 1, "unit": "tbsp" }
+        ]
+      },
+      {
+        "item": "Tea with Coffe (Sprice)",
+        "price": 100,
+        "ingredients": [
+          { "ingredient": "Black Tea Brew", "qty": 100, "unit": "ml" },
+          { "ingredient": "Brewed Coffee / Espresso", "qty": 100, "unit": "ml" },
+          { "ingredient": "Sugar", "qty": 2, "unit": "tsp" }
+        ]
+      },
+      {
+        "item": "Tea with Lemon",
+        "price": 80,
+        "ingredients": [
+          { "ingredient": "Black Tea Bag", "qty": 1, "unit": "piece" },
+          { "ingredient": "Fresh Lemon Slice", "qty": 1, "unit": "slice" },
+          { "ingredient": "Hot Water", "qty": 200, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Milk with Coffe",
+        "price": 160,
+        "ingredients": [
+          { "ingredient": "Brewed Coffee", "qty": 120, "unit": "ml" },
+          { "ingredient": "Warm Milk", "qty": 120, "unit": "ml" }
+        ]
+      }
+    ],
+    "mojito": [
+      {
+        "item": "Mint Mojito",
+        "price": 350,
+        "ingredients": [
+          { "ingredient": "Fresh Mint Leaves", "qty": 8, "unit": "piece" },
+          { "ingredient": "Lime Juice", "qty": 30, "unit": "ml" },
+          { "ingredient": "Sugar Syrup", "qty": 20, "unit": "ml" },
+          { "ingredient": "Soda Water", "qty": 150, "unit": "ml" },
+          { "ingredient": "Crushed Ice", "qty": 100, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Strawberry Mojito",
+        "price": 350,
+        "ingredients": [
+          { "ingredient": "Fresh Strawberries", "qty": 3, "unit": "piece" },
+          { "ingredient": "Fresh Mint Leaves", "qty": 6, "unit": "piece" },
+          { "ingredient": "Lime Juice", "qty": 20, "unit": "ml" },
+          { "ingredient": "Soda Water", "qty": 150, "unit": "ml" },
+          { "ingredient": "Crushed Ice", "qty": 100, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Bluberry Mojito",
+        "price": 350,
+        "ingredients": [
+          { "ingredient": "Blueberry Syrup / Fresh Blueberries", "qty": 30, "unit": "ml" },
+          { "ingredient": "Fresh Mint Leaves", "qty": 6, "unit": "piece" },
+          { "ingredient": "Lime Juice", "qty": 20, "unit": "ml" },
+          { "ingredient": "Soda Water", "qty": 150, "unit": "ml" },
+          { "ingredient": "Crushed Ice", "qty": 100, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Mango Mojito",
+        "price": 350,
+        "ingredients": [
+          { "ingredient": "Mango Puree / Syrup", "qty": 40, "unit": "ml" },
+          { "ingredient": "Fresh Mint Leaves", "qty": 6, "unit": "piece" },
+          { "ingredient": "Lime Juice", "qty": 20, "unit": "ml" },
+          { "ingredient": "Soda Water", "qty": 150, "unit": "ml" },
+          { "ingredient": "Crushed Ice", "qty": 100, "unit": "g" }
+        ]
+      }
+    ],
+    "cake_and_snacks": [
+      {
+        "item": "Croissants",
+        "price": 250,
+        "ingredients": [
+          { "ingredient": "Puff Pastry Dough", "qty": 80, "unit": "g" },
+          { "ingredient": "Butter", "qty": 20, "unit": "g" },
+          { "ingredient": "Egg Wash", "qty": 5, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "Cinamon Cake",
+        "price": 250,
+        "ingredients": [
+          { "ingredient": "Flour", "qty": 150, "unit": "g" },
+          { "ingredient": "Ground Cinnamon", "qty": 2, "unit": "tsp" },
+          { "ingredient": "Sugar", "qty": 100, "unit": "g" },
+          { "ingredient": "Butter", "qty": 50, "unit": "g" },
+          { "ingredient": "Egg", "qty": 1, "unit": "piece" }
+        ]
+      },
+      {
+        "item": "Chocolate Cream Cake",
+        "price": 90,
+        "ingredients": [
+          { "ingredient": "Chocolate Sponge Cake Layer", "qty": 1, "unit": "slice" },
+          { "ingredient": "Chocolate Whipped Cream", "qty": 40, "unit": "g" },
+          { "ingredient": "Chocolate Shavings", "qty": 5, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Custered Cream Cake",
+        "price": 80,
+        "ingredients": [
+          { "ingredient": "Sponge Cake Layer", "qty": 1, "unit": "slice" },
+          { "ingredient": "Pastry Custard Cream", "qty": 50, "unit": "g" }
+        ]
+      },
+      {
+        "item": "Boxegna Cake",
+        "price": 85,
+        "ingredients": [
+          { "ingredient": "Choux Pastry Dough / Flour", "qty": 40, "unit": "g" },
+          { "ingredient": "Butter", "qty": 15, "unit": "g" },
+          { "ingredient": "Eggs", "qty": 1, "unit": "piece" },
+          { "ingredient": "Vanilla Pastry Cream / Custard Filling", "qty": 60, "unit": "g" }
+        ]
+      }
+    ],
+    "beverages": [
+      {
+        "item": "1/4 Water (Mini)",
+        "price": 30,
+        "ingredients": [
+          { "ingredient": "Bottled Mineral Water", "qty": 250, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "0.5 Water",
+        "price": 45,
+        "ingredients": [
+          { "ingredient": "Bottled Mineral Water", "qty": 500, "unit": "ml" }
+        ]
+      },
+      {
+        "item": "1L Water",
+        "price": 55,
+        "ingredients": [
+          { "ingredient": "Bottled Mineral Water", "qty": 1000, "unit": "ml" }
+        ]
+      }
+    ]
+  }
+}

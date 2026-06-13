@@ -1,0 +1,55 @@
+{
+  "name": "cafe-system-backend",
+  "version": "1.0.0",
+  "description": "NestJS backend for Café Management System",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "node dist/main.js",
+    "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:import": "ts-node-dev --transpile-only scripts/importMenu.ts",
+    "db:populate-recipes": "ts-node-dev --transpile-only scripts/populateRecipes.ts",
+    "db:populate-menu": "ts-node-dev --transpile-only scripts/seedCafeMenu.ts",
+    "init-db": "ts-node-dev --transpile-only scripts/seed.ts",
+    "db:backfill-slugs": "ts-node-dev --transpile-only scripts/backfillSlugs.ts",
+    "legacy:dev": "nodemon --watch server.js --watch routes --watch controllers --watch models --watch middleware --watch config --ignore data/** --ignore web/** server.js"
+  },
+  "keywords": [
+    "cafe",
+    "management",
+    "nestjs",
+    "drizzle",
+    "postgresql"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/jwt": "^10.0.0",
+    "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/swagger": "^7.4.2",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.3.1",
+    "drizzle-orm": "^0.45.2",
+    "passport": "^0.6.0",
+    "passport-jwt": "^4.0.0",
+    "pg": "^8.20.0",
+    "qrcode": "^1.5.4",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.0",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.1.0"
+  }
+}

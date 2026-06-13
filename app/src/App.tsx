@@ -1,0 +1,188 @@
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import LoadingSpinner from './components/common/LoadingSpinner';
+
+// Import migrated pages
+import LoginPage from './pages/LoginPage';
+import DashboardLayout from './components/layout/DashboardLayout';
+import AdminDashboard from './pages/Dashboards/AdminDashboard/index';
+import CashierDashboard from './pages/Dashboards/CashierDashboard';
+import CafeWaiterDashboard from './pages/Dashboards/CafeWaiterDashboard';
+import KitchenStaffDashboard from './pages/Dashboards/KitchenStaffDashboard';
+
+// Import waiter pages
+import CreateOrder from './pages/waiter/CreateOrder';
+import OrderHistory from './pages/waiter/OrderHistory';
+
+// Import cashier pages
+import CashierEmployees from './pages/cashier/CashierEmployees';
+import CashierSelectWaiterForOrder from './pages/cashier/CashierSelectWaiterForOrder';
+import CashierCreateOrderAsWaiter from './pages/cashier/CashierCreateOrderAsWaiter';
+import CashierExpenses from './pages/cashier/CashierExpenses';
+import PrinterSettings from './pages/cashier/PrinterSettings';
+import CashierReceipt from './pages/cashier/CashierReceipt';
+
+// Import admin management pages
+import TableManagement from './pages/TableManagement/index';
+import EmployeeManagement from './pages/EmployeeManagement/index';
+import UserManagement from './pages/UserManagement/index';
+import MenuManagement from './pages/MenuManagement/index';
+import Profile from './pages/Profile/index';
+import PaymentManagement from './pages/PaymentManagement/index';
+import OrderManagement from './pages/OrderManagement/index';
+import InventoryManagement from './pages/InventoryManagement/index';
+import StockTransferManagement from './pages/StockTransferManagement/index';
+import StockLocationManagement from './pages/StockLocationManagement/index';
+import ExpenseManagement from './pages/ExpenseManagement/index';
+import Reports from './pages/Reports/index';
+import PaymentsItems from './pages/PaymentsItems/index';
+import AttendanceManagement from './pages/AttendanceManagement/index';
+import DataManagement from './pages/DataManagement/index';
+import PaymentMethodManagement from './pages/PaymentMethodManagement';
+import RoleManagement from './pages/RoleManagement';
+import OrganizationManagement from './pages/OrganizationManagement/index';
+import OrganizationDetail from './pages/OrganizationManagement/OrganizationDetail';
+import CreateOrgOrder from './pages/OrganizationManagement/CreateOrgOrder';
+
+
+
+// Protected Route Component
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+}
+const ProtectedRoute = ({ children, allowedRoles = [] }: ProtectedRouteProps) => {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles.length > 0 && user?.role && !allowedRoles.includes(user.role)) {
+    const getHomePath = () => {
+      if (user?.role === 'cafe_waiter') return "/waiter/create-order";
+      return "/dashboard";
+    };
+    return <Navigate to={getHomePath()} replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Waiter Router Component
+const WaiterRouter = () => {
+  return (
+    <Routes>
+      <Route index element={<CafeWaiterDashboard />} />
+      <Route path="dashboard" element={<CafeWaiterDashboard />} />
+      <Route path="create-order" element={<CreateOrder />} />
+      <Route path="order-history" element={<OrderHistory />} />
+      <Route path="profile" element={<Profile />} />
+      <Route path="*" element={<Navigate to="/waiter" replace />} />
+    </Routes>
+  );
+};
+
+// Dashboard Router Component for non-waiter roles
+const DashboardRouter = () => {
+  const { user } = useAuth();
+
+  const getDashboardComponent = () => {
+    switch (user?.role) {
+      case 'admin':
+        return <AdminDashboard />;
+      case 'cashier':
+        return <CashierDashboard />;
+      case 'kitchen_staff':
+        return <KitchenStaffDashboard />;
+      default:
+        return <div className="p-6 text-center">Invalid user role</div>;
+    }
+  };
+
+  return (
+    <DashboardLayout>
+      <Routes>
+        {/* Dashboard Home */}
+        <Route index element={getDashboardComponent()} />
+
+        <Route path="profile" element={<Profile />} />
+
+        <Route path="orders" element={<ProtectedRoute allowedRoles={['admin', 'cafe_waiter', 'kitchen_staff']}><OrderManagement /></ProtectedRoute>} />
+        <Route path="users" element={<ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>} />
+        <Route path="employees" element={<ProtectedRoute allowedRoles={['admin']}><EmployeeManagement /></ProtectedRoute>} />
+        <Route path="menu" element={<ProtectedRoute allowedRoles={['admin', 'cafe_waiter', 'kitchen_staff']}><MenuManagement /></ProtectedRoute>} />
+        <Route path="inventory" element={<ProtectedRoute allowedRoles={['admin']}><InventoryManagement /></ProtectedRoute>} />
+        <Route path="inventory/locations" element={<ProtectedRoute allowedRoles={['admin']}><StockLocationManagement /></ProtectedRoute>} />
+        <Route path="inventory/transfers" element={<ProtectedRoute allowedRoles={['admin']}><StockTransferManagement /></ProtectedRoute>} />
+        <Route path="reports" element={<ProtectedRoute allowedRoles={['admin']}><Reports /></ProtectedRoute>} />
+        <Route path="expenses" element={<ProtectedRoute allowedRoles={['admin']}><ExpenseManagement /></ProtectedRoute>} />
+        <Route path="payments-items" element={<ProtectedRoute allowedRoles={['admin']}><PaymentsItems /></ProtectedRoute>} />
+        <Route path="attendance" element={<ProtectedRoute allowedRoles={['admin']}><AttendanceManagement /></ProtectedRoute>} />
+        <Route path="tables" element={<ProtectedRoute allowedRoles={['admin']}><TableManagement /></ProtectedRoute>} />
+        <Route path="payments" element={<ProtectedRoute allowedRoles={['admin', 'cashier']}><PaymentManagement /></ProtectedRoute>} />
+        <Route path="cashier/employees" element={<ProtectedRoute allowedRoles={['cashier']}><CashierEmployees /></ProtectedRoute>} />
+        <Route path="cashier/select-waiter" element={<ProtectedRoute allowedRoles={['cashier']}><CashierSelectWaiterForOrder /></ProtectedRoute>} />
+        <Route path="cashier/create-order" element={<ProtectedRoute allowedRoles={['cashier']}><CashierCreateOrderAsWaiter /></ProtectedRoute>} />
+        <Route path="cashier/expenses" element={<ProtectedRoute allowedRoles={['cashier']}><CashierExpenses /></ProtectedRoute>} />
+        <Route path="cashier/printer-settings" element={<ProtectedRoute allowedRoles={['cashier']}><PrinterSettings /></ProtectedRoute>} />
+        <Route path="cashier/receipt" element={<ProtectedRoute allowedRoles={['cashier']}><CashierReceipt /></ProtectedRoute>} />
+
+        {/* Organizations — admin manages; cashier access gated by setting inside the pages */}
+        <Route path="organizations" element={<ProtectedRoute allowedRoles={['admin']}><OrganizationManagement /></ProtectedRoute>} />
+        <Route path="organizations/:id/create-order" element={<ProtectedRoute allowedRoles={['admin']}><CreateOrgOrder /></ProtectedRoute>} />
+        <Route path="organizations/:id" element={<ProtectedRoute allowedRoles={['admin']}><OrganizationDetail /></ProtectedRoute>} />
+
+        {/* New: Settings — Admin only */}
+        <Route path="settings/payment-methods" element={<ProtectedRoute allowedRoles={['admin']}><PaymentMethodManagement /></ProtectedRoute>} />
+        <Route path="settings/roles" element={<ProtectedRoute allowedRoles={['admin']}><RoleManagement /></ProtectedRoute>} />
+        <Route path="settings/data-management" element={<ProtectedRoute allowedRoles={['admin']}><DataManagement /></ProtectedRoute>} />
+        <Route path="settings/printer-settings" element={<ProtectedRoute allowedRoles={['admin']}><PrinterSettings /></ProtectedRoute>} />
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </DashboardLayout>
+  );
+};
+
+// Main App Component
+const AppContent = () => {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  const getRedirectPath = () => {
+    if (!isAuthenticated) return "/login";
+    if (user?.role === 'cafe_waiter') return "/waiter/create-order";
+    return "/dashboard";
+  };
+
+  return (
+    <Routes>
+      <Route path="/login" element={isAuthenticated ? <Navigate to={getRedirectPath()} replace /> : <LoginPage />} />
+      <Route path="/waiter/*" element={<ProtectedRoute allowedRoles={['cafe_waiter']}><WaiterRouter /></ProtectedRoute>} />
+      <Route path="/dashboard/*" element={<ProtectedRoute allowedRoles={['admin', 'cashier', 'kitchen_staff']}><DashboardRouter /></ProtectedRoute>} />
+      <Route path="/" element={<Navigate to={getRedirectPath()} replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <div className="App">
+        <AppContent />
+      </div>
+    </AuthProvider>
+  );
+}
+
+export default App;

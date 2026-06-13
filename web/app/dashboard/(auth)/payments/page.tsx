@@ -1,0 +1,33 @@
+"use client";
+
+import { Badge } from "@/components/ui/badge";
+import { ResourceManager, type Column } from "@/components/resource-manager";
+import { Payments } from "@/lib/resources";
+import { birr, shortDate } from "@/lib/format";
+
+type Payment = {
+  id: string;
+  amount: number | null;
+  payment_method: string | null;
+  status: string | null;
+  created_at: string;
+};
+
+const columns: Column<Payment>[] = [
+  { key: "id", label: "Payment", render: (r) => <span className="font-mono text-xs">{r.id.slice(0, 8)}</span> },
+  { key: "amount", label: "Amount", render: (r) => birr(r.amount) },
+  { key: "payment_method", label: "Method", render: (r) => <span className="capitalize">{r.payment_method ?? "—"}</span> },
+  { key: "status", label: "Status", render: (r) => <Badge variant={r.status === "paid" ? "success" : "muted"} className="capitalize">{r.status ?? "—"}</Badge> },
+  { key: "created_at", label: "Date", render: (r) => shortDate(r.created_at) },
+];
+
+export default function PaymentsPage() {
+  return (
+    <ResourceManager<Payment>
+      title="Payments"
+      description="Payment history for this branch."
+      columns={columns}
+      load={Payments.history}
+    />
+  );
+}

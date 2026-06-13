@@ -1,0 +1,773 @@
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { flushSync } from "react-dom";
+import api from "@/application";
+import { getLocalDb, localDbTables } from "@/db/localDb";
+import { isOnline } from "@/infrastructure/api/http-client";
+import { syncEngine } from "@/infrastructure/sync/sync-engine";
+import toast from "react-hot-toast";
+import { eq } from "drizzle-orm";
+
+interface DataProps {
+  user: any;
+  printOrderImmediately: (orderId: number) => Promise<void>;
+  pollUnprintedOrders: () => Promise<void>;
+}
+
+export const useCashierData = ({
+  user,
+  printOrderImmediately,
+  pollUnprintedOrders,
+}: DataProps) => {
+  const resolveOrderId = useCallback((entry: any) => {
+    const directOrderId =
+      entry?.order_id != null ? entry.order_id : null;
+    if (directOrderId != null && directOrderId !== "") return directOrderId;
+
+    const nestedOrderId = entry?.order?.id != null ? entry.order.id : null;
+    if (nestedOrderId != null && nestedOrderId !== "") return nestedOrderId;
+
+    const metaOrderId =
+      entry?.meta?.orderId != null ? entry.meta.orderId : null;
+    if (metaOrderId != null && metaOrderId !== "") return metaOrderId;
+
+    const metaOrderIdAlt =
+      entry?.meta?.order_id != null ? entry.meta.order_id : null;
+    if (metaOrderIdAlt != null && metaOrderIdAlt !== "") return metaOrderIdAlt;
+
+    const orderLocalId =
+      entry?.orderLocalId != null ? entry.orderLocalId : entry?.order_local_id ?? null;
+    if (orderLocalId != null && String(orderLocalId).trim() !== "") {
+      const parsed = String(orderLocalId);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+
+    const directId = entry?.id != null ? entry.id : null;
+    if (directId != null && directId !== "") return directId;
+
+    return null;
+  }, []);
+
+  // ── Admin cancel-order password feature ────────────────────────────────────
+  const [requireCancelPassword, setRequireCancelPassword] =
+    useState<boolean>(false);
+  const [adminHashedPassword, setAdminHashedPassword] = useState<string | null>(
+    null,
+  );
+  const [adminDisplayName, setAdminDisplayName] =
+    useState<string>("Administrator");
+
+  // Cashiers must confirm cancellations with the locally cached admin password.
+  useEffect(() => {
+    if (!user) return;
+    setRequireCancelPassword(user.role === "cashier");
+    setAdminDisplayName(user.full_name || user.username || "Administrator");
+  }, [user?.id, user?.role, user?.full_name, user?.username]);
+
+  // Refresh the locally cached admin cancellation hash.
+  const refreshAdminHashedPassword = useCallback(async () => {
+    try {
+      const db = await getLocalDb();
+      const settingRows = await db
+        .select()
+        .from(localDbTables.systemSettings)
+        .where(eq(localDbTables.systemSettings.key, "cancel_password"));
+      
+      const hp = settingRows[0]?.value || null;
+      setAdminHashedPassword(hp);
+      return hp;
+    } catch {
+      setAdminHashedPassword(null);
+      return null;
+    }
+  }, []);
+
+  // ── Dashboard data ──────────────────────────────────────────────────────────
+  const [loading, setLoading] = useState(true);
+  const [orderDetailsById, setOrderDetailsById] = useState<any>({});
+  const [orderIndex, setOrderIndex] = useState<any>({
+    byId: {},
+    byRemoteId: {},
+    byLocalId: {},
+  });
+  const [menuMainCategoryById, setMenuMainCategoryById] = useState<any>({});
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [expandedRecentPaymentIds, setExpandedRecentPaymentIds] = useState<any>(
+    () => new Set(),
+  );
+  const [loadingRecentPaymentOrderIds, setLoadingRecentPaymentOrderIds] =
+    useState<any>(() => new Set());
+  const [processingOrders, setProcessingOrders] = useState<any>(new Set());
+  const processingOrdersRef = useRef<any>(new Set());
+
+  const [dashboardData, setDashboardData] = useState<any>({
+    pendingPayments: [],
+    recentPayments: [],
+    ordersForPayment: [],
+    paymentsAll: [],
+  });
+
+  const [syncStatus, setSyncStatus] = useState({
+    online: true,
+    syncing: false,
+    unsyncedCount: 0,
+  });
+
+  useEffect(() => {
+    const unsubscribe = syncEngine.subscribe((status) => {
+      setSyncStatus(status);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const refreshDashboardData = useCallback(async () => {
+    try {
+      const [pendingResult, paymentsResult, ordersForPaymentResult] =
+        (await Promise.allSettled([
+          api.payments.getPending(),
+          api.payments.getAll(),
+          api.orders.getOrdersForPayment(),
+        ])) as any[];
+
+      setDashboardData((prev: any) => {
+        const pendingPaymentsRaw =
+          pendingResult?.status === "fulfilled"
+            ? (pendingResult.value?.data?.data?.payments ??
+              pendingResult.value?.data?.payments ??
+              [])
+            : prev.pendingPayments;
+
+        const paymentsAllRaw =
+          paymentsResult?.status === "fulfilled"
+            ? (paymentsResult.value?.data?.data?.payments ??
+              paymentsResult.value?.data?.payments ??
+              [])
+            : prev.paymentsAll;
+
+        const ordersForPaymentRaw =
+          ordersForPaymentResult?.status === "fulfilled"
+            ? (ordersForPaymentResult.value?.data?.data?.orders ??
+              ordersForPaymentResult.value?.data?.orders ??
+              [])
+            : prev.ordersForPayment;
+
+        const paymentsAll = Array.isArray(paymentsAllRaw) ? paymentsAllRaw : [];
+
+        return {
+          ...prev,
+          pendingPayments: Array.isArray(pendingPaymentsRaw)
+            ? pendingPaymentsRaw
+            : [],
+          recentPayments: paymentsAll.slice(0, 10),
+          ordersForPayment: Array.isArray(ordersForPaymentRaw)
+            ? ordersForPaymentRaw
+            : [],
+          paymentsAll,
+        };
+      });
+    } catch (err) {
+      // Silently ignore
+    }
+  }, []);
+
+  const handleManualSync = async () => {
+    if (syncStatus.syncing) return;
+    if (!syncStatus.online) {
+      toast.error(
+        "App is offline. Cannot sync. Please check internet connection.",
+      );
+      return;
+    }
+    toast.loading("Synchronizing data...", { id: "manual-sync-progress" });
+    const success = await syncEngine.sync();
+    toast.dismiss("manual-sync-progress");
+    if (success) {
+      toast.success("Synchronization completed successfully!");
+      refreshDashboardData();
+    } else {
+      toast.error("Failed to sync. Please try again.");
+    }
+  };
+
+  const confirmPaymentOnly = async (paymentId: any) => {
+    const resp = await api.payments.confirm(paymentId, {
+      processed_by: user.id,
+    });
+    return resp;
+  };
+
+  // Load menu items (manual only — no auto-load)
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const resp = (await api.menu.getAll()) as any;
+        const items =
+          resp?.data?.data?.menuItems ?? resp?.data?.menuItems ?? [];
+        if (!Array.isArray(items) || items.length === 0) {
+          if (cancelled) return;
+          setMenuItems([]);
+          setMenuMainCategoryById({});
+          return;
+        }
+        if (cancelled) return;
+
+        setMenuItems(items);
+
+        const next = {} as any;
+        for (const it of items) {
+          const id = it?.id != null ? it.id : null;
+          if ((id === "")) continue;
+          const main = String(it?.main_category || "")
+            .trim()
+            .toLowerCase();
+          if (!main) continue;
+          next[id as any] = main;
+        }
+        setMenuMainCategoryById(next);
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Fetch missing order details
+  useEffect(() => {
+    const candidateOrders = [
+      ...(Array.isArray(dashboardData.ordersForPayment)
+        ? dashboardData.ordersForPayment
+        : []),
+      ...(Array.isArray(dashboardData.recentPayments)
+        ? dashboardData.recentPayments
+        : []),
+    ];
+
+    const ordersById = new Map<number, any>();
+    for (const entry of candidateOrders) {
+      const id = resolveOrderId(entry);
+      if (id == null) continue;
+      ordersById.set(id, entry);
+    }
+
+    const missing = Array.from(ordersById.values()).filter((o: any) => {
+      const orderId = resolveOrderId(o);
+      if (orderId == null) return false;
+      const existing = orderDetailsById?.[orderId];
+      const hasItems = Array.isArray(o?.items) && o.items.length > 0;
+      const existingHasItems =
+        Array.isArray(existing?.items) && existing.items.length > 0;
+      return !hasItems && !existingHasItems;
+    });
+
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const results = (await Promise.allSettled(
+        missing
+          .map((o: any) => resolveOrderId(o))
+          .filter((id: number | null): id is number => id != null)
+          .map((id: number) => api.orders.getById(id) as any),
+      )) as any[];
+
+      if (cancelled) return;
+
+      setOrderDetailsById((prev: any) => {
+        const next = { ...(prev || {}) } as any;
+        for (const r of results) {
+          if (r.status !== "fulfilled") continue;
+          const order = r.value?.data?.data?.order ?? r.value?.data?.order;
+          const orderId = resolveOrderId(order);
+          if (orderId == null) continue;
+          next[orderId] = order;
+        }
+        // rebuild index
+        try {
+          const byId: any = {};
+          const byRemoteId: any = {};
+          const byLocalId: any = {};
+          for (const v of Object.values(next)) {
+            const o: any = v || {};
+            if (o?.id != null) byId[o.id] = o;
+            if (o?.remote_id != null) byRemoteId[o.remote_id] = o;
+            if (o?.localId != null) byLocalId[String(o.localId)] = o;
+            if (o?.order_local_id != null) byLocalId[String(o.order_local_id)] = o;
+          }
+          setOrderIndex({ byId, byRemoteId, byLocalId });
+        } catch (e) {
+          // ignore
+        }
+        return next;
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    dashboardData.ordersForPayment,
+    dashboardData.recentPayments,
+    orderDetailsById,
+    resolveOrderId,
+  ]);
+
+  // Modal states
+  const [showProcessPaymentModal, setShowProcessPaymentModal] = useState(false);
+  const [showGenerateQRModal, setShowGenerateQRModal] = useState(false);
+  const [showReportsModal, setShowReportsModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isBlockingPaymentUi, setIsBlockingPaymentUi] = useState(false);
+  const [showConfirmProcessPaymentModal, setShowConfirmProcessPaymentModal] =
+    useState(false);
+  const [showProcessPaymentConfirmModal, setShowProcessPaymentConfirmModal] =
+    useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [confirmOrder, setConfirmOrder] = useState<any>(null);
+  const [confirmProcessPaymentOrder, setConfirmProcessPaymentOrder] =
+    useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [qrCode, setQrCode] = useState<any>(null);
+
+  const [profileData, setProfileData] = useState<any>({
+    full_name: user?.full_name || "",
+    phone: "",
+    address: "",
+  });
+
+  // Fetch dashboard data on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await refreshDashboardData();
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [user?.id, refreshDashboardData]);
+
+  // Auto-refresh pending payments every 5 s  (sync inertia across dashboards)
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      refreshDashboardData();
+    }, 5000);
+
+    return () => clearInterval(refreshInterval);
+  }, [refreshDashboardData]);
+
+  const handleConfirmProcessPaymentYes = async (
+    orderArg: any,
+    paymentMethodOverride?: string,
+  ) => {
+    const order = orderArg || confirmOrder;
+    if (!order) return;
+
+    if (
+      processingOrders.has(order.id) ||
+      processingOrdersRef.current.has(order.id)
+    )
+      return;
+
+    processingOrdersRef.current.add(order.id);
+    flushSync(() => setIsBlockingPaymentUi(true));
+
+    try {
+      setProcessingOrders((prev: any) => new Set(prev).add(order.id));
+
+      setDashboardData((prev: any) => ({
+        ...prev,
+        ordersForPayment: prev.ordersForPayment.filter(
+          (o: any) => o.id !== order.id,
+        ),
+      }));
+
+      const paymentData = {
+        order_id: order.id,
+        amount: order.total_amount,
+        payment_method: paymentMethodOverride || paymentMethod || "cash",
+        status:
+          (paymentMethodOverride || paymentMethod || "cash") === "cash"
+            ? "paid"
+            : "pending",
+        processed_by: user.id,
+      };
+
+      const createResp = (await api.payments.create(paymentData)) as any;
+      const createdPayment = createResp?.data?.data?.payment;
+      if (createdPayment?.id) {
+        const confirmResp = await confirmPaymentOnly(createdPayment.id);
+        const confirmedPayment =
+          confirmResp?.data?.data?.payment ??
+          confirmResp?.data?.payment ??
+          null;
+
+        if (confirmedPayment?.id) {
+          setDashboardData((prev: any) => {
+            const nextRecent = [
+              confirmedPayment,
+              ...(prev.recentPayments || []),
+            ]
+              .filter((p) => p && p.id != null)
+              .slice(0, 10);
+            const nextAll = [
+              confirmedPayment,
+              ...(prev.paymentsAll || []),
+            ].filter((p) => p && p.id != null);
+            return {
+              ...prev,
+              recentPayments: nextRecent,
+              paymentsAll: nextAll,
+            };
+          });
+        }
+      }
+
+      toast.success("Payment confirmed successfully!");
+      setShowProcessPaymentConfirmModal(false);
+      setConfirmOrder(null);
+      refreshDashboardData();
+      syncEngine.notifyListeners();
+    } catch (error: any) {
+      console.error("Error confirming payment:", error);
+
+      if (
+        error.response?.status === 400 &&
+        error.response?.data?.message?.includes("already exists")
+      ) {
+        toast.error("Payment already created for this order");
+      } else {
+        toast.error("Failed to confirm payment");
+      }
+
+      refreshDashboardData();
+    } finally {
+      setIsBlockingPaymentUi(false);
+      processingOrdersRef.current.delete(order.id);
+      setProcessingOrders((prev: any) => {
+        const next = new Set(prev);
+        next.delete(order.id);
+        return next;
+      });
+    }
+  };
+
+  const handleConfirmProcessPaymentNo = async (orderArg?: any) => {
+    const order = orderArg || confirmOrder;
+    if (!order) return;
+
+    if (
+      processingOrders.has(order.id) ||
+      processingOrdersRef.current.has(order.id)
+    )
+      return;
+
+    processingOrdersRef.current.add(order.id);
+    flushSync(() => setIsBlockingPaymentUi(true));
+
+    try {
+      setProcessingOrders((prev: any) => new Set(prev).add(order.id));
+
+      setDashboardData((prev: any) => ({
+        ...prev,
+        ordersForPayment: prev.ordersForPayment.filter(
+          (o: any) => o.id !== order.id,
+        ),
+      }));
+
+      await api.orders.updateStatus(order.id, { status: "cancelled" });
+      const deletedResp = (await api.payments.create({
+        order_id: order.id,
+        amount: order.total_amount,
+        payment_method: "cash",
+        status: "deleted",
+        processed_by: user.id,
+      })) as any;
+
+      const deletedPayment =
+        deletedResp?.data?.data?.payment ?? deletedResp?.data?.payment ?? null;
+
+      if (deletedPayment?.id) {
+        setDashboardData((prev: any) => {
+          const nextRecent = [deletedPayment, ...(prev.recentPayments || [])]
+            .filter((p) => p && p.id != null)
+            .slice(0, 10);
+          const nextAll = [deletedPayment, ...(prev.paymentsAll || [])].filter(
+            (p) => p && p.id != null,
+          );
+          return { ...prev, recentPayments: nextRecent, paymentsAll: nextAll };
+        });
+      }
+
+      toast.success("Order cancelled");
+      setShowProcessPaymentConfirmModal(false);
+      // The order stays in confirmOrder so it survives the modal-to-password transition
+      setConfirmOrder(null);
+      refreshDashboardData();
+      syncEngine.notifyListeners();
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      toast.error("Failed to cancel order");
+      refreshDashboardData();
+    } finally {
+      setIsBlockingPaymentUi(false);
+      processingOrdersRef.current.delete(order.id);
+      setProcessingOrders((prev: any) => {
+        const next = new Set(prev);
+        next.delete(order.id);
+        return next;
+      });
+    }
+  };
+
+  const openCancelOrderConfirm = (order: any) => {
+    if (!order) return;
+    setConfirmOrder(order);
+    void refreshAdminHashedPassword();
+    setShowProcessPaymentConfirmModal(true);
+  };
+
+  const onConfirmCancelAdminPassword = () => {
+    void refreshAdminHashedPassword();
+    setShowProcessPaymentConfirmModal(true); // re-open the order body
+  };
+
+  const openProcessPaymentConfirm = (order: any) => {
+    if (!order) return;
+    if (isBlockingPaymentUi) return;
+    if (
+      processingOrders.has(order.id) ||
+      processingOrdersRef.current.has(order.id)
+    )
+      return;
+    setConfirmProcessPaymentOrder(order);
+    setShowConfirmProcessPaymentModal(true);
+  };
+
+  const toggleRecentPaymentDetails = async (payment: any) => {
+    const paymentId = payment?.id;
+    if (!paymentId) return;
+
+    const orderId = resolveOrderId(payment);
+    const orderIdKey = orderId != null ? String(orderId) : null;
+
+    setExpandedRecentPaymentIds((prev: any) => {
+      const next = new Set(prev || []);
+      if (next.has(paymentId)) next.delete(paymentId);
+      else next.add(paymentId);
+      return next;
+    });
+
+    if (orderId == null) return;
+    const existing = orderDetailsById?.[orderId as any];
+    if (existing) return;
+
+    if (orderIdKey && loadingRecentPaymentOrderIds.has(orderIdKey)) return;
+
+    setLoadingRecentPaymentOrderIds((prev: any) => {
+      const next = new Set(prev || []);
+      if (orderIdKey) next.add(orderIdKey);
+      return next;
+    });
+
+    try {
+      const resp = (await api.orders.getById(orderId as any)) as any;
+      const order = resp?.data?.data?.order ?? resp?.data?.order;
+      const normalizedOrderId = resolveOrderId(order);
+      if (normalizedOrderId != null) {
+        setOrderDetailsById((prev: any) => {
+          const next = { ...(prev || {}), [normalizedOrderId]: order } as any;
+          try {
+            const byId: any = {};
+            const byRemoteId: any = {};
+            const byLocalId: any = {};
+            for (const v of Object.values(next)) {
+              const o: any = v || {};
+              if (o?.id != null) byId[o.id] = o;
+              if (o?.remote_id != null) byRemoteId[o.remote_id] = o;
+              if (o?.localId != null) byLocalId[String(o.localId)] = o;
+              if (o?.order_local_id != null) byLocalId[String(o.order_local_id)] = o;
+            }
+            setOrderIndex({ byId, byRemoteId, byLocalId });
+          } catch (e) {
+            // ignore
+          }
+          return next;
+        });
+      }
+    } catch (e) {
+    } finally {
+      setLoadingRecentPaymentOrderIds((prev: any) => {
+        const next = new Set(prev || []);
+        if (orderIdKey) next.delete(orderIdKey);
+        return next;
+      });
+    }
+  };
+
+  const processPaymentWithMethod = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      const paymentData = {
+        order_id: selectedOrder.id,
+        amount: selectedOrder.total_amount,
+        payment_method: paymentMethod,
+        status: paymentMethod === "cash" ? "paid" : "pending",
+        processed_by: user.id,
+      };
+
+      if (paymentMethod === "qr_code") {
+        const response = (await api.payments.createWithQR(paymentData)) as any;
+        setQrCode(response.data.data.qr_code);
+        toast.success("QR payment created! Show QR code to customer.");
+      } else {
+        const createResp = (await api.payments.create(paymentData)) as any;
+        const createdPayment = createResp?.data?.data?.payment;
+        if (createdPayment?.id) {
+          await confirmPaymentOnly(createdPayment.id);
+          printOrderImmediately(selectedOrder.id);
+        }
+        toast.success("Cash payment processed successfully!");
+        setShowProcessPaymentModal(false);
+      }
+
+      await refreshDashboardData();
+      syncEngine.notifyListeners();
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      toast.error("Failed to process payment. Please try again.");
+    }
+  };
+
+  const generateStandaloneQR = async (amount: any) => {
+    try {
+      const paymentData = {
+        amount: amount,
+        payment_method: "qr_code",
+        status: "pending",
+        processed_by: user.id,
+        description: "Direct QR Payment",
+      };
+
+      const response = (await api.payments.createWithQR(paymentData)) as any;
+      setQrCode(response.data.data.qr_code);
+      toast.success("QR code generated successfully!");
+    } catch (error) {
+      console.error("Error generating QR code:", error);
+      toast.error("Failed to generate QR code.");
+    }
+  };
+
+  const updateProfile = async () => {
+    if (!syncStatus.online || !isOnline()) {
+      toast.error(
+        "Profile updates are disabled when the application is offline.",
+      );
+      return;
+    }
+    try {
+      await api.auth.updateProfile(user.id, profileData);
+      toast.success("Profile updated successfully!");
+      setShowProfileModal(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile.");
+    }
+  };
+
+  const confirmCashPayment = (order: any, selectedPaymentMethod?: string) => {
+    if (!order) return;
+    if (isBlockingPaymentUi) return;
+    if (
+      processingOrders.has(order.id) ||
+      processingOrdersRef.current.has(order.id)
+    )
+      return;
+
+    flushSync(() => setIsBlockingPaymentUi(true));
+    setShowConfirmProcessPaymentModal(false);
+    setConfirmProcessPaymentOrder(null);
+    handleConfirmProcessPaymentYes(order, selectedPaymentMethod);
+  };
+
+  const ordersForPaymentSorted = useMemo(() => {
+    const list = Array.isArray(dashboardData.ordersForPayment)
+      ? dashboardData.ordersForPayment
+      : [];
+    return list.slice().sort((a: any, b: any) => {
+      const ad = new Date(a?.created_at || a?.updated_at);
+      const bd = new Date(b?.created_at || b?.updated_at);
+      const at = Number.isNaN(ad.getTime()) ? null : ad.getTime();
+      const bt = Number.isNaN(bd.getTime()) ? null : bd.getTime();
+      if (at != null && bt != null) return bt - at;
+      if (at != null) return -1;
+      if (bt != null) return 1;
+      return (b?.id || 0) - (a?.id || 0);
+    });
+  }, [dashboardData.ordersForPayment]);
+
+  return {
+    loading,
+    dashboardData,
+    syncStatus,
+    orderDetailsById,
+    setOrderDetailsById,
+    expandedRecentPaymentIds,
+    loadingRecentPaymentOrderIds,
+    processingOrders,
+    isBlockingPaymentUi,
+    setIsBlockingPaymentUi,
+    showProcessPaymentModal,
+    setShowProcessPaymentModal,
+    showGenerateQRModal,
+    setShowGenerateQRModal,
+    showReportsModal,
+    setShowReportsModal,
+    showProfileModal,
+    setShowProfileModal,
+    showConfirmProcessPaymentModal,
+    setShowConfirmProcessPaymentModal,
+    showProcessPaymentConfirmModal,
+    setShowProcessPaymentConfirmModal,
+    selectedOrder,
+    setSelectedOrder,
+    confirmOrder,
+    setConfirmOrder,
+    confirmProcessPaymentOrder,
+    setConfirmProcessPaymentOrder,
+    paymentMethod,
+    setPaymentMethod,
+    qrCode,
+    setQrCode,
+    profileData,
+    setProfileData,
+    menuItems,
+    menuMainCategoryById,
+    handleManualSync,
+    refreshDashboardData,
+    handleConfirmProcessPaymentYes,
+    handleConfirmProcessPaymentNo,
+    openCancelOrderConfirm,
+    openProcessPaymentConfirm,
+    toggleRecentPaymentDetails,
+    processPaymentWithMethod,
+    generateStandaloneQR,
+    updateProfile,
+    confirmCashPayment,
+    ordersForPaymentSorted,
+    // ── Cancel-password props ───────────────────────────────────────────────
+    requireCancelPassword,
+    setRequireCancelPassword,
+    adminHashedPassword,
+    refreshAdminHashedPassword,
+    adminDisplayName,
+    onConfirmCancelAdminPassword,
+    orderIndex,
+  };
+};
