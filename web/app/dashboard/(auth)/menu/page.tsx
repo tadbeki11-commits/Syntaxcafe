@@ -10,16 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DataTable, type Column } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { Menu } from "@/lib/resources";
 import { birr } from "@/lib/format";
@@ -130,6 +122,39 @@ export default function MenuPage() {
     }
   }
 
+  const itemColumns: Column<Item>[] = [
+    { key: "name", label: "Name", className: "font-medium" },
+    {
+      key: "category",
+      label: "Category",
+      className: "text-muted-foreground",
+      searchValue: (it) => it.main_category || it.category || "",
+      render: (it) => it.main_category || it.category || "—",
+    },
+    { key: "price", label: "Price", render: (it) => birr(it.price) },
+    {
+      key: "is_available",
+      label: "Available",
+      render: (it) => (
+        <Switch checked={!!it.is_available} onCheckedChange={() => toggle(it.id)} />
+      ),
+    },
+  ];
+
+  const categoryColumns: Column<Category>[] = [
+    { key: "name", label: "Name", className: "font-medium" },
+    { key: "slug", label: "Slug", className: "text-muted-foreground" },
+    {
+      key: "type",
+      label: "Type",
+      render: (c) => (
+        <Badge variant="muted" className="capitalize">
+          {c.type}
+        </Badge>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -150,65 +175,53 @@ export default function MenuPage() {
         </TabsList>
 
         <TabsContent value="items">
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Available</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={5}>
-                        <Skeleton className="h-6 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ) : items.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
-                        No menu items. Add your first item.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    items.map((it) => (
-                      <TableRow key={it.id}>
-                        <TableCell className="font-medium">{it.name}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {it.main_category || it.category || "—"}
-                        </TableCell>
-                        <TableCell>{birr(it.price)}</TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={!!it.is_available}
-                            onCheckedChange={() => toggle(it.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => { setEditing(it); setOpen(true); }}>
-                            <PencilIcon className="size-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => remove(it.id)}>
-                            <Trash2Icon className="size-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <DataTable<Item>
+            columns={itemColumns}
+            rows={items}
+            loading={loading}
+            searchKeys={["name", "category"]}
+            searchPlaceholder="Search items…"
+            emptyMessage="No menu items. Add your first item."
+            filters={[
+              {
+                key: "main_category",
+                label: "Category",
+                options: categories.map((c) => ({ value: c.slug, label: c.name })),
+                match: (it, v) => it.main_category === v || it.category === v,
+              },
+              {
+                key: "is_available",
+                label: "Availability",
+                options: [
+                  { value: "available", label: "Available" },
+                  { value: "unavailable", label: "Unavailable" },
+                ],
+                match: (it, v) =>
+                  v === "available" ? !!it.is_available : !it.is_available,
+              },
+            ]}
+            rowActions={(it) => (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setEditing(it);
+                    setOpen(true);
+                  }}>
+                  <PencilIcon className="size-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => remove(it.id)}>
+                  <Trash2Icon className="size-4 text-destructive" />
+                </Button>
+              </>
+            )}
+          />
         </TabsContent>
 
-        <TabsContent value="categories">
+        <TabsContent value="categories" className="space-y-4">
           <Card>
-            <CardContent className="space-y-4 pt-6">
+            <CardContent className="pt-6">
               <div className="flex gap-2">
                 <Input
                   placeholder="New category name"
@@ -220,36 +233,16 @@ export default function MenuPage() {
                   Add
                 </Button>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>Type</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {categories.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-muted-foreground py-8 text-center">
-                        No categories yet.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    categories.map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{c.slug}</TableCell>
-                        <TableCell>
-                          <Badge variant="muted" className="capitalize">{c.type}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
             </CardContent>
           </Card>
+          <DataTable<Category>
+            columns={categoryColumns}
+            rows={categories}
+            loading={loading}
+            searchKeys={["name", "slug"]}
+            searchPlaceholder="Search categories…"
+            emptyMessage="No categories yet."
+          />
         </TabsContent>
       </Tabs>
 

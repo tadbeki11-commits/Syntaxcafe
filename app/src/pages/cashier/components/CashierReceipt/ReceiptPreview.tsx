@@ -64,10 +64,10 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         { Text: { text: format.businessAddress, align: 'Center' } },
         { Text: { text: format.businessPhone, align: 'Center' } },
         { Text: { text: '--------------------------------', align: 'Center' } },
-        { Text: { text: `Receipt #: ${uuidToDisplayId(order.id)}`, align: 'Center' } },
+        { Text: { text: `Receipt #: ${order.order_number ?? uuidToDisplayId(order.id)}`, align: 'Center' } },
         { Text: { text: `Date: ${new Date().toLocaleDateString('en-GB')}`, align: 'Center' } },
         { Text: { text: `Time: ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, align: 'Center' } },
-        { Text: { text: `Order #: ${uuidToDisplayId(order.id)}`, align: 'Center' } },
+        { Text: { text: `Order #: ${order.order_number ?? uuidToDisplayId(order.id)}`, align: 'Center' } },
       ];
 
       if (order.table_number) {

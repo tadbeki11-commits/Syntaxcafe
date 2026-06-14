@@ -6,8 +6,7 @@ import { PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DataTable, type Column } from "@/components/data-table";
 import { apiFetch } from "@/lib/api";
 
 type Business = {
@@ -19,6 +18,43 @@ type Business = {
   is_active: boolean;
   branch_count: number;
 };
+
+const columns: Column<Business>[] = [
+  {
+    key: "name",
+    label: "Name",
+    searchValue: (b) => `${b.name} ${b.slug}`,
+    render: (b) => (
+      <>
+        <Link
+          href={`/dashboard/businesses/${b.id}`}
+          className="font-medium hover:underline">
+          {b.name}
+        </Link>
+        <div className="text-muted-foreground text-xs">{b.slug}</div>
+      </>
+    ),
+  },
+  { key: "plan", label: "Plan", className: "capitalize" },
+  {
+    key: "branch_count",
+    label: "Branches",
+    render: (b) => (
+      <>
+        {b.branch_count}
+        {b.max_branches != null && (
+          <span className="text-muted-foreground"> / {b.max_branches}</span>
+        )}
+      </>
+    ),
+  },
+  {
+    key: "is_active",
+    label: "Status",
+    searchValue: (b) => (b.is_active ? "active" : "suspended"),
+    render: (b) => <StatusBadge active={b.is_active} />,
+  },
+];
 
 export default function BusinessesPage() {
   const [rows, setRows] = useState<Business[]>([]);
@@ -48,62 +84,35 @@ export default function BusinessesPage() {
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Plan</th>
-                <th className="px-4 py-3 font-medium">Branches</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                [...Array(3)].map((_, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="px-4 py-3" colSpan={4}>
-                      <Skeleton className="h-5 w-full" />
-                    </td>
-                  </tr>
-                ))
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td
-                    className="text-muted-foreground px-4 py-10 text-center"
-                    colSpan={4}>
-                    No businesses yet. Create your first one.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((b) => (
-                  <tr key={b.id} className="border-b hover:bg-muted/40">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/dashboard/businesses/${b.id}`}
-                        className="font-medium hover:underline">
-                        {b.name}
-                      </Link>
-                      <div className="text-muted-foreground text-xs">{b.slug}</div>
-                    </td>
-                    <td className="px-4 py-3 capitalize">{b.plan}</td>
-                    <td className="px-4 py-3">
-                      {b.branch_count}
-                      {b.max_branches != null && (
-                        <span className="text-muted-foreground"> / {b.max_branches}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge active={b.is_active} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
+      <DataTable<Business>
+        columns={columns}
+        rows={rows}
+        loading={loading}
+        searchKeys={["name", "plan"]}
+        searchPlaceholder="Search businesses…"
+        emptyMessage="No businesses yet. Create your first one."
+        filters={[
+          {
+            key: "plan",
+            label: "Plan",
+            options: [
+              { value: "free", label: "Free" },
+              { value: "basic", label: "Basic" },
+              { value: "pro", label: "Pro" },
+              { value: "enterprise", label: "Enterprise" },
+            ],
+          },
+          {
+            key: "is_active",
+            label: "Status",
+            options: [
+              { value: "active", label: "Active" },
+              { value: "suspended", label: "Suspended" },
+            ],
+            match: (b, v) => (v === "active" ? b.is_active : !b.is_active),
+          },
+        ]}
+      />
     </div>
   );
 }

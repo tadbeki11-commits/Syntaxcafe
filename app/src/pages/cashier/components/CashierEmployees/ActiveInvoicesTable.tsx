@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -86,7 +86,7 @@ export const ActiveInvoicesTable: React.FC<ActiveInvoicesTableProps> = ({
                 return (
                   <TableRow key={o.id} className="border-b">
                     <TableCell className="py-3.5 text-xs font-semibold text-foreground">
-                      #{uuidToDisplayId(o.id)}
+                      {formatOrderNumber(o)}
                     </TableCell>
                     <TableCell className="py-3.5 text-xs text-muted-foreground">
                       {o.order_type_label || (o.table_number ? `Table ${o.table_number}` : 'Take Away')}

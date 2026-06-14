@@ -9,9 +9,10 @@ export type SyncStatusCallback = (status: {
 }) => void;
 
 /**
- * Tasks that run automatically (e.g. right after login). Limited to the data
- * the app needs to be usable offline: authentication (users/roles).
- * Everything else — menu, orders, payments, inventory, tables, organizations,
+ * Tasks that run automatically (e.g. right after login): the data the app needs
+ * to be usable immediately — authentication (users/roles), menu, settings, and
+ * today's orders (so the cashier sees orders created on other devices, like the
+ * web waiter app). Everything else — payments, inventory, tables, organizations,
  * stock locations/transfers — is only pushed/pulled on an explicit manual
  * "Sync" button press.
  */
@@ -20,7 +21,15 @@ export const AUTO_SYNC_TASKS: readonly string[] = [
   'roles_pull',
   'menu_items_pull',
   'settings_pull',
+  // Push locally-created (offline) orders before pulling, so anything made while
+  // offline is flushed to the server as soon as we're back online.
+  'orders',
+  'orders_pull',
 ];
+
+// Tasks run automatically when connectivity is restored mid-session: flush any
+// offline-created orders to the server, then reconcile today's list.
+export const RECONNECT_SYNC_TASKS: readonly string[] = ['orders', 'orders_pull'];
 
 class SimpleSyncEngine {
   private online: boolean =
@@ -168,6 +177,12 @@ class SimpleSyncEngine {
     this.online = next;
     if (next) {
       toast.success('You are back online.', { id: 'sync-online' });
+      // Flush offline-created orders as soon as connectivity returns so they
+      // can never be stranded locally. Fire-and-forget; sync() self-guards
+      // against overlapping runs and re-verifies the connection.
+      void this.sync(RECONNECT_SYNC_TASKS).catch((error) =>
+        console.warn('[sync] Reconnect order flush failed', error),
+      );
     } else {
       toast.error('You are offline. Sync is paused.', { id: 'sync-offline' });
     }

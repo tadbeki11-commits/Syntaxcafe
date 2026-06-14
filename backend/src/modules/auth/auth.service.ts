@@ -10,7 +10,7 @@ export class AuthService {
   ) {}
 
   async validateUser(username: string, pass: string) {
-    const user = await this.usersService.findByUsername(username);
+    const user = await this.usersService.findForLogin(username);
     if (user && (await this.usersService.verifyPassword(user, pass))) {
       // strip sensitive fields
       const { password_hash, ...safe } = user;

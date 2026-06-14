@@ -4,14 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DataTable, type Column } from "@/components/data-table";
 import { apiFetch } from "@/lib/api";
 
 type Log = {
@@ -30,6 +23,45 @@ function actionVariant(action: string): "muted" | "destructive" | "success" {
   return "muted";
 }
 
+const columns: Column<Log>[] = [
+  {
+    key: "action",
+    label: "Action",
+    render: (l) => (
+      <Badge variant={actionVariant(l.action)} className="font-mono text-xs">
+        {l.action}
+      </Badge>
+    ),
+  },
+  {
+    key: "actor_username",
+    label: "Actor",
+    searchValue: (l) => l.actor_username ?? "system",
+    render: (l) => <span className="font-medium">{l.actor_username ?? "system"}</span>,
+  },
+  {
+    key: "target_label",
+    label: "Target",
+    searchValue: (l) => `${l.target_type ?? ""} ${l.target_label ?? ""}`,
+    render: (l) =>
+      l.target_label ? (
+        <span>
+          <span className="text-muted-foreground capitalize">{l.target_type}</span>{" "}
+          <span className="font-medium">{l.target_label}</span>
+        </span>
+      ) : (
+        "—"
+      ),
+  },
+  {
+    key: "created_at",
+    label: "When",
+    className: "text-muted-foreground",
+    searchValue: () => "",
+    render: (l) => (l.created_at ? new Date(l.created_at).toLocaleString() : "—"),
+  },
+];
+
 export default function PlatformAuditPage() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +73,6 @@ export default function PlatformAuditPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Skeleton className="h-64 w-full" />;
-
   return (
     <div className="space-y-6">
       <div>
@@ -52,46 +82,15 @@ export default function PlatformAuditPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity</CardTitle>
-          <CardDescription>Business and branch changes across the platform.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {logs.length === 0 ? (
-            <div className="text-muted-foreground py-6 text-center text-sm">
-              No activity recorded yet.
-            </div>
-          ) : (
-            <div className="divide-y rounded-md border">
-              {logs.map((l) => (
-                <div key={l.id} className="flex items-center gap-3 p-3">
-                  <Badge variant={actionVariant(l.action)} className="font-mono text-xs">
-                    {l.action}
-                  </Badge>
-                  <div className="flex-1">
-                    <div className="text-sm">
-                      <span className="font-medium">{l.actor_username ?? "system"}</span>
-                      {l.target_label && (
-                        <>
-                          {" → "}
-                          <span className="text-muted-foreground capitalize">
-                            {l.target_type}
-                          </span>{" "}
-                          <span className="font-medium">{l.target_label}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <span className="text-muted-foreground text-xs">
-                    {l.created_at ? new Date(l.created_at).toLocaleString() : "—"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable<Log>
+        columns={columns}
+        rows={logs}
+        loading={loading}
+        searchKeys={["action", "actor_username", "target_label"]}
+        searchPlaceholder="Search activity…"
+        emptyMessage="No activity recorded yet."
+        pageSize={15}
+      />
     </div>
   );
 }

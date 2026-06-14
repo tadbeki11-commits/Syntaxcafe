@@ -51,6 +51,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  order_number?: number | null;
   type: "cafe";
   status:
     | "pending"

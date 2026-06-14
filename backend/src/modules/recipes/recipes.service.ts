@@ -55,7 +55,7 @@ export class RecipesService {
     const [recipe] = await db
       .select()
       .from(recipes)
-      .where(eq(recipes.id, id))
+      .where(and(eq(recipes.id, id), eq(recipes.branch_id, requireBranchId())))
       .limit(1);
 
     if (!recipe) {
@@ -91,7 +91,12 @@ export class RecipesService {
     const [recipe] = await db
       .select()
       .from(recipes)
-      .where(eq(recipes.menu_item_id, menuItemId))
+      .where(
+        and(
+          eq(recipes.menu_item_id, menuItemId),
+          eq(recipes.branch_id, requireBranchId()),
+        ),
+      )
       .limit(1);
 
     if (!recipe) return null;
@@ -109,7 +114,7 @@ export class RecipesService {
     const [menuItem] = await db
       .select()
       .from(menuItems)
-      .where(eq(menuItems.id, menuItemId))
+      .where(and(eq(menuItems.id, menuItemId), eq(menuItems.branch_id, requireBranchId())))
       .limit(1);
     if (!menuItem) {
       throw new NotFoundException(`Menu item ${menuItemId} does not exist`);
@@ -183,7 +188,7 @@ export class RecipesService {
           meta: payload.meta !== undefined ? payload.meta : existing.meta,
           updated_at: new Date(),
         })
-        .where(eq(recipes.id, id));
+        .where(and(eq(recipes.id, id), eq(recipes.branch_id, requireBranchId())));
 
       // Handle ingredients list replace
       if (payload.ingredients !== undefined) {
@@ -218,7 +223,7 @@ export class RecipesService {
   async delete(id: string) {
     const existing = await this.findById(id);
     await emitDeleted(db, "recipe", "RECIPE_DELETED", id);
-    await db.delete(recipes).where(eq(recipes.id, id));
+    await db.delete(recipes).where(and(eq(recipes.id, id), eq(recipes.branch_id, requireBranchId())));
     return existing;
   }
 }

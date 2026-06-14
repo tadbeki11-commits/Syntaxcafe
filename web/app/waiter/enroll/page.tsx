@@ -70,7 +70,7 @@ export default function EnrollPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-slate-100 flex flex-col justify-center items-center p-4 overflow-hidden relative">
+    <div className="min-h-screen bg-linear-to-br from-amber-50 to-slate-100 flex flex-col justify-center items-center p-4 overflow-hidden relative">
       {/* Animated background shapes */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-200/30 rounded-full blur-3xl animate-pulse" />

@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { getActivePrinterName } from "@/pages/cashier/PrinterSettings";
 import { getApproximateServerNow } from "@/shared/utils/serverTime";
 import { orderSocket } from "@/infrastructure/realtime/order-socket";
+import { persistServerOrders } from "@/infrastructure/adapters/orders.adapter";
 
 interface PrintingProps {
   refreshDashboardData: () => Promise<void>;
@@ -258,8 +259,15 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
   // active branch-scoped socket to the backend; an order created by a waiter
   // arrives instantly and triggers an immediate refresh + auto-print pass.
   useEffect(() => {
-    const unsubscribe = orderSocket.subscribeNewOrder(async () => {
+    const unsubscribe = orderSocket.subscribeNewOrder(async (order) => {
       try {
+        // The socket payload carries the full order. The cashier list reads
+        // from the local DB, so persist it locally before refreshing —
+        // otherwise the refresh re-reads a local table that has no record of
+        // the order (e.g. one created on the web waiter app) and shows nothing.
+        if (order) {
+          await persistServerOrders([order]);
+        }
         refreshDashboardData();
         await pollUnprintedOrders();
       } catch (e) {

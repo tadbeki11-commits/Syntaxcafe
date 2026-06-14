@@ -1,19 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { StoreIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DataTable, type Column } from "@/components/data-table";
 import { apiFetch } from "@/lib/api";
 
 type User = {
@@ -22,12 +14,21 @@ type User = {
   username: string | null;
   role: string;
   is_active: boolean;
+  branch_id: string | null;
+  branch_name: string | null;
 };
 type Branch = { id: string; name: string; slug: string; is_active: boolean };
 type Group = {
   business: { id: string; name: string; slug: string; plan: string; is_active: boolean } | null;
   branches: Branch[];
   users: User[];
+};
+
+// Each row is a user enriched with its owning business so the table stays flat.
+type Row = User & {
+  business_id: string;
+  business_name: string;
+  branch_label: string;
 };
 
 export default function PlatformUsersPage() {
@@ -45,7 +46,93 @@ export default function PlatformUsersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Skeleton className="h-64 w-full" />;
+  const rows: Row[] = useMemo(
+    () =>
+      groups.flatMap((g) =>
+        g.users.map((u) => ({
+          ...u,
+          business_id: g.business?.id ?? "",
+          business_name: g.business?.name ?? "Platform / unassigned",
+          // Branch-scoped staff show their branch; cross-branch accounts (owners,
+          // super admins) have no branch_id.
+          branch_label:
+            u.branch_name ??
+            (u.role === "super_admin" ? "Platform" : "Business-wide"),
+        })),
+      ),
+    [groups],
+  );
+
+  const columns: Column<Row>[] = [
+    {
+      key: "username",
+      label: "User",
+      searchValue: (r) => `${r.username ?? ""} ${r.name}`,
+      render: (r) => (
+        <div>
+          <div className="font-medium">{r.username ?? r.name}</div>
+          {r.username && r.name !== r.username && (
+            <div className="text-muted-foreground text-xs">{r.name}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "business_name",
+      label: "Business",
+      render: (r) =>
+        r.business_id ? (
+          <Link
+            href={`/dashboard/businesses/${r.business_id}`}
+            className="hover:underline">
+            {r.business_name}
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">{r.business_name}</span>
+        ),
+    },
+    {
+      key: "branch_label",
+      label: "Branch",
+      render: (r) =>
+        r.branch_name ? (
+          <span>{r.branch_name}</span>
+        ) : (
+          <span className="text-muted-foreground">{r.branch_label}</span>
+        ),
+    },
+    {
+      key: "role",
+      label: "Role",
+      render: (r) => (
+        <Badge variant="muted" className="capitalize">
+          {r.role}
+        </Badge>
+      ),
+    },
+    {
+      key: "is_active",
+      label: "Status",
+      searchValue: (r) => (r.is_active ? "active" : "inactive"),
+      render: (r) => (
+        <Badge variant={r.is_active ? "success" : "muted"}>
+          {r.is_active ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+  ];
+
+  const businessOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    rows.forEach((r) => seen.set(r.business_name, r.business_name));
+    return [...seen.keys()].map((name) => ({ value: name, label: name }));
+  }, [rows]);
+
+  const branchOptions = useMemo(() => {
+    const seen = new Set<string>();
+    rows.forEach((r) => seen.add(r.branch_label));
+    return [...seen].map((label) => ({ value: label, label }));
+  }, [rows]);
 
   return (
     <div className="space-y-6">
@@ -53,84 +140,49 @@ export default function PlatformUsersPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
         <p className="text-muted-foreground text-sm">
           {total} user{total === 1 ? "" : "s"} across {groups.length} group
-          {groups.length === 1 ? "" : "s"}, divided by business.
+          {groups.length === 1 ? "" : "s"}.
         </p>
       </div>
 
-      {groups.map((g) => (
-        <Card key={g.business?.id ?? "unassigned"}>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  {g.business ? (
-                    <Link
-                      href={`/dashboard/businesses/${g.business.id}`}
-                      className="hover:underline">
-                      {g.business.name}
-                    </Link>
-                  ) : (
-                    "Platform / unassigned"
-                  )}
-                  {g.business && (
-                    <Badge variant="muted" className="capitalize">
-                      {g.business.plan}
-                    </Badge>
-                  )}
-                  {g.business && !g.business.is_active && (
-                    <Badge variant="muted">Suspended</Badge>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  {g.users.length} user{g.users.length === 1 ? "" : "s"}
-                  {g.business ? ` · ${g.branches.length} branch${g.branches.length === 1 ? "" : "es"}` : ""}
-                </CardDescription>
-              </div>
-            </div>
-
-            {g.branches.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {g.branches.map((br) => (
-                  <span
-                    key={br.id}
-                    className="text-muted-foreground inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs">
-                    <StoreIcon className="size-3" />
-                    {br.name}
-                    {!br.is_active && <span className="opacity-60">(inactive)</span>}
-                  </span>
-                ))}
-              </div>
-            )}
-          </CardHeader>
-
-          <CardContent>
-            {g.users.length === 0 ? (
-              <div className="text-muted-foreground py-4 text-center text-sm">
-                No users.
-              </div>
-            ) : (
-              <div className="divide-y rounded-md border">
-                {g.users.map((u) => (
-                  <div key={u.id} className="flex items-center gap-3 p-3">
-                    <div className="flex-1">
-                      <div className="font-medium">{u.username ?? u.name}</div>
-                      {u.username && u.name !== u.username && (
-                        <div className="text-muted-foreground text-xs">{u.name}</div>
-                      )}
-                    </div>
-                    <Badge variant="muted" className="capitalize">
-                      {u.role}
-                    </Badge>
-                    <Badge variant={u.is_active ? "success" : "muted"}>
-                      {u.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+      <DataTable<Row>
+        columns={columns}
+        rows={rows}
+        loading={loading}
+        searchKeys={["username", "business_name", "branch_label", "role"]}
+        searchPlaceholder="Search users…"
+        emptyMessage="No users."
+        filters={[
+          {
+            key: "business_name",
+            label: "Business",
+            options: businessOptions,
+          },
+          {
+            key: "branch_label",
+            label: "Branch",
+            options: branchOptions,
+          },
+          {
+            key: "role",
+            label: "Role",
+            options: [
+              { value: "admin", label: "Admin" },
+              { value: "cashier", label: "Cashier" },
+              { value: "kitchen_staff", label: "Kitchen staff" },
+              { value: "cafe_waiter", label: "Waiter" },
+            ],
+          },
+          {
+            key: "is_active",
+            label: "Status",
+            options: [
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ],
+            match: (r, v) => (v === "active" ? r.is_active : !r.is_active),
+          },
+        ]}
+      />
     </div>
   );
 }

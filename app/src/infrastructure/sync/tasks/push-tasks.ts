@@ -1,5 +1,8 @@
 import { localDbTables, generateLocalId } from "@/db/localDb";
-import { ordersAdapter } from "@/infrastructure/adapters/orders.adapter";
+import {
+  ordersAdapter,
+  extractPersistedOrderIds,
+} from "@/infrastructure/adapters/orders.adapter";
 import { readRows, upsertRow } from "@/infrastructure/database/local-db-query";
 import type { SyncTask } from "./types";
 
@@ -80,12 +83,24 @@ const ordersPushTask: SyncTask = {
       const orderPayloads = batch.map(normalizeOrderPayload);
 
       try {
-        await ordersAdapter.syncBulk({
+        const resp = await ordersAdapter.syncBulk({
           orders: orderPayloads,
           payments: [],
         });
-        await markSynced(batch);
-        totalPushed += batch.length;
+        // Only mark the orders the backend confirms it persisted. Anything it
+        // skipped (e.g. unknown employee) stays unsynced and retries next cycle
+        // — that is what stops offline orders from silently disappearing.
+        const persisted = extractPersistedOrderIds(resp);
+        const confirmed = persisted
+          ? batch.filter((o: any) => persisted.has(String(o.id)))
+          : batch;
+        await markSynced(confirmed);
+        totalPushed += confirmed.length;
+        if (confirmed.length < batch.length) {
+          console.warn(
+            `[sync] Backend skipped ${batch.length - confirmed.length} order(s); kept unsynced for retry`,
+          );
+        }
       } catch (error) {
         const status = Number((error as any)?.response?.status);
         if (status !== 409) throw error;
@@ -97,10 +112,18 @@ const ordersPushTask: SyncTask = {
 
         for (const order of batch) {
           try {
-            await ordersAdapter.syncBulk({
+            const resp = await ordersAdapter.syncBulk({
               orders: [normalizeOrderPayload(order)],
               payments: [],
             });
+            const persisted = extractPersistedOrderIds(resp);
+            if (persisted && !persisted.has(String(order.id))) {
+              console.warn(
+                "[sync] Backend skipped order during retry; kept unsynced",
+                { orderId: order.id },
+              );
+              continue;
+            }
             await markSynced([order]);
             totalPushed += 1;
           } catch (singleError) {

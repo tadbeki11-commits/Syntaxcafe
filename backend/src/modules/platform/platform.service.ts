@@ -384,6 +384,7 @@ export class PlatformService {
         .select({
           id: users.id,
           business_id: users.business_id,
+          branch_id: users.branch_id,
           name: users.name,
           username: users.username,
           role: users.role,
@@ -394,6 +395,12 @@ export class PlatformService {
         .orderBy(asc(users.created_at)),
     ]);
 
+    const branchNameById = new Map(branchRows.map((br) => [br.id, br.name]));
+    const withBranchName = userRows.map((u) => ({
+      ...u,
+      branch_name: u.branch_id ? branchNameById.get(u.branch_id) ?? null : null,
+    }));
+
     const branchesByBusiness = new Map<string, typeof branchRows>();
     for (const br of branchRows) {
       const list = branchesByBusiness.get(br.business_id) ?? [];
@@ -401,8 +408,8 @@ export class PlatformService {
       branchesByBusiness.set(br.business_id, list);
     }
 
-    const usersByBusiness = new Map<string | null, typeof userRows>();
-    for (const u of userRows) {
+    const usersByBusiness = new Map<string | null, typeof withBranchName>();
+    for (const u of withBranchName) {
       const key = u.business_id ?? null;
       const list = usersByBusiness.get(key) ?? [];
       list.push(u);

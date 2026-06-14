@@ -1,10 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import db from "../../db/drizzle";
 import { users } from "../../db/tables/users.table";
 import { hash, compare } from "bcryptjs";
 import { emitCreated, emitDeleted, emitUpdated } from "../sync/sync-emit.util";
-import { requireBusinessId } from "../../common/tenant/tenant-context";
+import {
+  requireBranchId,
+  requireBusinessId,
+} from "../../common/tenant/tenant-context";
 
 @Injectable()
 export class UsersService {
@@ -13,8 +16,9 @@ export class UsersService {
 
     const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
     // Tenancy is derived from the device token (the sync caller), never the
-    // client payload, so synced staff are scoped to the device's business.
+    // client payload, so synced staff are scoped to the device's branch.
     const businessId = requireBusinessId();
+    const branchId = requireBranchId();
     const updatedIds: string[] = [];
     const createdRows: Array<typeof users.$inferSelect> = [];
 
@@ -45,6 +49,7 @@ export class UsersService {
             .values({
               ...(item.id ? { id: item.id } : {}),
               business_id: businessId,
+              branch_id: branchId,
               username: item.username || `user_${Date.now()}`,
               name: item.name || item.full_name || item.username || "Staff",
               password_hash: hashed,
@@ -91,7 +96,10 @@ export class UsersService {
       .from(users)
       .$dynamic();
 
-    const conditions = [eq(users.business_id, requireBusinessId())];
+    const conditions = [
+      eq(users.business_id, requireBusinessId()),
+      eq(users.branch_id, requireBranchId()),
+    ];
     if (params?.role) {
       conditions.push(eq(users.role, params.role));
     }
@@ -133,18 +141,34 @@ export class UsersService {
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.id, id))
+      .where(and(eq(users.id, id), eq(users.branch_id, requireBranchId())))
       .limit(1);
     return user || null;
   }
 
-  async findByUsername(username: string) {
-    const [user] = await db
+  /**
+   * Resolves a login by username. Staff/branch-admin accounts are unique per
+   * branch, so we first look within the caller's branch (set by the device token
+   * on desktop). Cross-branch accounts — business owners and platform super
+   * admins — have a NULL branch and are matched by the fallback, which also
+   * covers web logins where no real branch context exists.
+   */
+  async findForLogin(username: string) {
+    const [scoped] = await db
       .select()
       .from(users)
-      .where(eq(users.username, username))
+      .where(
+        and(eq(users.username, username), eq(users.branch_id, requireBranchId())),
+      )
       .limit(1);
-    return user || null;
+    if (scoped) return scoped;
+
+    const [crossBranch] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.username, username), isNull(users.branch_id)))
+      .limit(1);
+    return crossBranch || null;
   }
 
   async findByName(name: string) {
@@ -156,6 +180,8 @@ export class UsersService {
         password_hash: users.password_hash,
         pin_hash: users.pin_hash,
         role: users.role,
+        role_id: users.role_id,
+        business_id: users.business_id,
         first_name: users.first_name,
         last_name: users.last_name,
         phone: users.phone,
@@ -163,11 +189,15 @@ export class UsersService {
       })
       .from(users)
       .where(
-        or(
-          ilike(users.name, pattern),
-          ilike(users.username, pattern),
-          ilike(users.first_name, pattern),
-          ilike(users.last_name, pattern),
+        and(
+          eq(users.business_id, requireBusinessId()),
+          eq(users.branch_id, requireBranchId()),
+          or(
+            ilike(users.name, pattern),
+            ilike(users.username, pattern),
+            ilike(users.first_name, pattern),
+            ilike(users.last_name, pattern),
+          ),
         ),
       )
       .limit(1);
@@ -186,7 +216,7 @@ export class UsersService {
     const [existing] = await db
       .select({ id: users.id, is_active: users.is_active })
       .from(users)
-      .where(eq(users.id, id))
+      .where(and(eq(users.id, id), eq(users.branch_id, requireBranchId())))
       .limit(1);
     if (!existing) throw new Error("User not found");
 
@@ -203,6 +233,13 @@ export class UsersService {
   }
 
   async deleteUser(id: string) {
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, id), eq(users.branch_id, requireBranchId())))
+      .limit(1);
+    if (!existing) throw new Error("User not found");
+
     await emitDeleted(db, "user", "USER_DELETED", id);
     await db.delete(users).where(eq(users.id, id));
   }
@@ -215,7 +252,7 @@ export class UsersService {
     const [user] = await db
       .select({ id: users.id, password_hash: users.password_hash })
       .from(users)
-      .where(eq(users.id, id))
+      .where(and(eq(users.id, id), eq(users.branch_id, requireBranchId())))
       .limit(1);
 
     if (!user) throw new Error("User not found");
@@ -259,7 +296,10 @@ export class UsersService {
       .select({ id: users.id })
       .from(users)
       .where(
-        and(eq(users.business_id, requireBusinessId()), eq(users.username, username)),
+        and(
+          eq(users.branch_id, requireBranchId()),
+          eq(users.username, username),
+        ),
       )
       .limit(1);
     if (existingUser.length > 0) {
@@ -279,6 +319,7 @@ export class UsersService {
       .insert(users)
       .values({
         business_id: requireBusinessId(),
+        branch_id: requireBranchId(),
         username,
         name: full_name || [fname, lname].filter(Boolean).join(" ") || username,
         password_hash,
@@ -333,7 +374,7 @@ export class UsersService {
     const [existing] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.id, userId))
+      .where(and(eq(users.id, userId), eq(users.branch_id, requireBranchId())))
       .limit(1);
     if (!existing) {
       throw new Error("User not found");

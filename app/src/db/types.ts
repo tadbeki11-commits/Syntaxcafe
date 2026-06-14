@@ -85,6 +85,7 @@ export interface LocalOrder extends Omit<Order, 'id'> {
   id: string;
   synced: 0 | 1;        // 0 = unsynced local order, 1 = successfully synced to server
   is_printed: 0 | 1;    // Whether this order ticket has been printed locally via QZ Tray
+  order_number?: number | null;  // Backend-assigned per-branch serial; null until synced
   payment_status?: string;
   waiter_id?: string;
   created_by_id?: string;

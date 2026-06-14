@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -93,7 +93,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
         {selectedOrder && (
           <div className="space-y-4 pt-2">
             <div className="bg-muted/40 p-4 rounded-xl space-y-1.5">
-              <div className="font-extrabold text-sm">Order #{uuidToDisplayId(selectedOrder.id)}</div>
+              <div className="font-extrabold text-sm">Order {formatOrderNumber(selectedOrder)}</div>
               <p className="text-xs text-muted-foreground font-semibold">
                 {selectedOrder.type === 'cafe' ? 'Café' : 'Bakery'} Order
                 {selectedOrder.table_number && ` • Table ${selectedOrder.table_number}`}

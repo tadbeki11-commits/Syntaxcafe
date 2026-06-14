@@ -89,6 +89,12 @@ export const waiterServices = {
   tables: {
     getAll: () => waiterApi.get("/tables"),
   },
+  users: {
+    // Public (no-auth) list of café waiters for the enrolled branch's business.
+    // Scoped server-side by the x-device-token header.
+    getWaiters: () =>
+      waiterApi.get("/users/public", { role: "cafe_waiter", is_active: "true" }),
+  },
   settings: {
     getTableSelectionSettings: async (): Promise<{
       force_table_selection: boolean;

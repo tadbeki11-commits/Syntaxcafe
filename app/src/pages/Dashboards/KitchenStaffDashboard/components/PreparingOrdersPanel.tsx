@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React from 'react';
 import { MapPin, Plus, Minus, X, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -71,7 +71,7 @@ export const PreparingOrdersPanel: React.FC<PreparingOrdersPanelProps> = ({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <MapPin className="w-3.5 h-3.5 text-warning" />
                 <span className="font-extrabold text-xs">{order.order_type_label || (order.table_number ? `Table ${order.table_number}` : 'Take Away')}</span>
-                <span className="text-[9px] text-muted-foreground font-semibold">#{uuidToDisplayId(order.id)}</span>
+                <span className="text-[9px] text-muted-foreground font-semibold">{formatOrderNumber(order)}</span>
               </div>
               <span className="text-xs font-extrabold text-warning">
                 {formatCurrency(order.total_amount)}

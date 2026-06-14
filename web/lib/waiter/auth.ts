@@ -1,4 +1,5 @@
 import { API_BASE } from "@/lib/api";
+import { getDeviceToken } from "@/lib/waiter/device";
 
 export type WaiterUser = {
   id: string;
@@ -14,24 +15,30 @@ const USER_KEY = "wp_user";
 // is meant for floor staff taking table orders.
 const ALLOWED_ROLES = ["cafe_waiter"];
 
+// Mirrors the desktop POS login: floor staff pick their name and tap a 4-digit
+// PIN. We send the enrolled device token (added by the caller's fetch headers is
+// not needed here — pin-login resolves the user by name within the device's
+// business via the x-device-token header below).
 export async function waiterLogin(
-  username: string,
-  password: string,
+  name: string,
+  pin: string,
 ): Promise<WaiterUser> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  const res = await fetch(`${API_BASE}/auth/pin-login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-App-Client": "tauri-pos-app",
+      ...(getDeviceToken() ? { "x-device-token": getDeviceToken()! } : {}),
     },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ name, pin }),
   });
 
   if (!res.ok) {
-    let message = `Login failed (${res.status})`;
+    let message =
+      res.status === 401 ? "Invalid name or PIN" : `Login failed (${res.status})`;
     try {
       const body = await res.json();
-      message = body.message || message;
+      if (body?.message) message = body.message;
       if (Array.isArray(message)) message = message.join(", ");
     } catch {
       /* non-JSON error body */

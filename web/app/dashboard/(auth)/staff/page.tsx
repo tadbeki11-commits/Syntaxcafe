@@ -4,18 +4,22 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ResourceManager, type Column } from "@/components/resource-manager";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/page-header";
+import { StaffActivity } from "@/components/staff/staff-activity";
 import { Users } from "@/lib/resources";
 
 type U = {
   id: string;
   name: string;
+  full_name?: string | null;
   username: string | null;
+  phone?: string | null;
   role: string;
   is_active: boolean;
 };
 
 const columns: Column<U>[] = [
-  // { key: "name", label: "Name", render: (r) => <span className="font-medium">{r.name}</span> },
   { key: "username", label: "Username", className: "text-muted-foreground" },
   { key: "role", label: "Role", render: (r) => <Badge variant="muted" className="capitalize">{r.role}</Badge> },
   {
@@ -29,14 +33,15 @@ const columns: Column<U>[] = [
   },
 ];
 
-export default function StaffPage() {
+function StaffAccounts() {
   return (
     <ResourceManager<U>
-      title="Staff"
+      title="Staff accounts"
       description="Employees who can sign in to the POS."
       createLabel="New staff"
+      editLabel="Edit staff"
       columns={columns}
-      searchKeys={["name", "username", "role"]}
+      searchKeys={["full_name", "name", "username", "role"]}
       searchPlaceholder="Search staff…"
       filters={[
         {
@@ -60,14 +65,15 @@ export default function StaffPage() {
         },
       ]}
       fields={[
-        { key: "name", label: "Full name", required: true },
+        { key: "full_name", label: "Full name", required: true },
         { key: "username", label: "Username", required: true },
-        { key: "password", label: "Password", type: "password", required: true },
+        { key: "password", label: "Password", type: "password", required: true, createOnly: true },
         {
           key: "role",
           label: "Role",
           type: "select",
           default: "cashier",
+          createOnly: true,
           options: [
             { value: "admin", label: "Admin" },
             { value: "cashier", label: "Cashier" },
@@ -79,6 +85,7 @@ export default function StaffPage() {
       ]}
       load={Users.list}
       create={Users.create}
+      update={Users.update}
       rowActions={(row, reload) => (
         <Button
           variant="ghost"
@@ -95,5 +102,28 @@ export default function StaffPage() {
         </Button>
       )}
     />
+  );
+}
+
+export default function StaffPage() {
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Staff"
+        description="Manage POS logins and review each employee's order activity."
+      />
+      <Tabs defaultValue="accounts" className="space-y-5">
+        <TabsList>
+          <TabsTrigger value="accounts">Accounts</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+        </TabsList>
+        <TabsContent value="accounts">
+          <StaffAccounts />
+        </TabsContent>
+        <TabsContent value="activity">
+          <StaffActivity />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

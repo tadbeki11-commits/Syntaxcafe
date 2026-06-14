@@ -33,9 +33,66 @@ export type DataTableFilter<T> = {
   match?: (row: T, value: string) => boolean;
 };
 
+export type DateRangeFilter<T> = {
+  key: string;
+  label: string;
+  /** Returns the row's date (ISO string / Date / null) to compare against the range. */
+  getDate: (row: T) => string | Date | null | undefined;
+};
+
 function textOf<T>(row: T, col: Column<T> | undefined, key: string): string {
   if (col?.searchValue) return col.searchValue(row);
   return String((row as Record<string, unknown>)[key] ?? "");
+}
+
+function fmtDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+const DATE_PRESETS = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "this_week", label: "This week" },
+  { value: "this_month", label: "This month" },
+  { value: "this_year", label: "This year" },
+];
+
+/** Resolve a preset key into a yyyy-mm-dd from/to range (local time). */
+function presetRange(preset: string): { from?: string; to?: string } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  switch (preset) {
+    case "today":
+      return { from: fmtDate(today), to: fmtDate(today) };
+    case "yesterday": {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      return { from: fmtDate(y), to: fmtDate(y) };
+    }
+    case "this_week": {
+      // Week runs Monday–Sunday.
+      const monday = new Date(today);
+      monday.setDate(monday.getDate() - ((today.getDay() + 6) % 7));
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      return { from: fmtDate(monday), to: fmtDate(sunday) };
+    }
+    case "this_month":
+      return {
+        from: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)),
+        to: fmtDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+      };
+    case "this_year":
+      return {
+        from: fmtDate(new Date(now.getFullYear(), 0, 1)),
+        to: fmtDate(new Date(now.getFullYear(), 11, 31)),
+      };
+    default:
+      return {};
+  }
 }
 
 export function DataTable<T>({
@@ -46,6 +103,7 @@ export function DataTable<T>({
   searchPlaceholder = "Search…",
   searchKeys,
   filters,
+  dateFilters,
   pageSize = 10,
   emptyMessage = "Nothing here yet.",
   rowActions,
@@ -59,6 +117,7 @@ export function DataTable<T>({
   /** Column keys to search across. Defaults to every column key. */
   searchKeys?: string[];
   filters?: DataTableFilter<T>[];
+  dateFilters?: DateRangeFilter<T>[];
   pageSize?: number;
   emptyMessage?: string;
   rowActions?: (row: T) => React.ReactNode;
@@ -67,6 +126,8 @@ export function DataTable<T>({
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<Record<string, string>>({});
+  const [ranges, setRanges] = useState<Record<string, { from?: string; to?: string }>>({});
+  const [presets, setPresets] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
 
   const filtered = useMemo(() => {
@@ -80,6 +141,16 @@ export function DataTable<T>({
           : String((row as Record<string, unknown>)[f.key] ?? "") === val;
         if (!ok) return false;
       }
+      for (const f of dateFilters ?? []) {
+        const range = ranges[f.key];
+        if (!range?.from && !range?.to) continue;
+        const raw = f.getDate(row);
+        if (!raw) return false;
+        const t = new Date(raw).getTime();
+        if (Number.isNaN(t)) return false;
+        if (range.from && t < new Date(`${range.from}T00:00:00`).getTime()) return false;
+        if (range.to && t > new Date(`${range.to}T23:59:59.999`).getTime()) return false;
+      }
       if (!q) return true;
       const keys = searchKeys ?? columns.map((c) => c.key);
       return keys.some((k) => {
@@ -87,13 +158,12 @@ export function DataTable<T>({
         return textOf(row, col, k).toLowerCase().includes(q);
       });
     });
-  }, [rows, query, active, filters, searchKeys, columns]);
+  }, [rows, query, active, ranges, filters, dateFilters, searchKeys, columns]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pageCount - 1);
   const paged = filtered.slice(current * pageSize, current * pageSize + pageSize);
   const colSpan = columns.length + (rowActions ? 1 : 0);
-  const hasControls = !!(filters?.length || true);
 
   function onQuery(v: string) {
     setQuery(v);
@@ -103,11 +173,20 @@ export function DataTable<T>({
     setActive((prev) => ({ ...prev, [key]: v }));
     setPage(0);
   }
+  function onRange(key: string, bound: "from" | "to", v: string) {
+    setRanges((prev) => ({ ...prev, [key]: { ...prev[key], [bound]: v || undefined } }));
+    setPresets((prev) => ({ ...prev, [key]: "custom" }));
+    setPage(0);
+  }
+  function onPreset(key: string, preset: string) {
+    setPresets((prev) => ({ ...prev, [key]: preset }));
+    setRanges((prev) => ({ ...prev, [key]: presetRange(preset) }));
+    setPage(0);
+  }
 
   return (
     <Card>
-      {hasControls && (
-        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
           <div className="relative w-full sm:max-w-xs">
             <SearchIcon className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
             <Input
@@ -133,9 +212,41 @@ export function DataTable<T>({
             </select>
           ))}
 
+          {dateFilters?.map((f) => (
+            <div key={f.key} className="flex items-center gap-1.5">
+              <select
+                aria-label={`${f.label} range`}
+                className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+                value={presets[f.key] ?? ""}
+                onChange={(e) => onPreset(f.key, e.target.value)}>
+                <option value="">{f.label}: All time</option>
+                {DATE_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+                <option value="custom">Custom range</option>
+              </select>
+              <Input
+                type="date"
+                aria-label={`${f.label} from`}
+                value={ranges[f.key]?.from ?? ""}
+                onChange={(e) => onRange(f.key, "from", e.target.value)}
+                className="h-9 w-auto"
+              />
+              <span className="text-muted-foreground text-sm">–</span>
+              <Input
+                type="date"
+                aria-label={`${f.label} to`}
+                value={ranges[f.key]?.to ?? ""}
+                onChange={(e) => onRange(f.key, "to", e.target.value)}
+                className="h-9 w-auto"
+              />
+            </div>
+          ))}
+
           {toolbar && <div className="sm:ml-auto">{toolbar}</div>}
         </div>
-      )}
 
       <CardContent className="p-0">
         <Table>

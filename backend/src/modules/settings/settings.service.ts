@@ -10,7 +10,7 @@ import {
 } from "../../db/schema";
 import { and, eq } from "drizzle-orm";
 import { hash, compare } from "bcryptjs";
-import { requireBranchId, tenantInsert } from "../../common/tenant/tenant-context";
+import { requireBranchId, requireBusinessId, tenantInsert } from "../../common/tenant/tenant-context";
 import { emitCreated, emitDeleted, emitUpdated } from "../sync/sync-emit.util";
 
 @Injectable()
@@ -21,13 +21,19 @@ export class SettingsService {
     ordersDeleted: number;
     paymentsDeleted: number;
   }> {
+    const branchId = requireBranchId();
     return await db.transaction(async (tx) => {
+      // Scope the wipe to the current branch only — never touch other tenants' data.
       // First delete payments (though cascade should handle it)
-      const pResult = await tx.delete(payments);
+      const pResult = await tx
+        .delete(payments)
+        .where(eq(payments.branch_id, branchId));
       // Then delete orders
-      const oResult = await tx.delete(orders);
+      const oResult = await tx
+        .delete(orders)
+        .where(eq(orders.branch_id, branchId));
 
-      console.log(`[SettingsService] Data cleanup: Removed all payments and orders.`);
+      console.log(`[SettingsService] Data cleanup: Removed payments and orders for branch ${branchId}.`);
 
       return {
         ordersDeleted: 0, // Drizzle delete doesn't return count by default in some pg drivers without .returning().count() or similar, but we can just say success
@@ -81,7 +87,7 @@ export class SettingsService {
         is_active: data.is_active,
         updated_at: new Date(),
       })
-      .where(eq(paymentMethods.id, id))
+      .where(and(eq(paymentMethods.id, id), eq(paymentMethods.branch_id, requireBranchId())))
       .returning();
     if (!updated) throw new Error("Payment method not found");
     await emitUpdated(db, "payment_method", "PAYMENT_METHOD_UPDATED", updated as any);
@@ -92,7 +98,7 @@ export class SettingsService {
     const [deleted] = await db
       .update(paymentMethods)
       .set({ is_active: false, updated_at: new Date() })
-      .where(eq(paymentMethods.id, id))
+      .where(and(eq(paymentMethods.id, id), eq(paymentMethods.branch_id, requireBranchId())))
       .returning();
     if (!deleted) throw new Error("Payment method not found");
     await emitUpdated(db, "payment_method", "PAYMENT_METHOD_DEACTIVATED", deleted as any);
@@ -248,10 +254,10 @@ export class SettingsService {
         print_copies: users.print_copies,
       })
       .from(users)
-      .where(eq(users.id, userId));
+      .where(and(eq(users.id, userId), eq(users.business_id, requireBusinessId())));
 
-    return { 
-      cancel_password: cancelPassword, 
+    return {
+      cancel_password: cancelPassword,
       print_copies: row?.print_copies || "1" 
     };
   }
@@ -263,7 +269,7 @@ export class SettingsService {
     const [user] = await db
       .select({ role: users.role })
       .from(users)
-      .where(eq(users.id, userId));
+      .where(and(eq(users.id, userId), eq(users.business_id, requireBusinessId())));
     if (!user || user.role !== "admin") {
       throw new Error("Only admins can change the cancellation password.");
     }
@@ -289,7 +295,7 @@ export class SettingsService {
     const [updated] = await db
       .update(users)
       .set({ print_copies: copies, updated_at: new Date() })
-      .where(eq(users.id, userId))
+      .where(and(eq(users.id, userId), eq(users.business_id, requireBusinessId())))
       .returning({ print_copies: users.print_copies });
     return updated;
   }
@@ -299,7 +305,8 @@ export class SettingsService {
   async getAllSystemSettings(): Promise<Array<{ key: string; value: string }>> {
     return db
       .select({ key: systemSettings.key, value: systemSettings.value })
-      .from(systemSettings);
+      .from(systemSettings)
+      .where(eq(systemSettings.branch_id, requireBranchId()));
   }
 
   async getSystemSetting(key: string): Promise<string | null> {

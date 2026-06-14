@@ -21,3 +21,17 @@ export function uuidToDisplayId(uuid: string | null | undefined): number {
   
   return Math.abs(hash);
 }
+
+/**
+ * Display label for an order's tracking number. Prefers the backend-assigned
+ * per-branch serial (`order_number`); falls back to the UUID-derived id for
+ * legacy or not-yet-synced orders so something stable always renders.
+ */
+export function formatOrderNumber(order: {
+  order_number?: number | null;
+  id?: string | null;
+} | null | undefined): string {
+  const serial = order?.order_number;
+  if (serial != null && Number(serial) > 0) return `#${serial}`;
+  return `#${uuidToDisplayId(order?.id)}`;
+}

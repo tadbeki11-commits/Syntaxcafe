@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
-import { DataTable, type Column, type DataTableFilter } from "@/components/data-table";
+import {
+  DataTable,
+  type Column,
+  type DataTableFilter,
+  type DateRangeFilter,
+} from "@/components/data-table";
 
-export type { Column, DataTableFilter };
+export type { Column, DataTableFilter, DateRangeFilter };
 
 export type Field = {
   key: string;
@@ -27,6 +32,8 @@ export type Field = {
   options?: { value: string; label: string }[];
   default?: any;
   required?: boolean;
+  /** Hide this field when editing an existing row (e.g. password, role). */
+  createOnly?: boolean;
 };
 
 export function ResourceManager<T extends { id: string }>({
@@ -36,12 +43,15 @@ export function ResourceManager<T extends { id: string }>({
   fields,
   load,
   create,
+  update,
   remove,
   rowActions,
   createLabel = "New",
+  editLabel = "Edit",
   searchKeys,
   searchPlaceholder,
   filters,
+  dateFilters,
   pageSize,
 }: {
   title: string;
@@ -50,18 +60,23 @@ export function ResourceManager<T extends { id: string }>({
   fields?: Field[];
   load: () => Promise<T[]>;
   create?: (body: any) => Promise<any>;
+  update?: (id: string, body: any) => Promise<any>;
   remove?: (id: string) => Promise<any>;
   rowActions?: (row: T, reload: () => Promise<void>) => React.ReactNode;
   createLabel?: string;
+  editLabel?: string;
   searchKeys?: string[];
   searchPlaceholder?: string;
   filters?: DataTableFilter<T>[];
+  dateFilters?: DateRangeFilter<T>[];
   pageSize?: number;
 }) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Record<string, any>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const visibleFields = (fields ?? []).filter((f) => !(editingId && f.createOnly));
 
   async function reload() {
     setLoading(true);
@@ -82,14 +97,32 @@ export function ResourceManager<T extends { id: string }>({
     const init: Record<string, any> = {};
     fields?.forEach((f) => (init[f.key] = f.default ?? (f.type === "switch" ? true : "")));
     setForm(init);
+    setEditingId(null);
+    setOpen(true);
+  }
+
+  function openEdit(row: T) {
+    const init: Record<string, any> = {};
+    fields?.forEach((f) => {
+      if (f.createOnly) return;
+      init[f.key] = (row as Record<string, any>)[f.key] ?? f.default ?? (f.type === "switch" ? false : "");
+    });
+    setForm(init);
+    setEditingId(row.id);
     setOpen(true);
   }
 
   async function submit() {
-    if (!create) return;
     try {
-      await create(form);
-      toast.success("Created");
+      if (editingId) {
+        if (!update) return;
+        await update(editingId, form);
+        toast.success("Saved");
+      } else {
+        if (!create) return;
+        await create(form);
+        toast.success("Created");
+      }
       setOpen(false);
       await reload();
     } catch (e: any) {
@@ -108,7 +141,8 @@ export function ResourceManager<T extends { id: string }>({
     }
   }
 
-  const showActions = !!remove || !!rowActions;
+  const canEdit = !!update && !!fields;
+  const showActions = !!remove || !!rowActions || canEdit;
 
   return (
     <div className="space-y-6">
@@ -132,12 +166,18 @@ export function ResourceManager<T extends { id: string }>({
         searchKeys={searchKeys}
         searchPlaceholder={searchPlaceholder}
         filters={filters}
+        dateFilters={dateFilters}
         pageSize={pageSize}
         rowActions={
           showActions
             ? (row) => (
                 <>
                   {rowActions?.(row, reload)}
+                  {canEdit && (
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(row)}>
+                      <PencilIcon className="size-4" />
+                    </Button>
+                  )}
                   {remove && (
                     <Button variant="ghost" size="icon" onClick={() => onDelete(row.id)}>
                       <Trash2Icon className="text-destructive size-4" />
@@ -149,14 +189,14 @@ export function ResourceManager<T extends { id: string }>({
         }
       />
 
-      {create && fields && (
+      {(create || update) && fields && (
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{createLabel}</DialogTitle>
+              <DialogTitle>{editingId ? editLabel : createLabel}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {fields.map((f) => (
+              {visibleFields.map((f) => (
                 <div key={f.key} className="space-y-2">
                   {f.type === "switch" ? (
                     <div className="flex items-center gap-3">

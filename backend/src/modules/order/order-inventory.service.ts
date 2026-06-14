@@ -8,7 +8,7 @@ import { recipes } from "../../db/tables/recipes.table";
 import { recipeIngredients } from "../../db/tables/recipe-ingredients.table";
 import { stockLocations } from "../../db/tables/stock-locations.table";
 import { stockMovements } from "../../db/tables/stock-movements.table";
-import { tenantInsert } from "../../common/tenant/tenant-context";
+import { requireBranchId, tenantInsert } from "../../common/tenant/tenant-context";
 
 type DbClient = typeof db;
 
@@ -108,6 +108,7 @@ export class OrderInventoryService {
 
   private async buildRequirements(tx: DbClient, items: OrderLine[]) {
     const requirements: InventoryRequirement[] = [];
+    const branchId = requireBranchId();
 
     for (const item of items || []) {
       const menuItemId = item?.menu_item_id ? String(item.menu_item_id) : "";
@@ -119,7 +120,7 @@ export class OrderInventoryService {
       const [menuItem] = await tx
         .select()
         .from(menuItems)
-        .where(eq(menuItems.id, menuItemId))
+        .where(and(eq(menuItems.id, menuItemId), eq(menuItems.branch_id, branchId)))
         .limit(1);
 
       const [recipe] = await tx
@@ -129,6 +130,7 @@ export class OrderInventoryService {
           and(
             eq(recipes.menu_item_id, menuItemId),
             eq(recipes.is_active, true),
+            eq(recipes.branch_id, branchId),
           ),
         )
         .limit(1);
@@ -140,7 +142,7 @@ export class OrderInventoryService {
       const [defaultLocation] = await tx
         .select()
         .from(stockLocations)
-        .where(eq(stockLocations.is_default, true))
+        .where(and(eq(stockLocations.is_default, true), eq(stockLocations.branch_id, branchId)))
         .limit(1);
 
       const linkedLocation = menuItem?.main_category
@@ -150,6 +152,7 @@ export class OrderInventoryService {
             .where(
               and(
                 eq(stockLocations.is_active, true),
+                eq(stockLocations.branch_id, branchId),
                 eq(
                   stockLocations.linked_main_category_slug,
                   asText(menuItem.main_category),
@@ -186,7 +189,12 @@ export class OrderInventoryService {
       const ingredients = await tx
         .select()
         .from(recipeIngredients)
-        .where(eq(recipeIngredients.recipe_id, recipe.id));
+        .where(
+          and(
+            eq(recipeIngredients.recipe_id, recipe.id),
+            eq(recipeIngredients.branch_id, branchId),
+          ),
+        );
 
       for (const ingredient of ingredients) {
         const yieldQty = Math.max(1, asNumber(recipe.yield_quantity, 1));
@@ -249,6 +257,7 @@ export class OrderInventoryService {
         )
         .where(
           and(
+            eq(inventoryStock.branch_id, requireBranchId()),
             eq(inventoryStock.inventory_item_id, requirement.inventory_item_id),
             eq(inventoryStock.location_id, requirement.location_id),
           ),
@@ -293,6 +302,7 @@ export class OrderInventoryService {
         .from(inventoryStock)
         .where(
           and(
+            eq(inventoryStock.branch_id, requireBranchId()),
             eq(inventoryStock.inventory_item_id, requirement.inventory_item_id),
             eq(inventoryStock.location_id, requirement.location_id),
           ),

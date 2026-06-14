@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { formatOrderNumber } from '@/lib/utils';
 
 interface OrdersForPaymentPanelProps {
   orders: any[];
@@ -87,7 +88,7 @@ export const OrdersForPaymentPanel: React.FC<OrdersForPaymentPanelProps> = ({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <span className="font-extrabold text-md text-foreground">
-                  Order {order.table_number && ` • Table ${order.table_number}`}
+                  Order {formatOrderNumber(order)}{order.table_number && ` • Table ${order.table_number}`}
                 </span>
                 <p className="font-extrabold text-md text-foreground">
                   Waiter: {order.waiter_name || order.employee_name}

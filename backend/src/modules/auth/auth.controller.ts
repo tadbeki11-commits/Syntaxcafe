@@ -46,7 +46,7 @@ export class AuthController {
   @Post("login")
   async login(@Body() body: LoginRequestDto) {
     const { username, password } = body;
-    const user = await this.usersService.findByUsername(username);
+    const user = await this.usersService.findForLogin(username);
     if (!user) throw new UnauthorizedException("Invalid credentials");
     if (!user.is_active)
       throw new UnauthorizedException("Account is deactivated");
@@ -79,6 +79,7 @@ export class AuthController {
       throw new UnauthorizedException("Account is deactivated");
     const ok = await this.usersService.verifyPin(user, pin);
     if (!ok) throw new UnauthorizedException("Invalid credentials");
+    const token = await this.authService.login(user);
     return {
       status: "success",
       message: "Login successful",
@@ -88,6 +89,7 @@ export class AuthController {
         role: user.role,
         full_name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
       },
+      token,
       server_time: this.getServerTime(),
     };
   }

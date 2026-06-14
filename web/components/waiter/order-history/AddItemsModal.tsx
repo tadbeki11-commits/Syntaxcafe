@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { uuidToDisplayId } from "@/lib/utils";
+import { formatOrderNumber } from "@/lib/utils";
 import React, { useState, useMemo } from "react";
 import {
   Plus,
@@ -103,7 +103,7 @@ export const AddItemsModal: React.FC<AddItemsModalProps> = ({
             </div>
             <div>
               <DialogTitle className="text-base font-black text-foreground flex items-center gap-2">
-                Modify Order #{uuidToDisplayId(order.id)}
+                Modify Order {formatOrderNumber(order)}
                 <Badge
                   variant="secondary"
                   className="text-[9px] font-black tracking-widest bg-primary/10 text-primary"

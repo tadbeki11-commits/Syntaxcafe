@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -9,6 +10,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { businesses } from "./businesses.table";
+import { branches } from "./branches.table";
 
 export const users = pgTable(
   "users",
@@ -17,6 +19,12 @@ export const users = pgTable(
   // Nullable: platform super admins have no owning business; all other users do.
   business_id: uuid("business_id").references(() => businesses.id, {
     onDelete: "set null",
+  }),
+  // The branch a user belongs to. NULL only for cross-branch accounts: platform
+  // super admins and business owners. All in-cafe staff (admin/cashier/
+  // kitchen_staff/cafe_waiter) are pinned to exactly one branch.
+  branch_id: uuid("branch_id").references(() => branches.id, {
+    onDelete: "cascade",
   }),
   name: varchar("name", { length: 200 }).notNull(),
   username: varchar("username", { length: 200 }),
@@ -35,9 +43,14 @@ export const users = pgTable(
   updated_at: timestamp("updated_at").defaultNow(),
   },
   (table) => ({
-    businessUsernameIdx: uniqueIndex("users_business_username_idx").on(
-      table.business_id,
-      table.username,
-    ),
+    // Staff usernames are unique within their branch.
+    branchUsernameIdx: uniqueIndex("users_branch_username_idx")
+      .on(table.branch_id, table.username)
+      .where(sql`${table.branch_id} IS NOT NULL`),
+    // Cross-branch accounts (owners; super_admins have NULL business_id, which
+    // Postgres treats as distinct) are unique within their business.
+    businessUsernameIdx: uniqueIndex("users_business_username_idx")
+      .on(table.business_id, table.username)
+      .where(sql`${table.branch_id} IS NULL`),
   }),
 );

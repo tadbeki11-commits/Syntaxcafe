@@ -10,6 +10,7 @@ export * from "./main-categories.table";
 export * from "./categories.table";
 export * from "./menu-item-categories.table";
 export * from "./orders.table";
+export * from "./order-counters.table";
 export * from "./order-items.table";
 export * from "./order-status-logs.table";
 export * from "./payments.table";

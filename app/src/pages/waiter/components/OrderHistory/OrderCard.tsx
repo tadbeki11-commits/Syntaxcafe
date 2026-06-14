@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React from 'react';
 import { 
   Calendar, 
@@ -103,7 +103,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-black text-foreground tracking-tight">
-                  Order #{uuidToDisplayId(order.id)}
+                  Order {formatOrderNumber(order)}
                 </h3>
                 <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-wider py-0.5 px-2 bg-muted/80">
                   {order.type || 'Cafe'}

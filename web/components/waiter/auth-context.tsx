@@ -19,7 +19,7 @@ interface WaiterAuthContextValue {
   user: WaiterUser | null;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<WaiterUser>;
+  login: (name: string, pin: string) => Promise<WaiterUser>;
   logout: () => void;
 }
 
@@ -38,8 +38,8 @@ export function WaiterAuthProvider({
     setLoading(false);
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const u = await waiterLogin(username, password);
+  const login = useCallback(async (name: string, pin: string) => {
+    const u = await waiterLogin(name, pin);
     setUser(u);
     return u;
   }, []);

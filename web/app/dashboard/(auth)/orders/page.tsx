@@ -21,16 +21,11 @@ import { PageHeader } from "@/components/page-header";
 import { Orders, Payments, Settings } from "@/lib/resources";
 import { getUser } from "@/lib/auth";
 import { birr, shortDate } from "@/lib/format";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-
+import { formatOrderNumber } from "@/lib/utils";
 
 type Order = {
   id: string;
+  order_number?: number | null;
   type: string | null;
   status: string;
   payment_status: string | null;
@@ -96,7 +91,7 @@ export default function OrdersPage() {
       key: "id",
       label: "Order",
       className: "font-mono text-xs",
-      render: (o) => o.id.slice(0, 8),
+      render: (o) => formatOrderNumber(o),
     },
     {
       key: "type",
@@ -147,62 +142,45 @@ export default function OrdersPage() {
         }
       />
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ) : orders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
-                    No orders yet. Create your first order.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                orders.map((o) => (
-                  <TableRow key={o.id}>
-                    <TableCell className="font-mono text-xs">{o.id.slice(0, 8)}</TableCell>
-                    <TableCell className="capitalize">{o.type ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="muted" className="capitalize">{o.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={isPaid(o) ? "success" : "muted"} className="capitalize">
-                        {o.payment_status ?? "unpaid"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{birr(o.total_amount)}</TableCell>
-                    <TableCell className="text-muted-foreground">{shortDate(o.created_at)}</TableCell>
-                    <TableCell className="text-right">
-                      {!isPaid(o) && (
-                        <Button variant="outline" size="sm" onClick={() => openPay(o)}>
-                          Take payment
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable<Order>
+        columns={columns}
+        rows={orders}
+        loading={loading}
+        searchKeys={["id", "type", "status", "payment_status"]}
+        searchPlaceholder="Search orders…"
+        emptyMessage="No orders yet. Create your first order."
+        filters={[
+          {
+            key: "status",
+            label: "Status",
+            options: [
+              { value: "pending", label: "Pending" },
+              { value: "completed", label: "Completed" },
+              { value: "paid", label: "Paid" },
+              { value: "cancelled", label: "Cancelled" },
+            ],
+          },
+          {
+            key: "payment",
+            label: "Payment",
+            options: [
+              { value: "paid", label: "Paid" },
+              { value: "unpaid", label: "Unpaid" },
+            ],
+            match: (o, v) => (v === "paid" ? isPaid(o) : !isPaid(o)),
+          },
+        ]}
+        dateFilters={[
+          { key: "created_at", label: "Date", getDate: (o) => o.created_at },
+        ]}
+        rowActions={(o) =>
+          !isPaid(o) ? (
+            <Button variant="outline" size="sm" onClick={() => openPay(o)}>
+              Take payment
+            </Button>
+          ) : null
+        }
+      />
 
       <Dialog open={!!paying} onOpenChange={(v) => !v && setPaying(null)}>
         <DialogContent>

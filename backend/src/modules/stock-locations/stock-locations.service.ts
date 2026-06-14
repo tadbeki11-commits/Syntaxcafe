@@ -79,7 +79,7 @@ export class StockLocationsService {
     const [row] = await db
       .select()
       .from(stockLocations)
-      .where(eq(stockLocations.id, id))
+      .where(and(eq(stockLocations.id, id), eq(stockLocations.branch_id, requireBranchId())))
       .limit(1);
     if (!row) throw new NotFoundException("Stock location not found");
     return row;
@@ -96,10 +96,11 @@ export class StockLocationsService {
       ? payload.location_type
       : "storage";
 
+    const branchId = requireBranchId();
     const [existing] = await db
       .select({ id: stockLocations.id })
       .from(stockLocations)
-      .where(eq(stockLocations.slug, slug))
+      .where(and(eq(stockLocations.slug, slug), eq(stockLocations.branch_id, branchId)))
       .limit(1);
     if (existing) {
       throw new BadRequestException(`Location slug "${slug}" already exists`);
@@ -112,7 +113,7 @@ export class StockLocationsService {
         await tx
           .update(stockLocations)
           .set({ is_default: false, updated_at: new Date() })
-          .where(eq(stockLocations.is_default, true));
+          .where(and(eq(stockLocations.is_default, true), eq(stockLocations.branch_id, branchId)));
       }
 
       const [created] = await tx
@@ -137,13 +138,13 @@ export class StockLocationsService {
         const [defaultRow] = await tx
           .select({ id: stockLocations.id })
           .from(stockLocations)
-          .where(eq(stockLocations.is_default, true))
+          .where(and(eq(stockLocations.is_default, true), eq(stockLocations.branch_id, branchId)))
           .limit(1);
         if (!defaultRow) {
           const [promoted] = await tx
             .update(stockLocations)
             .set({ is_default: true, updated_at: new Date() })
-            .where(eq(stockLocations.id, created.id))
+            .where(and(eq(stockLocations.id, created.id), eq(stockLocations.branch_id, branchId)))
             .returning();
           if (promoted) Object.assign(created, promoted);
           created.is_default = true;
@@ -164,6 +165,7 @@ export class StockLocationsService {
   }
 
   async update(id: string, payload: any) {
+    const branchId = requireBranchId();
     const current = await this.findById(id);
     const updates: Record<string, any> = {
       updated_at: new Date(),
@@ -182,7 +184,13 @@ export class StockLocationsService {
       const [conflict] = await db
         .select({ id: stockLocations.id })
         .from(stockLocations)
-        .where(and(eq(stockLocations.slug, slug), ne(stockLocations.id, id)))
+        .where(
+          and(
+            eq(stockLocations.slug, slug),
+            ne(stockLocations.id, id),
+            eq(stockLocations.branch_id, branchId),
+          ),
+        )
         .limit(1);
       if (conflict) {
         throw new BadRequestException(`Location slug "${slug}" already exists`);
@@ -223,7 +231,11 @@ export class StockLocationsService {
         .select({ id: stockLocations.id })
         .from(stockLocations)
         .where(
-          and(eq(stockLocations.is_default, true), ne(stockLocations.id, id)),
+          and(
+            eq(stockLocations.is_default, true),
+            ne(stockLocations.id, id),
+            eq(stockLocations.branch_id, branchId),
+          ),
         )
         .limit(1);
       if (!otherDefault) {
@@ -239,14 +251,14 @@ export class StockLocationsService {
         await tx
           .update(stockLocations)
           .set({ is_default: false, updated_at: new Date() })
-          .where(eq(stockLocations.is_default, true));
+          .where(and(eq(stockLocations.is_default, true), eq(stockLocations.branch_id, branchId)));
         updates.is_default = true;
       }
 
       const [updated] = await tx
         .update(stockLocations)
         .set(updates)
-        .where(eq(stockLocations.id, id))
+        .where(and(eq(stockLocations.id, id), eq(stockLocations.branch_id, branchId)))
         .returning();
 
       if (!updated) throw new NotFoundException("Stock location not found");
@@ -287,7 +299,7 @@ export class StockLocationsService {
         updated_at: new Date(),
         version: (current.version ?? 1) + 1,
       })
-      .where(eq(stockLocations.id, id))
+      .where(and(eq(stockLocations.id, id), eq(stockLocations.branch_id, requireBranchId())))
       .returning();
 
     if (updated) {
@@ -315,7 +327,12 @@ export class StockLocationsService {
       })
       .from(inventoryStock)
       .innerJoin(inventoryItems, eq(inventoryStock.inventory_item_id, inventoryItems.id))
-      .where(eq(inventoryStock.location_id, id));
+      .where(
+        and(
+          eq(inventoryStock.location_id, id),
+          eq(inventoryStock.branch_id, requireBranchId()),
+        ),
+      );
 
     return { location, stock: stockRows, count: stockRows.length };
   }
@@ -326,7 +343,12 @@ export class StockLocationsService {
         total: sql<number>`COALESCE(sum(quantity), 0)`,
       })
       .from(inventoryStock)
-      .where(eq(inventoryStock.location_id, id));
+      .where(
+        and(
+          eq(inventoryStock.location_id, id),
+          eq(inventoryStock.branch_id, requireBranchId()),
+        ),
+      );
     return row ? Number(row.total) : 0;
   }
 }

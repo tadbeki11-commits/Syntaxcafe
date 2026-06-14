@@ -40,6 +40,7 @@ export default function PaymentsPage() {
           ],
         },
       ]}
+      dateFilters={[{ key: "created_at", label: "Date", getDate: (r) => r.created_at }]}
       load={Payments.history}
     />
   );

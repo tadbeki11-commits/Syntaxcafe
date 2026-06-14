@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { useRouter } from "next/navigation";
 import LoadingSpinner from "@/components/waiter/LoadingSpinner";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +88,7 @@ export default function CreateOrderPage() {
           />
 
           <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-border/80 bg-background/90 shadow-sm shadow-amber-100/30">
-            <div className="flex flex-col gap-3 border-b border-border/50 bg-gradient-to-r from-white to-amber-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-b border-border/50 bg-linear-to-r from-white to-amber-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <h3 className="text-base font-bold text-foreground">
@@ -120,7 +119,7 @@ export default function CreateOrderPage() {
             <CardContent className="min-h-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 overflow-auto gap-2 p-2">
               {filteredItems.length === 0 ? (
                 <div className="col-span-full flex min-h-full flex-col items-center justify-center px-6 py-16 text-center">
-                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-amber-100 to-orange-100 text-2xl shadow-sm">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-linear-to-br from-amber-100 to-orange-100 text-2xl shadow-sm">
                     🍽️
                   </div>
                   <h3 className="text-lg font-bold text-foreground mb-1">

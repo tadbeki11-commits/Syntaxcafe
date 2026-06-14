@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -43,7 +43,7 @@ export const OrderStreamPanel: React.FC<OrderStreamPanelProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
                   <span className="font-extrabold text-xs text-foreground">
-                    #{uuidToDisplayId(order.id)}
+                    {formatOrderNumber(order)}
                   </span>
                   <Badge
                     variant={

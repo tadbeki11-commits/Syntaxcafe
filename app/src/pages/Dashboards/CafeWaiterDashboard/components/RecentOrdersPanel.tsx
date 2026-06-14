@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React from 'react';
 import { MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -44,7 +44,7 @@ export const RecentOrdersPanel: React.FC<RecentOrdersPanelProps> = ({ orders }) 
                         {order.order_type_label || (order.table_number ? `Table ${order.table_number}` : 'Take Away')}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        Order #{uuidToDisplayId(order.id)}
+                        Order {formatOrderNumber(order)}
                       </span>
                       {isCanceled ? (
                         <Badge variant="destructive" className="text-[9px] uppercase py-0 px-2">

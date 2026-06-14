@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { uuidToDisplayId } from "@/lib/utils";
+import { formatOrderNumber } from "@/lib/utils";
 import React from "react";
 import { MapPin } from "lucide-react";
 import {
@@ -63,7 +63,7 @@ export const RecentOrdersPanel: React.FC<RecentOrdersPanelProps> = ({
                             : "Take Away")}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        Order #{uuidToDisplayId(order.id)}
+                        Order {formatOrderNumber(order)}
                       </span>
                       {isCanceled ? (
                         <Badge

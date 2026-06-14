@@ -4,14 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DataTable, type Column } from "@/components/data-table";
 import { apiFetch } from "@/lib/api";
 
 type Device = {
@@ -35,6 +28,44 @@ function relativeTime(iso: string | null): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+const columns: Column<Device>[] = [
+  {
+    key: "name",
+    label: "Device",
+    searchValue: (d) => `${d.name ?? ""} ${d.business_name ?? ""} ${d.branch_name ?? ""}`,
+    render: (d) => (
+      <div className="flex items-center gap-3">
+        <span
+          className={`size-2.5 shrink-0 rounded-full ${d.online ? "bg-green-500" : "bg-muted-foreground/40"}`}
+          title={d.online ? "Online" : "Offline"}
+        />
+        <div>
+          <div className="font-medium">{d.name ?? "Unnamed device"}</div>
+          <div className="text-muted-foreground text-xs">
+            {d.business_name ?? "—"} · {d.branch_name ?? "—"}
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    key: "status",
+    label: "Status",
+    render: (d) => (
+      <Badge variant="muted" className="capitalize">
+        {d.status}
+      </Badge>
+    ),
+  },
+  {
+    key: "last_seen_at",
+    label: "Last seen",
+    className: "text-muted-foreground",
+    searchValue: () => "",
+    render: (d) => relativeTime(d.last_seen_at),
+  },
+];
+
 export default function PlatformDevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [online, setOnline] = useState(0);
@@ -52,8 +83,6 @@ export default function PlatformDevicesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Skeleton className="h-64 w-full" />;
-
   return (
     <div className="space-y-6">
       <div>
@@ -64,42 +93,34 @@ export default function PlatformDevicesPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Enrolled devices</CardTitle>
-          <CardDescription>Every POS install across all businesses.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {devices.length === 0 ? (
-            <div className="text-muted-foreground py-6 text-center text-sm">
-              No devices enrolled yet.
-            </div>
-          ) : (
-            <div className="divide-y rounded-md border">
-              {devices.map((d) => (
-                <div key={d.id} className="flex items-center gap-3 p-3">
-                  <span
-                    className={`size-2.5 shrink-0 rounded-full ${d.online ? "bg-green-500" : "bg-muted-foreground/40"}`}
-                    title={d.online ? "Online" : "Offline"}
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">{d.name ?? "Unnamed device"}</div>
-                    <div className="text-muted-foreground text-xs">
-                      {d.business_name ?? "—"} · {d.branch_name ?? "—"}
-                    </div>
-                  </div>
-                  <Badge variant="muted" className="capitalize">
-                    {d.status}
-                  </Badge>
-                  <span className="text-muted-foreground w-20 text-right text-xs">
-                    {relativeTime(d.last_seen_at)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable<Device>
+        columns={columns}
+        rows={devices}
+        loading={loading}
+        searchKeys={["name"]}
+        searchPlaceholder="Search devices…"
+        emptyMessage="No devices enrolled yet."
+        filters={[
+          {
+            key: "online",
+            label: "Connectivity",
+            options: [
+              { value: "online", label: "Online" },
+              { value: "offline", label: "Offline" },
+            ],
+            match: (d, v) => (v === "online" ? d.online : !d.online),
+          },
+          {
+            key: "status",
+            label: "Status",
+            options: [
+              { value: "active", label: "Active" },
+              { value: "pending", label: "Pending" },
+              { value: "revoked", label: "Revoked" },
+            ],
+          },
+        ]}
+      />
     </div>
   );
 }

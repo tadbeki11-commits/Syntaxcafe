@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,7 +72,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
                   } hover:bg-muted/50`}
                 onClick={() => setSelectedOrder(order)}
               >
-                <TableCell className="font-medium">#{uuidToDisplayId(order.id)}</TableCell>
+                <TableCell className="font-medium">{formatOrderNumber(order)}</TableCell>
 
                 <TableCell>
                   {order.table_number ? (

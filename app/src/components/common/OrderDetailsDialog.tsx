@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { uuidToDisplayId } from '@/lib/utils';
+import { uuidToDisplayId, formatOrderNumber } from '@/lib/utils';
 
 export interface OrderDetailsDialogProps {
   order: any | null;
@@ -21,7 +21,7 @@ export const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Order Details #{uuidToDisplayId(order.id)}</DialogTitle>
+          <DialogTitle>Order Details {formatOrderNumber(order)}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-3 rounded-md">

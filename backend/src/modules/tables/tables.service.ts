@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "../../db/drizzle";
 import { diningTables } from "../../db/schema";
 import { requireBranchId, tenantInsert } from "../../common/tenant/tenant-context";
@@ -22,7 +22,7 @@ export class TablesService {
     const [row] = await db
       .select()
       .from(diningTables)
-      .where(eq(diningTables.id, id))
+      .where(and(eq(diningTables.id, id), eq(diningTables.branch_id, requireBranchId())))
       .limit(1);
     if (!row) throw new NotFoundException("Table not found");
     return row;
@@ -63,7 +63,7 @@ export class TablesService {
     const [updated] = await db
       .update(diningTables)
       .set(updates)
-      .where(eq(diningTables.id, id))
+      .where(and(eq(diningTables.id, id), eq(diningTables.branch_id, requireBranchId())))
       .returning();
 
     if (!updated) throw new NotFoundException("Table not found");
@@ -73,7 +73,7 @@ export class TablesService {
   async remove(id: string) {
     const [deleted] = await db
       .delete(diningTables)
-      .where(eq(diningTables.id, id))
+      .where(and(eq(diningTables.id, id), eq(diningTables.branch_id, requireBranchId())))
       .returning();
     if (!deleted) throw new NotFoundException("Table not found");
     return deleted;

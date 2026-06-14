@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +25,7 @@ export const RecentOrdersList: React.FC<RecentOrdersListProps> = ({ recentOrders
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
                   <span className="font-extrabold text-xs text-foreground">
-                    Order #{uuidToDisplayId(order.id)}
+                    Order {formatOrderNumber(order)}
                   </span>
                   <Badge variant="secondary" className="text-[9px] capitalize py-0 px-1.5">
                     {String(order.type || '').trim().toLowerCase() === 'bakery' ? 'cafe' : order.type}

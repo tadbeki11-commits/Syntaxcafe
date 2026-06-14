@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React from 'react';
 import { Order } from '@/types/api.types';
 
@@ -51,7 +51,7 @@ export const ReceiptSelector: React.FC<ReceiptSelectorProps> = ({
                     }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-medium">Order #{uuidToDisplayId(order.id)}</span>
+                    <span className="font-medium">Order {formatOrderNumber(order)}</span>
                     <span className="text-sm text-gray-600">
                       {parseFloat(String(order.total_amount)).toFixed(2)} Birr
                     </span>

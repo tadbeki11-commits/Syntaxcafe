@@ -15,6 +15,7 @@
     "db:populate-menu": "ts-node-dev --transpile-only scripts/seedCafeMenu.ts",
     "init-db": "ts-node-dev --transpile-only scripts/seed.ts",
     "db:backfill-slugs": "ts-node-dev --transpile-only scripts/backfillSlugs.ts",
+    "db:backfill-user-branch": "ts-node-dev --transpile-only scripts/backfillUserBranch.ts",
     "legacy:dev": "nodemon --watch server.js --watch routes --watch controllers --watch models --watch middleware --watch config --ignore data/** --ignore web/** server.js"
   },
   "keywords": [

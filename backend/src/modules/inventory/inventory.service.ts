@@ -103,10 +103,11 @@ export class InventoryService {
   }
 
   async findOne(id: string) {
+    const branchId = requireBranchId();
     const [item] = await db
       .select()
       .from(inventoryItems)
-      .where(eq(inventoryItems.id, id))
+      .where(and(eq(inventoryItems.id, id), eq(inventoryItems.branch_id, branchId)))
       .limit(1);
 
     if (!item) throw new NotFoundException("Inventory item not found");
@@ -123,16 +124,23 @@ export class InventoryService {
         stockLocations,
         eq(inventoryStock.location_id, stockLocations.id),
       )
-      .where(eq(inventoryStock.inventory_item_id, id));
+      .where(
+        and(
+          eq(inventoryStock.inventory_item_id, id),
+          eq(inventoryStock.branch_id, branchId),
+        ),
+      );
 
     return { ...item, stock_by_location: stockRows };
   }
 
   async findTransfers(page: number = 1, limit: number = 10) {
+    const branchId = requireBranchId();
     // Get total count
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)` })
-      .from(stockTransfers);
+      .from(stockTransfers)
+      .where(eq(stockTransfers.branch_id, branchId));
 
     // Get paginated transfers
     const offset = (page - 1) * limit;
@@ -153,6 +161,7 @@ export class InventoryService {
         updated_at: stockTransfers.updated_at,
       })
       .from(stockTransfers)
+      .where(eq(stockTransfers.branch_id, branchId))
       .orderBy(sql`${stockTransfers.created_at} desc`)
       .limit(limit)
       .offset(offset);
@@ -282,7 +291,7 @@ export class InventoryService {
           const [defaultLoc] = await tx
             .select()
             .from(stockLocations)
-            .where(eq(stockLocations.is_default, true))
+            .where(and(eq(stockLocations.is_default, true), eq(stockLocations.branch_id, requireBranchId())))
             .limit(1);
           if (defaultLoc) {
             await tx.insert(inventoryStock).values({
@@ -368,7 +377,7 @@ export class InventoryService {
       const [updated] = await tx
         .update(inventoryItems)
         .set(updates)
-        .where(eq(inventoryItems.id, id))
+        .where(and(eq(inventoryItems.id, id), eq(inventoryItems.branch_id, requireBranchId())))
         .returning();
 
       if (!updated) throw new NotFoundException("Inventory item not found");
@@ -495,7 +504,7 @@ export class InventoryService {
     await emitDeleted(db, "inventory_item", "INVENTORY_ITEM_DELETED", id);
     const [deleted] = await db
       .delete(inventoryItems)
-      .where(eq(inventoryItems.id, id))
+      .where(and(eq(inventoryItems.id, id), eq(inventoryItems.branch_id, requireBranchId())))
       .returning({ id: inventoryItems.id });
     if (!deleted) throw new NotFoundException("Inventory item not found");
     return deleted;
@@ -503,6 +512,7 @@ export class InventoryService {
 
   async getStockMovements(inventoryItemId: string, locationId?: string, page: number = 1, limit: number = 20) {
     const whereConditions = [
+      eq(stockMovements.branch_id, requireBranchId()),
       eq(stockMovements.inventory_item_id, inventoryItemId),
     ];
 
@@ -577,6 +587,7 @@ export class InventoryService {
       meta,
       createdBy,
     } = params;
+    const branchId = requireBranchId();
 
     // Check idempotency for order/sync
     if (meta?.orderId && meta?.orderItemId) {
@@ -585,6 +596,7 @@ export class InventoryService {
         .from(stockMovements)
         .where(
           and(
+            eq(stockMovements.branch_id, branchId),
             eq(stockMovements.inventory_item_id, inventoryItemId),
             eq(stockMovements.location_id, locationId),
             eq(stockMovements.movement_type, movementType),
@@ -601,6 +613,7 @@ export class InventoryService {
             .from(inventoryStock)
             .where(
               and(
+                eq(inventoryStock.branch_id, branchId),
                 eq(inventoryStock.inventory_item_id, inventoryItemId),
                 eq(inventoryStock.location_id, locationId),
               ),
@@ -618,6 +631,7 @@ export class InventoryService {
         .from(inventoryStock)
         .where(
           and(
+            eq(inventoryStock.branch_id, branchId),
             eq(inventoryStock.inventory_item_id, inventoryItemId),
             eq(inventoryStock.location_id, locationId),
           ),
@@ -668,12 +682,13 @@ export class InventoryService {
   }
 
   async updateQuantity(id: string, payload: any) {
+    const branchId = requireBranchId();
     let locationId = payload.location_id || payload.locationId || "";
     if (!locationId) {
       const [defaultLoc] = await db
         .select()
         .from(stockLocations)
-        .where(eq(stockLocations.is_default, true))
+        .where(and(eq(stockLocations.is_default, true), eq(stockLocations.branch_id, branchId)))
         .limit(1);
       if (!defaultLoc)
         throw new BadRequestException("No default stock location defined");
@@ -699,6 +714,7 @@ export class InventoryService {
         .from(inventoryStock)
         .where(
           and(
+            eq(inventoryStock.branch_id, branchId),
             eq(inventoryStock.inventory_item_id, id),
             eq(inventoryStock.location_id, locationId),
           ),
@@ -745,7 +761,7 @@ export class InventoryService {
     const [updated] = await db
       .select()
       .from(inventoryItems)
-      .where(eq(inventoryItems.id, id))
+      .where(and(eq(inventoryItems.id, id), eq(inventoryItems.branch_id, branchId)))
       .limit(1);
 
     const stocks = await db
@@ -760,7 +776,12 @@ export class InventoryService {
         stockLocations,
         eq(inventoryStock.location_id, stockLocations.id),
       )
-      .where(eq(inventoryStock.inventory_item_id, id));
+      .where(
+        and(
+          eq(inventoryStock.inventory_item_id, id),
+          eq(inventoryStock.branch_id, branchId),
+        ),
+      );
 
     return {
       ...updated,
@@ -787,6 +808,7 @@ export class InventoryService {
       throw new BadRequestException("Transfer requires at least one item");
     }
 
+    const branchId = requireBranchId();
     return db.transaction(async (tx) => {
       const [transfer] = await tx
         .insert(stockTransfers)
@@ -813,7 +835,7 @@ export class InventoryService {
         const [item] = await tx
           .select()
           .from(inventoryItems)
-          .where(eq(inventoryItems.id, itemId))
+          .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.branch_id, branchId)))
           .limit(1);
         if (!item)
           throw new NotFoundException(`Inventory item ID ${itemId} not found`);
@@ -823,6 +845,7 @@ export class InventoryService {
           .from(inventoryStock)
           .where(
             and(
+              eq(inventoryStock.branch_id, branchId),
               eq(inventoryStock.inventory_item_id, itemId),
               eq(inventoryStock.location_id, fromLocationId),
             ),
@@ -856,6 +879,7 @@ export class InventoryService {
           .from(inventoryStock)
           .where(
             and(
+              eq(inventoryStock.branch_id, branchId),
               eq(inventoryStock.inventory_item_id, itemId),
               eq(inventoryStock.location_id, toLocationId),
             ),
@@ -926,7 +950,7 @@ export class InventoryService {
         received_at: new Date(),
         updated_at: new Date(),
       })
-      .where(eq(stockTransfers.id, id))
+      .where(and(eq(stockTransfers.id, id), eq(stockTransfers.branch_id, requireBranchId())))
       .returning();
     if (!updated) throw new NotFoundException("Transfer not found");
     return updated;
@@ -935,7 +959,11 @@ export class InventoryService {
   async checkAvailability(
     items: Array<{ menu_item_id: string; quantity: number }>,
   ) {
-    const locationsList = await db.select().from(stockLocations);
+    const branchId = requireBranchId();
+    const locationsList = await db
+      .select()
+      .from(stockLocations)
+      .where(eq(stockLocations.branch_id, branchId));
     const defaultLoc =
       locationsList.find((l) => l.is_default) || locationsList[0];
 
@@ -971,7 +999,7 @@ export class InventoryService {
       const [menuItem] = await db
         .select()
         .from(menuItems)
-        .where(eq(menuItems.id, menuItemId))
+        .where(and(eq(menuItems.id, menuItemId), eq(menuItems.branch_id, branchId)))
         .limit(1);
       if (!menuItem) continue;
 
@@ -982,6 +1010,7 @@ export class InventoryService {
           and(
             eq(recipes.menu_item_id, menuItemId),
             eq(recipes.is_active, true),
+            eq(recipes.branch_id, branchId),
           ),
         )
         .limit(1);
@@ -990,7 +1019,12 @@ export class InventoryService {
       const ingredients = await db
         .select()
         .from(recipeIngredients)
-        .where(eq(recipeIngredients.recipe_id, recipe.id));
+        .where(
+          and(
+            eq(recipeIngredients.recipe_id, recipe.id),
+            eq(recipeIngredients.branch_id, branchId),
+          ),
+        );
 
       const locId = resolveLocationId(recipe, menuItem);
       if (!locId) continue;
@@ -1032,6 +1066,7 @@ export class InventoryService {
         )
         .where(
           and(
+            eq(inventoryStock.branch_id, branchId),
             eq(inventoryStock.inventory_item_id, req.inventory_item_id),
             eq(inventoryStock.location_id, req.location_id),
           ),
@@ -1048,12 +1083,12 @@ export class InventoryService {
           const [item] = await db
             .select()
             .from(inventoryItems)
-            .where(eq(inventoryItems.id, req.inventory_item_id))
+            .where(and(eq(inventoryItems.id, req.inventory_item_id), eq(inventoryItems.branch_id, branchId)))
             .limit(1);
           const [loc] = await db
             .select()
             .from(stockLocations)
-            .where(eq(stockLocations.id, req.location_id))
+            .where(and(eq(stockLocations.id, req.location_id), eq(stockLocations.branch_id, branchId)))
             .limit(1);
           itemName = item?.name || `Item ${req.inventory_item_id}`;
           baseUnit = item?.base_unit || "piece";

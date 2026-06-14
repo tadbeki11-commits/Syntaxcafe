@@ -9,7 +9,7 @@ import { systemSettings } from "../../db/tables/system-settings.table";
 import { users } from "../../db/tables/users.table";
 import { OrderInventoryService } from "../order/order-inventory.service";
 import { emitCreated, emitUpdated } from "../sync/sync-emit.util";
-import { tenantInsert } from "../../common/tenant/tenant-context";
+import { requireBranchId, tenantInsert } from "../../common/tenant/tenant-context";
 const QRCode: any = require("qrcode");
 
 @Injectable()
@@ -51,7 +51,7 @@ export class PaymentService {
       .from(payments)
       .leftJoin(orders, eq(payments.order_id, orders.id))
       .leftJoin(users, eq(payments.processed_by, users.id))
-      .where(eq(payments.id, id))
+      .where(and(eq(payments.id, id), eq(payments.branch_id, requireBranchId())))
       .limit(1);
 
     if (!row) return undefined;
@@ -72,7 +72,12 @@ export class PaymentService {
       })
       .from(payments)
       .leftJoin(users, eq(payments.processed_by, users.id))
-      .where(eq(payments.order_id, orderId))
+      .where(
+        and(
+          eq(payments.order_id, orderId),
+          eq(payments.branch_id, requireBranchId()),
+        ),
+      )
       .orderBy(desc(payments.created_at));
 
     return rows.map((row: any) => ({
@@ -109,7 +114,7 @@ export class PaymentService {
     const [updated] = await db
       .update(payments)
       .set({ qr_code: qrCodeDataURL, updated_at: new Date() })
-      .where(eq(payments.id, id))
+      .where(and(eq(payments.id, id), eq(payments.branch_id, requireBranchId())))
       .returning();
 
     return updated;
@@ -119,7 +124,7 @@ export class PaymentService {
     const [updated] = await db
       .update(payments)
       .set({ status, processed_by: processedBy, updated_at: new Date() })
-      .where(eq(payments.id, id))
+      .where(and(eq(payments.id, id), eq(payments.branch_id, requireBranchId())))
       .returning();
     if (updated) {
       await emitUpdated(db, "payment", "PAYMENT_UPDATED", updated as any);
@@ -128,10 +133,16 @@ export class PaymentService {
   }
 
   async confirmPayment(id: string, processedBy?: any) {
+    const branchId = requireBranchId();
     const [settingRow] = await db
       .select({ value: systemSettings.value })
       .from(systemSettings)
-      .where(eq(systemSettings.key, "allow_low_stock_orders"))
+      .where(
+        and(
+          eq(systemSettings.key, "allow_low_stock_orders"),
+          eq(systemSettings.branch_id, branchId),
+        ),
+      )
       .limit(1);
     const allowLowStock = settingRow?.value === "true";
 
@@ -144,7 +155,7 @@ export class PaymentService {
           paid_at: new Date(),
           updated_at: new Date(),
         })
-        .where(eq(payments.id, id))
+        .where(and(eq(payments.id, id), eq(payments.branch_id, branchId)))
         .returning();
 
       if (!payment) {
@@ -169,7 +180,9 @@ export class PaymentService {
           payment_status: "paid",
           updated_at: new Date(),
         })
-        .where(eq(orders.id, payment.order_id));
+        .where(
+          and(eq(orders.id, payment.order_id), eq(orders.branch_id, branchId)),
+        );
 
       const orderLines = await tx
         .select({
@@ -209,7 +222,12 @@ export class PaymentService {
       .from(payments)
       .innerJoin(orders, eq(payments.order_id, orders.id))
       .leftJoin(users, eq(payments.processed_by, users.id))
-      .where(eq(payments.status, "pending"))
+      .where(
+        and(
+          eq(payments.status, "pending"),
+          eq(payments.branch_id, requireBranchId()),
+        ),
+      )
       .orderBy(asc(payments.created_at));
 
     return rows.map((row: any) => ({
@@ -222,7 +240,7 @@ export class PaymentService {
   }
 
   async getPaymentHistory(filters: any) {
-    const conditions = [] as any[];
+    const conditions = [eq(payments.branch_id, requireBranchId())] as any[];
     if (filters.status) conditions.push(eq(payments.status, filters.status));
     if (filters.payment_method)
       conditions.push(eq(payments.payment_method, filters.payment_method));

@@ -49,7 +49,7 @@ export class OrganizationService {
     const [row] = await db
       .select()
       .from(organizations)
-      .where(eq(organizations.id, id))
+      .where(and(eq(organizations.id, id), eq(organizations.branch_id, requireBranchId())))
       .limit(1);
     if (!row) throw new NotFoundException("Organization not found");
     return row;
@@ -115,7 +115,7 @@ export class OrganizationService {
       const [updated] = await tx
         .update(organizations)
         .set(updates)
-        .where(eq(organizations.id, id))
+        .where(and(eq(organizations.id, id), eq(organizations.branch_id, requireBranchId())))
         .returning();
       if (!updated) throw new NotFoundException("Organization not found");
 
@@ -142,7 +142,7 @@ export class OrganizationService {
         updated_at: new Date(),
         version: (current.version ?? 1) + 1,
       })
-      .where(eq(organizations.id, id))
+      .where(and(eq(organizations.id, id), eq(organizations.branch_id, requireBranchId())))
       .returning();
 
     if (updated) {
@@ -162,7 +162,12 @@ export class OrganizationService {
     const rows = await db
       .select()
       .from(orders)
-      .where(eq(orders.organization_id, id))
+      .where(
+        and(
+          eq(orders.organization_id, id),
+          eq(orders.branch_id, requireBranchId()),
+        ),
+      )
       .orderBy(desc(orders.created_at));
 
     const withItems = await Promise.all(

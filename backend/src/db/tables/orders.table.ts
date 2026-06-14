@@ -15,6 +15,10 @@ import { tenantColumns } from "./_tenant";
 export const orders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
   ...tenantColumns(),
+  // Human-friendly, ever-increasing serial scoped to the branch. Assigned on
+  // create/sync from order_counters. Nullable for legacy rows created before
+  // this column existed.
+  order_number: integer("order_number"),
   customer_id: text("customer_id"),
   organization_id: uuid("organization_id").references(() => organizations.id, {
     onDelete: "set null",

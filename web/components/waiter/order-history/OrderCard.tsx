@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { uuidToDisplayId } from "@/lib/utils";
+import { formatOrderNumber } from "@/lib/utils";
 import React from "react";
 import { Calendar, MapPin, Plus, ClipboardList, ChefHat } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -106,7 +106,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-black text-foreground tracking-tight">
-                  Order #{uuidToDisplayId(order.id)}
+                  Order {formatOrderNumber(order)}
                 </h3>
                 <Badge
                   variant="secondary"

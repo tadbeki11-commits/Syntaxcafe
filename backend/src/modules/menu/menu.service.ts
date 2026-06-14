@@ -86,7 +86,11 @@ export class MenuService {
       for (const item of items) {
         const categoryInputs = asCategoryInputs(item);
         const [existing] = item.id
-          ? await tx.select({ id: menuItems.id }).from(menuItems).where(eq(menuItems.id, item.id)).limit(1)
+          ? await tx
+              .select({ id: menuItems.id })
+              .from(menuItems)
+              .where(and(eq(menuItems.id, item.id), eq(menuItems.branch_id, requireBranchId())))
+              .limit(1)
           : [];
 
         if (existing) {
@@ -107,7 +111,7 @@ export class MenuService {
               barcode: item.barcode ?? null,
               updated_at: new Date()
             })
-            .where(eq(menuItems.id, item.id));
+            .where(and(eq(menuItems.id, item.id), eq(menuItems.branch_id, requireBranchId())));
           await this.replaceMenuItemCategories(tx, item.id, categoryInputs);
           updatedIds.push(item.id);
         } else {
@@ -161,7 +165,7 @@ export class MenuService {
         eq(menuItems.id, menuItemCategories.menu_item_id),
       )
       .leftJoin(categories, eq(menuItemCategories.category_id, categories.id))
-      .where(eq(menuItems.id, id))
+      .where(and(eq(menuItems.id, id), eq(menuItems.branch_id, requireBranchId())))
       .orderBy(asc(categories.display_order), asc(categories.name));
 
     return this.hydrateMenuItems(rows)[0];
@@ -238,7 +242,7 @@ export class MenuService {
         await tx
           .update(menuItems)
           .set({ ...updates, updated_at: new Date() })
-          .where(eq(menuItems.id, id))
+          .where(and(eq(menuItems.id, id), eq(menuItems.branch_id, requireBranchId())))
           .returning();
       }
 
@@ -258,7 +262,7 @@ export class MenuService {
     await emitDeleted(db, "menu_item", "MENU_ITEM_DELETED", id);
     const [deleted] = await db
       .delete(menuItems)
-      .where(eq(menuItems.id, id))
+      .where(and(eq(menuItems.id, id), eq(menuItems.branch_id, requireBranchId())))
       .returning({ id: menuItems.id });
     return deleted;
   }
@@ -419,7 +423,12 @@ export class MenuService {
       .select({ menu_item_id: menuItemCategories.menu_item_id })
       .from(menuItemCategories)
       .innerJoin(categories, eq(menuItemCategories.category_id, categories.id))
-      .where(inArray(categories.slug, slugs))
+      .where(
+        and(
+          eq(categories.branch_id, requireBranchId()),
+          inArray(categories.slug, slugs),
+        ),
+      )
       .groupBy(menuItemCategories.menu_item_id);
 
     if (match === "all") {

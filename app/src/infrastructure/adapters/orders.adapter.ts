@@ -189,6 +189,65 @@ const upsertOrder = async (order: any) => {
   return upsertRow(localDbTables.orders, order);
 };
 
+/** Shape a backend order row into the local-DB order record. */
+const mapServerOrderToLocal = (remote: any, cached?: any) => ({
+  id: remote.id,
+  order_number: remote.order_number ?? cached?.order_number ?? null,
+  employee_id: remote.employee_id,
+  waiter_id: remote.waiter_id,
+  created_by_id: remote.created_by_id,
+  organization_id: remote.organization_id,
+  type: remote.type,
+  status: remote.status,
+  payment_status: remote.payment_status,
+  total_amount: remote.total_amount,
+  notes: remote.notes,
+  table_number: remote.table_number,
+  items: remote.items || [],
+  synced: 1,
+  // Keep the local print flag so a pull/socket refresh never re-queues an
+  // order we've already printed at this station.
+  is_printed: cached?.is_printed || 0,
+  created_at: remote.created_at,
+  updated_at: remote.updated_at,
+});
+
+/**
+ * Persist backend order rows into the local DB. Used by the realtime socket
+ * (instant path) and the orders pull sync task (catch-up path) so orders
+ * created on other devices — e.g. the web waiter app — show up in the local
+ * cashier list, which reads exclusively from the local DB.
+ */
+export const persistServerOrders = async (remoteOrders: any[]) => {
+  if (!Array.isArray(remoteOrders) || remoteOrders.length === 0) return 0;
+  const localOrders = await readRows(localDbTables.orders);
+  let count = 0;
+  for (const remote of remoteOrders) {
+    if (!remote?.id) continue;
+    const cached = localOrders.find((c: any) => c?.id === remote.id);
+    // Never clobber a locally-created order that hasn't been pushed yet.
+    if (cached && Number(cached.synced ?? 0) === 0) continue;
+    await upsertOrder(mapServerOrderToLocal(remote, cached));
+    count += 1;
+  }
+  return count;
+};
+
+/**
+ * Given a `/orders/sync` response, return the set of order ids the backend
+ * confirms it actually persisted (created or already-present). Returns null for
+ * older backends that don't report this — callers then treat the whole pushed
+ * batch as accepted (legacy behaviour). Anything pushed but NOT in this set was
+ * skipped server-side and must stay unsynced so it retries instead of being
+ * silently lost.
+ */
+export const extractPersistedOrderIds = (resp: any): Set<string> | null => {
+  const body = resp?.data?.data ?? resp?.data ?? {};
+  const ids = body?.persisted_ids;
+  if (!Array.isArray(ids)) return null;
+  return new Set(ids.map((id: any) => String(id)));
+};
+
 export const normalizeOrderPayload = (order: any) => ({
   id: order.id,
   employee_id: order.employee_id,
@@ -228,11 +287,20 @@ const syncUnsyncedOrders = async () => {
     const orderPayloads = batch.map(normalizeOrderPayload);
 
     try {
-      await api.post("/orders/sync", { orders: orderPayloads, payments: [] });
-      for (const order of batch) {
+      const resp = await api.post("/orders/sync", { orders: orderPayloads, payments: [] });
+      const persisted = extractPersistedOrderIds(resp);
+      const confirmed = persisted
+        ? batch.filter((o: any) => persisted.has(String(o.id)))
+        : batch;
+      for (const order of confirmed) {
         await upsertRow(localDbTables.orders, { ...order, synced: 1 });
       }
-      console.log("[Orders Sync] Pushed", batch.length, "unsynced orders");
+      const skipped = batch.length - confirmed.length;
+      console.log(
+        "[Orders Sync] Pushed",
+        confirmed.length,
+        "unsynced orders" + (skipped > 0 ? `; ${skipped} kept for retry` : ""),
+      );
     } catch (error) {
       const status = Number((error as any)?.response?.status);
       if (status !== 409) throw error;
@@ -288,40 +356,8 @@ const ordersAdapterImpl = {
           response.data?.data?.orders ?? response.data?.orders ?? [];
 
         if (Array.isArray(remoteOrders) && remoteOrders.length > 0) {
-          const localOrders = await readRows(localDbTables.orders);
-          const syncedOrders = remoteOrders.map((o: any) => {
-            const cached = localOrders.find(
-              (c: any) => c?.id === o.id,
-            );
-            return {
-              id: o.id,
-              employee_id: o.employee_id,
-              waiter_id: o.waiter_id,
-              created_by_id: o.created_by_id,
-              organization_id: o.organization_id,
-              type: o.type,
-              status: o.status,
-              payment_status: o.payment_status,
-              total_amount: o.total_amount,
-              notes: o.notes,
-              table_number: o.table_number,
-              items: o.items || [],
-              synced: 1,
-              is_printed: cached?.is_printed || 0,
-              created_at: o.created_at,
-              updated_at: o.updated_at,
-            };
-          });
-
-          console.log("[Orders Sync] Upserting", syncedOrders.length, "orders");
-          for (const order of syncedOrders) {
-            try {
-              await upsertOrder(order);
-            } catch (upsertErr) {
-              console.error("Failed to upsert order:", order, upsertErr);
-              throw upsertErr;
-            }
-          }
+          const upserted = await persistServerOrders(remoteOrders);
+          console.log("[Orders Sync] Upserting", upserted, "orders");
 
           const freshLocalOrders = await readRows(localDbTables.orders);
           const filtered = filterOrdersByParams(freshLocalOrders, params);
@@ -463,11 +499,26 @@ const ordersAdapterImpl = {
 
     if (isOnline()) {
       try {
-        await api.post("/orders/sync", {
+        const resp = await api.post("/orders/sync", {
           orders: [normalizeOrderPayload(localOrder)],
           payments: []
         });
-        localOrder.synced = 1;
+        // Only mark synced if the backend confirms it actually stored the order;
+        // otherwise leave it unsynced so the sync engine retries it later.
+        const persisted = extractPersistedOrderIds(resp);
+        if (!persisted || persisted.has(String(orderId))) {
+          localOrder.synced = 1;
+        } else {
+          console.warn("[Orders Create] Backend skipped order; keeping it unsynced for retry", orderId);
+        }
+        // Adopt the backend-assigned serial so the cashier sees the official
+        // order number immediately instead of waiting for the next pull.
+        const assigned = (resp?.data?.data?.orders ?? []).find(
+          (o: any) => o?.id === orderId,
+        );
+        if (assigned?.order_number != null) {
+          localOrder.order_number = assigned.order_number;
+        }
         console.log("[Orders Create] Successfully synced order immediately");
       } catch (err) {
         console.warn("[Orders Create] Failed to sync order immediately:", err);

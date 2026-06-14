@@ -1,103 +1,245 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ReceiptTextIcon, BanknoteIcon, CheckCircle2Icon } from "lucide-react";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  BarChart2,
+  Download,
+  FileText,
+  ListOrdered,
+  PackageSearch,
+  PieChart,
+  TrendingUp,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { Orders, Payments } from "@/lib/resources";
-import { birr } from "@/lib/format";
+import { Orders, Payments, Menu } from "@/lib/resources";
+import {
+  INITIAL_REPORT_DATA,
+  calculateReportData,
+  exportBusinessData,
+  filterSourceDataByDateRange,
+  type SourceData,
+} from "@/lib/reports";
+
+import { ReportsStats } from "@/components/reports/reports-stats";
+import { RevenueTrend } from "@/components/reports/revenue-trend";
+import { PaymentMethodsBreakdown } from "@/components/reports/payment-methods-breakdown";
+import { CategorySales } from "@/components/reports/category-sales";
+import { HourlyPerformance } from "@/components/reports/hourly-performance";
+import { PopularMenuItems } from "@/components/reports/popular-menu-items";
+import { RecentOrdersList } from "@/components/reports/recent-orders-list";
+import { ZReport } from "@/components/reports/z-report";
+
+const inputCls = "border-input bg-background h-9 rounded-md border px-3 text-sm";
 
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
+  const [source, setSource] = useState<SourceData>({ orders: [], payments: [], menuItems: [] });
+  const [businessUnit, setBusinessUnit] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [topItemsPeriod, setTopItemsPeriod] = useState("selected_range");
+
+  const loadSource = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const [orders, payments, menuItems] = await Promise.all([
+        Orders.list().catch(() => []),
+        Payments.history().catch(() => []),
+        Menu.items().catch(() => []),
+      ]);
+      setSource({
+        orders: Array.isArray(orders) ? orders : [],
+        payments: Array.isArray(payments) ? payments : [],
+        menuItems: Array.isArray(menuItems) ? menuItems : [],
+      });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to load report data");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    Promise.all([Orders.list().catch(() => []), Payments.history().catch(() => [])])
-      .then(([o, p]) => {
-        setOrders(o);
-        setPayments(p);
-      })
-      .catch((e) => toast.error(e.message))
-      .finally(() => setLoading(false));
+    loadSource();
   }, []);
 
-  const paid = orders.filter((o) => o.payment_status === "paid");
-  const revenue = payments
-    .filter((p) => p.status === "paid")
-    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const reportData = useMemo(() => {
+    if (loading) return INITIAL_REPORT_DATA;
+    const filtered = filterSourceDataByDateRange(
+      source.orders,
+      source.payments,
+      source.menuItems,
+      dateFrom,
+      dateTo,
+    );
+    return calculateReportData(
+      filtered.orders,
+      filtered.payments,
+      filtered.menuItems,
+      businessUnit,
+      topItemsPeriod,
+    );
+  }, [loading, source, businessUnit, dateFrom, dateTo, topItemsPeriod]);
 
-  const byStatus = orders.reduce<Record<string, number>>((acc, o) => {
-    acc[o.status] = (acc[o.status] || 0) + 1;
-    return acc;
-  }, {});
+  const handleExport = () => {
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      toast.error("Invalid date range: From date must be before To date");
+      return;
+    }
+    try {
+      exportBusinessData(source, businessUnit, dateFrom, dateTo);
+      toast.success("Export downloaded");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to export report");
+    }
+  };
 
-  const cards = [
-    { label: "Total orders", value: String(orders.length), icon: ReceiptTextIcon },
-    { label: "Paid orders", value: String(paid.length), icon: CheckCircle2Icon },
-    { label: "Revenue", value: birr(revenue), icon: BanknoteIcon },
-  ];
+  const handleGenerate = async () => {
+    await loadSource(true);
+    toast.success("Report refreshed");
+  };
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" description="Sales summary for the selected branch." />
+      <PageHeader
+        title="Business Reports"
+        description="Analytics, operational metrics, and complete data exports."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={inputCls}
+              aria-label="From date"
+            />
+            <span className="text-muted-foreground text-sm">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className={inputCls}
+              aria-label="To date"
+            />
+            <select
+              value={businessUnit}
+              onChange={(e) => setBusinessUnit(e.target.value)}
+              className={inputCls}
+              aria-label="Business unit">
+              <option value="all">All Units</option>
+              <option value="cafe">Cafe</option>
+              <option value="restaurant">Restaurant</option>
+              <option value="barista">Barista</option>
+            </select>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="mr-2 size-4" />
+              Export
+            </Button>
+            <Button size="sm" onClick={handleGenerate}>
+              <BarChart2 className="mr-2 size-4" />
+              Generate
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {cards.map((c) => (
-          <Card key={c.label}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-muted-foreground text-sm font-medium">{c.label}</CardTitle>
-              <c.icon className="text-muted-foreground size-4" />
-            </CardHeader>
-            <CardContent>
-              {loading ? <Skeleton className="h-8 w-20" /> : <div className="text-2xl font-semibold">{c.value}</div>}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {loading ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
+          </div>
+          <Skeleton className="h-96 w-full rounded-2xl" />
+        </div>
+      ) : (
+        <>
+          <ReportsStats reportData={reportData} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Orders by status</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Count</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.keys(byStatus).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="text-muted-foreground py-8 text-center">
-                    No data.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                Object.entries(byStatus).map(([status, count]) => (
-                  <TableRow key={status}>
-                    <TableCell className="capitalize">{status}</TableCell>
-                    <TableCell className="text-right">{count}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          <Tabs defaultValue="overview" className="space-y-5">
+            <TabsList className="flex w-full flex-wrap">
+              <TabsTrigger value="overview" className="gap-2">
+                <TrendingUp className="size-4" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="product-mix" className="gap-2">
+                <PackageSearch className="size-4" />
+                Product Mix
+              </TabsTrigger>
+              <TabsTrigger value="sales-breakdown" className="gap-2">
+                <PieChart className="size-4" />
+                Sales Breakdown
+              </TabsTrigger>
+              <TabsTrigger value="operations" className="gap-2">
+                <BarChart2 className="size-4" />
+                Operations
+              </TabsTrigger>
+              <TabsTrigger value="orders" className="gap-2">
+                <ListOrdered className="size-4" />
+                Orders
+              </TabsTrigger>
+              <TabsTrigger value="z-report" className="gap-2">
+                <FileText className="size-4" />
+                Z-Report
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
+                <RevenueTrend points={reportData.revenueTrend} />
+                <PaymentMethodsBreakdown paymentMethods={reportData.paymentMethods} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="product-mix" className="space-y-6">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_1fr]">
+                <PopularMenuItems
+                  topItems={reportData.topItems}
+                  topItemsPeriod={topItemsPeriod}
+                  setTopItemsPeriod={setTopItemsPeriod}
+                />
+                <CategorySales items={reportData.categorySales} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="sales-breakdown" className="space-y-6">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <PaymentMethodsBreakdown paymentMethods={reportData.paymentMethods} />
+                <CategorySales items={reportData.categorySales} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="operations" className="space-y-6">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_1fr]">
+                <HourlyPerformance items={reportData.hourlyPerformance} />
+                <Card>
+                  <CardContent className="space-y-4 pt-6">
+                    <h3 className="text-sm font-bold">Operational Focus</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      Use this view to identify rush hours, staffing pressure, and settlement
+                      patterns before adjusting shifts or prep quantities.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="orders" className="space-y-6">
+              <RecentOrdersList recentOrders={reportData.recentOrders} />
+            </TabsContent>
+
+            <TabsContent value="z-report" className="space-y-6">
+              <ZReport />
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
     </div>
   );
 }

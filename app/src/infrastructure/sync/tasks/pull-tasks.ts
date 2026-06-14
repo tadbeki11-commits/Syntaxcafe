@@ -3,6 +3,7 @@ import { api as apiClient } from '@/infrastructure/api/http-client';
 import { localDbTables } from '@/db/localDb';
 import { readRows, upsertRow, deleteById } from '@/infrastructure/database/local-db-query';
 import { usersAdapter } from '@/infrastructure/adapters/users.adapter';
+import { persistServerOrders } from '@/infrastructure/adapters/orders.adapter';
 import { SyncTask } from './types';
 
 const usersPullTask: SyncTask = {
@@ -122,6 +123,31 @@ const recipesPullTask: SyncTask = {
   },
 };
 
+const ordersPullTask: SyncTask = {
+  name: 'orders_pull',
+  async pull() {
+    try {
+      // Pull today's orders from the backend into the local DB. The cashier
+      // list reads exclusively from local, so this is how orders created on
+      // other devices (e.g. the web waiter app) become visible. The realtime
+      // socket handles the instant path; this reconciles anything it missed
+      // (offline gaps, reconnects, app restart).
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const resp = await apiClient.get('/orders', {
+        params: { date_from: startOfDay.toISOString() },
+      });
+      const remoteOrders =
+        resp.data?.data?.orders ?? resp.data?.orders ?? [];
+
+      await persistServerOrders(remoteOrders);
+    } catch (error) {
+      console.error('[sync] Failed to refresh orders', error);
+    }
+  },
+};
+
 const settingsPullTask: SyncTask = {
   name: 'settings_pull',
   async pull() {
@@ -142,4 +168,5 @@ export const pullTasks: SyncTask[] = [
   menuPullTask,
   tablesPullTask,
   recipesPullTask,
+  ordersPullTask,
 ];

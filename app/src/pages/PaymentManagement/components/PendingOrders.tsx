@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
 import React from 'react';
 import { Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -29,7 +29,7 @@ export const PendingOrders: React.FC<PendingOrdersProps> = ({ ordersForPayment }
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-sm">Order #{uuidToDisplayId(order.id)}</span>
+                  <span className="font-semibold text-sm">Order {formatOrderNumber(order)}</span>
                   <Badge variant="info" className="text-[10px]">{order.type}</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">

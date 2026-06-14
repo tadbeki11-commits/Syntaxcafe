@@ -9,6 +9,7 @@ import {
   getPrinterDepartmentMap,
 } from "@/infrastructure/printing/printer-config";
 import { getApproximateServerDate } from "@/shared/utils/serverTime";
+import { uuidToDisplayId } from "@/lib/utils";
 import { renderReceiptImage, ReceiptBlock } from "@/utils/receiptImage";
 
 /**
@@ -173,7 +174,7 @@ function generateDepartmentReceipts(order: any) {
   <div class="department">${department.toUpperCase()}</div>
   <div class="line"></div>
   <div style="font-size:9px;margin:2mm 0;">
-    Order #${order.id}<br>
+    Order #${order.order_number ?? uuidToDisplayId(order.id)}<br>
     ${order.table_number ? `Table: ${order.table_number}` : "Take Away"}<br>
     ${new Date(order.created_at || getApproximateServerDate()).toLocaleString()}
   </div>

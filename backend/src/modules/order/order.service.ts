@@ -12,7 +12,7 @@ import { users } from "../../db/tables/users.table";
 import { randomUUID } from "crypto";
 import { OrderInventoryService } from "./order-inventory.service";
 import { emitCreated, emitUpdated } from "../sync/sync-emit.util";
-import { requireBranchId, tenantInsert } from "../../common/tenant/tenant-context";
+import { requireBranchId, requireBusinessId, tenantInsert } from "../../common/tenant/tenant-context";
 import { OrdersGateway } from "./orders.gateway";
 
 
@@ -52,6 +52,23 @@ export class OrderService {
 
   private isValidUUID(uuid: string): boolean {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid);
+  }
+
+  /**
+   * Atomically reserve the next order serial for a branch. Runs inside the
+   * caller's transaction; the upsert row-locks the counter so concurrent
+   * creates can't hand out the same number.
+   */
+  private async nextOrderNumber(tx: any, branchId: string): Promise<number> {
+    const result = await tx.execute(sql`
+      INSERT INTO order_counters (branch_id, last_number)
+      VALUES (${branchId}, 1)
+      ON CONFLICT (branch_id)
+      DO UPDATE SET last_number = order_counters.last_number + 1
+      RETURNING last_number
+    `);
+    const row = (result as any)?.rows?.[0];
+    return Number(row?.last_number ?? 0);
   }
 
   private async getSetting(key: string): Promise<string | null> {
@@ -100,11 +117,13 @@ export class OrderService {
     }
 
     const createdOrder = await db.transaction(async (tx: any) => {
+      const order_number = await this.nextOrderNumber(tx, requireBranchId());
       const [order] = await tx
         .insert(orders)
         .values({
           ...tenantInsert(),
           ...(orderData.id ? { id: orderData.id } : {}),
+          order_number,
           customer_id: customer_id || randomUUID(),
           employee_id,
           table_number: safeTableNumber,
@@ -160,17 +179,23 @@ export class OrderService {
     } = orderData;
 
     const finalEmployeeId = this.validateUserId(employee_id, validUserIds, syncUserId);
-    
+
     if(!finalEmployeeId){
       console.warn(`[BulkSync] Skipping order ${id}: employee_id ${employee_id} not found in valid users`);
-      return 
+      // Report the skip so the client keeps this order unsynced and retries it
+      // later (e.g. once its employee has synced) instead of silently dropping it.
+      return { id, skipped: true as const };
     }
     const finalWaiterId = this.validateUserId(waiter_id, validUserIds, finalEmployeeId);
     const safeTableNumber = this.normalizeTableNumber(table_number);
     const safeOrganizationId = this.normalizeOrganizationId(organization_id);
 
     const [existingOrder] = id
-      ? await tx.select({ id: orders.id, status: orders.status }).from(orders).where(eq(orders.id, id)).limit(1)
+      ? await tx
+          .select({ id: orders.id, status: orders.status })
+          .from(orders)
+          .where(and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())))
+          .limit(1)
       : [];
 
     if (existingOrder) {
@@ -195,20 +220,24 @@ export class OrderService {
         await tx
           .update(orders)
           .set({ status: incomingStatus, payment_status: payment_status || undefined, updated_at: new Date() })
-          .where(eq(orders.id, id));
+          .where(and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())));
         console.log(`[BulkSync] Updated existing order ${id} status: "${existingStatus}" → "${incomingStatus}"`);
       } else if (incomingStatus !== existingStatus) {
         console.log(`[BulkSync] Skipping status downgrade for order ${id}: "${existingStatus}" (existing) ≥ "${incomingStatus}" (incoming)`);
       }
 
-      return;
+      // Already on the server — report it as persisted so the client can safely
+      // mark it synced (idempotent re-push).
+      return { id, exists: true as const };
     }
 
+    const order_number = await this.nextOrderNumber(tx, requireBranchId());
     const [createdOrder] = await tx
       .insert(orders)
       .values({
         ...tenantInsert(),
         id,
+        order_number,
         customer_id: customer_id || randomUUID(),
         employee_id: finalEmployeeId,
         waiter_id: finalWaiterId,
@@ -297,6 +326,8 @@ export class OrderService {
         );
       }
     }
+
+    return { id: createdOrder.id, order_number };
   }
 
   private async syncPayment(paymentData: any, validUserIds: Set<string>, syncUserId: string, tx: any) {
@@ -319,7 +350,7 @@ export class OrderService {
     const [verifiedOrder] = await tx
       .select({ id: orders.id })
       .from(orders)
-      .where(eq(orders.id, order_id));
+      .where(and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())));
     if (!verifiedOrder) {
       console.warn(`[BulkSync] Skipping payment ${id}: Order ${order_id} not found in DB.`);
       return;
@@ -352,7 +383,7 @@ export class OrderService {
       await tx
         .update(orders)
         .set({ status: "paid", payment_status: "paid", updated_at: new Date() })
-        .where(eq(orders.id, order_id));
+        .where(and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())));
 
       if (!existingSaleMovement) {
         const paidItems = await this.loadOrderItems(order_id, undefined, tx);
@@ -380,12 +411,32 @@ export class OrderService {
 
     console.log(`[OrderService] Starting bulk sync: ${syncOrders.length} orders, ${syncPayments.length} payments`);
 
-    const userRows = await db.select({ id: users.id }).from(users);
+    const userRows = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.business_id, requireBusinessId()));
     const validUserIds = new Set(userRows.map((u) => u.id));
 
+    // `orders` keeps its original shape (newly-created orders + assigned serial)
+    // for the immediate-create path. `persisted_ids` lists every order the
+    // server is guaranteed to be holding (created OR already-present) so the
+    // client only marks those as synced; `skipped_ids` are the ones it must keep
+    // unsynced and retry — this is what prevents offline orders from vanishing.
+    const orderResults: Array<{ id: string; order_number: number }> = [];
+    const persistedIds: string[] = [];
+    const skippedIds: string[] = [];
     await db.transaction(async (tx: any) => {
       for (const orderData of syncOrders) {
-        await this.syncOrder(orderData, validUserIds, syncUserId, tx);
+        const result = await this.syncOrder(orderData, validUserIds, syncUserId, tx);
+        if (!result?.id) continue;
+        if ("skipped" in result && result.skipped) {
+          skippedIds.push(result.id);
+          continue;
+        }
+        persistedIds.push(result.id);
+        if ("order_number" in result && result.order_number != null) {
+          orderResults.push({ id: result.id, order_number: result.order_number });
+        }
       }
 
       for (const paymentData of syncPayments) {
@@ -393,7 +444,11 @@ export class OrderService {
       }
     });
 
-    return {};
+    if (skippedIds.length > 0) {
+      console.warn(`[OrderService] bulk sync skipped ${skippedIds.length} order(s):`, skippedIds);
+    }
+
+    return { orders: orderResults, persisted_ids: persistedIds, skipped_ids: skippedIds };
   }
 
   async findById(id: string) {
@@ -404,7 +459,7 @@ export class OrderService {
       })
       .from(orders)
       .leftJoin(users, eq(orders.employee_id, users.id))
-      .where(eq(orders.id, id))
+      .where(and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())))
       .limit(1);
 
     if (!orderRow) return null;
@@ -452,17 +507,18 @@ export class OrderService {
   }
 
   async updateStatus(id: string, status: string, updatedBy?: any) {
+    const branchId = requireBranchId();
     return db.transaction(async (tx: any) => {
       const [existingOrder] = await tx
         .select()
         .from(orders)
-        .where(eq(orders.id, id))
+        .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)))
         .limit(1);
 
       const [updated] = await tx
         .update(orders)
         .set({ status, updated_at: new Date() })
-        .where(eq(orders.id, id))
+        .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)))
         .returning();
 
       if (updated) {
@@ -504,7 +560,12 @@ export class OrderService {
       })
       .from(orderStatusLogs)
       .leftJoin(users, eq(orderStatusLogs.changed_by, users.id))
-      .where(eq(orderStatusLogs.order_id, id))
+      .where(
+        and(
+          eq(orderStatusLogs.order_id, id),
+          eq(orderStatusLogs.branch_id, requireBranchId()),
+        ),
+      )
       .orderBy(desc(orderStatusLogs.changed_at));
 
     return rows.map((row: any) => ({
@@ -515,6 +576,7 @@ export class OrderService {
 
   async getPendingOrders(type?: string) {
     const conditions = [
+      eq(orders.branch_id, requireBranchId()),
       inArray(orders.status, ["pending", "preparing"]),
     ] as any[];
     if (type) conditions.push(eq(orders.type, type));
@@ -540,7 +602,10 @@ export class OrderService {
   }
 
   async getReadyOrders(type?: string) {
-    const conditions = [eq(orders.status, "ready")] as any[];
+    const conditions = [
+      eq(orders.branch_id, requireBranchId()),
+      eq(orders.status, "ready"),
+    ] as any[];
     if (type) conditions.push(eq(orders.type, type));
 
     const rows = await db
@@ -578,6 +643,7 @@ export class OrderService {
       .leftJoin(order_items, eq(orders.id, order_items.order_id))
       .where(
         and(
+          eq(orders.branch_id, requireBranchId()),
           eq(orders.type, "cafe"),
           inArray(orders.status, ["pending", "preparing"]),
           eq(order_items.item_type, "food"),
@@ -615,12 +681,14 @@ export class OrderService {
 
   async updateOrderItems(id: string, items: any[], updatedBy?: any) {
     const allowLowStock = await this.isLowStockAllowed();
+    const branchId = requireBranchId();
     return db.transaction(async (tx: any) => {
       const [existingOrder] = await tx
         .select()
         .from(orders)
-        .where(eq(orders.id, id))
+        .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)))
         .limit(1);
+      if (!existingOrder) return null;
       const wasPaid =
         String(existingOrder?.payment_status || "").toLowerCase() === "paid" ||
         String(existingOrder?.status || "").toLowerCase() === "paid";
@@ -648,7 +716,7 @@ export class OrderService {
       await tx
         .update(orders)
         .set({ total_amount: newTotal, updated_at: new Date() })
-        .where(eq(orders.id, id));
+        .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)));
 
       if (wasPaid) {
         const nextItems = await this.loadOrderItems(id, undefined, tx);
@@ -668,12 +736,14 @@ export class OrderService {
 
   async addOrderItems(id: string, items: any[], updatedBy?: any) {
     const allowLowStock = await this.isLowStockAllowed();
+    const branchId = requireBranchId();
     return db.transaction(async (tx: any) => {
       const [existingOrder] = await tx
         .select()
         .from(orders)
-        .where(eq(orders.id, id))
+        .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)))
         .limit(1);
+      if (!existingOrder) return null;
       const wasPaid =
         String(existingOrder?.payment_status || "").toLowerCase() === "paid" ||
         String(existingOrder?.status || "").toLowerCase() === "paid";
@@ -681,7 +751,7 @@ export class OrderService {
       const [order] = await tx
         .select({ total_amount: orders.total_amount })
         .from(orders)
-        .where(eq(orders.id, id))
+        .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)))
         .limit(1);
 
       const currentTotal = Number(order?.total_amount || 0);
@@ -720,7 +790,7 @@ export class OrderService {
       await tx
         .update(orders)
         .set({ total_amount: currentTotal + additionalTotal, updated_at: new Date() })
-        .where(eq(orders.id, id));
+        .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)));
 
       if (wasPaid) {
         const nextItems = await this.loadOrderItems(id, undefined, tx);
@@ -746,7 +816,12 @@ export class OrderService {
       })
       .from(orders)
       .leftJoin(users, eq(orders.employee_id, users.id))
-      .where(eq(orders.type, "cafe"));
+      .where(
+        and(
+          eq(orders.branch_id, requireBranchId()),
+          eq(orders.type, "cafe"),
+        ),
+      );
 
     const filtered = rows.filter((row: any) => {
       if (orderType === "beverage_only") {
@@ -800,6 +875,7 @@ export class OrderService {
       .leftJoin(users, eq(orders.employee_id, users.id))
       .where(
         and(
+          eq(orders.branch_id, requireBranchId()),
           eq(orders.type, "cafe"),
           inArray(orders.status, ["pending", "preparing", "ready"]),
         ),

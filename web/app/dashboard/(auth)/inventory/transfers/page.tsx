@@ -8,16 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -25,14 +15,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DataTable, type Column } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { Inventory, StockLocations } from "@/lib/resources";
 import { shortDate } from "@/lib/format";
 
 type Line = { inventory_item_id: string; quantity: string };
+type Transfer = {
+  id: string;
+  from_location_id: string;
+  to_location_id: string;
+  from_location_name?: string | null;
+  to_location_name?: string | null;
+  status: string;
+  created_at: string;
+};
 
 export default function TransfersPage() {
-  const [transfers, setTransfers] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +85,36 @@ export default function TransfersPage() {
 
   const locName = (id: string) => locations.find((l) => l.id === id)?.name ?? "—";
 
+  const columns: Column<Transfer>[] = [
+    {
+      key: "from",
+      label: "From",
+      searchValue: (t) => t.from_location_name ?? locName(t.from_location_id),
+      render: (t) => t.from_location_name ?? locName(t.from_location_id),
+    },
+    {
+      key: "to",
+      label: "To",
+      searchValue: (t) => t.to_location_name ?? locName(t.to_location_id),
+      render: (t) => t.to_location_name ?? locName(t.to_location_id),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (t) => (
+        <Badge variant="muted" className="capitalize">
+          {t.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "created_at",
+      label: "Date",
+      className: "text-muted-foreground",
+      render: (t) => shortDate(t.created_at),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -98,46 +128,25 @@ export default function TransfersPage() {
         }
       />
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>From</TableHead>
-                <TableHead>To</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={4}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ) : transfers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-muted-foreground py-8 text-center">
-                    No transfers yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                transfers.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{t.from_location_name ?? locName(t.from_location_id)}</TableCell>
-                    <TableCell>{t.to_location_name ?? locName(t.to_location_id)}</TableCell>
-                    <TableCell>
-                      <Badge variant="muted" className="capitalize">{t.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{shortDate(t.created_at)}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable<Transfer>
+        columns={columns}
+        rows={transfers}
+        loading={loading}
+        searchKeys={["from", "to", "status"]}
+        searchPlaceholder="Search transfers…"
+        emptyMessage="No transfers yet."
+        filters={[
+          {
+            key: "status",
+            label: "Status",
+            options: [
+              { value: "pending", label: "Pending" },
+              { value: "completed", label: "Completed" },
+              { value: "cancelled", label: "Cancelled" },
+            ],
+          },
+        ]}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

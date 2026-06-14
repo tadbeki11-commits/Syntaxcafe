@@ -6,6 +6,7 @@ import { payments } from "../../db/tables/payments.table";
 import { order_items } from "../../db/tables/order-items.table";
 import { users } from "../../db/tables/users.table";
 import { menuItems } from "../../db/tables/menu-items.table";
+import { requireBranchId } from "../../common/tenant/tenant-context";
 
 export interface ZReportData {
   report_date: string;
@@ -59,13 +60,15 @@ export class ZReportService {
   async generateZReport(startDate: Date, endDate: Date): Promise<ZReportData> {
     const periodStart = startDate.toISOString();
     const periodEnd = endDate.toISOString();
+    const branchId = requireBranchId();
 
-    // Get all orders in the period
+    // Get all orders in the period (scoped to the current branch)
     const allOrders = await db
       .select()
       .from(orders)
       .where(
         and(
+          eq(orders.branch_id, branchId),
           gte(orders.created_at, startDate),
           lte(orders.created_at, endDate)
         )
@@ -104,6 +107,7 @@ export class ZReportService {
       .from(payments)
       .where(
         and(
+          eq(payments.branch_id, branchId),
           eq(payments.status, "completed"),
           completedOrderIds.length > 0
             ? sql`${payments.order_id} IN ${completedOrderIds}`
@@ -134,6 +138,7 @@ export class ZReportService {
       .leftJoin(users, eq(orders.employee_id, users.id))
       .where(
         and(
+          eq(orders.branch_id, branchId),
           gte(orders.created_at, startDate),
           lte(orders.created_at, endDate),
           sql`${orders.status} IN ('completed', 'paid')`
@@ -163,6 +168,7 @@ export class ZReportService {
       .leftJoin(users, eq(orders.employee_id, users.id))
       .where(
         and(
+          eq(orders.branch_id, branchId),
           gte(orders.created_at, startDate),
           lte(orders.created_at, endDate),
           sql`${orders.status} IN ('cancelled', 'voided')`

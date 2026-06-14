@@ -52,11 +52,23 @@ export const Organizations = {
   remove: (id: string) => apiFetch(`/organizations/${id}`, del),
 };
 
+const qs = (params?: Record<string, any>) => {
+  if (!params) return "";
+  const entries = Object.entries(params).filter(
+    ([, v]) => v !== undefined && v !== null && v !== "",
+  );
+  if (entries.length === 0) return "";
+  return "?" + entries.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+};
+
 export const Orders = {
-  list: () => apiFetch("/orders").then((d) => d.data.orders ?? []),
+  list: (params?: Record<string, any>) =>
+    apiFetch(`/orders${qs(params)}`).then((d) => d.data.orders ?? []),
   forPayment: () =>
     apiFetch("/orders/for-payment").then((d) => d.data.orders ?? []),
   create: (b: any) => apiFetch("/orders", j(b)),
+  zReport: (params: { start_date?: string; end_date?: string }) =>
+    apiFetch(`/orders/z-report${qs(params)}`).then((d) => d.data.zReport),
 };
 
 export const Payments = {
