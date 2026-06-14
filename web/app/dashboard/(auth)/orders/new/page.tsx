@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
-import { Menu, Tables, Orders } from "@/lib/resources";
+import { Menu, Tables, Orders, Organizations } from "@/lib/resources";
 import { getUser } from "@/lib/auth";
 import { birr } from "@/lib/format";
 
@@ -29,6 +29,8 @@ export default function NewOrderPage() {
   const [notes, setNotes] = useState("");
   const [placing, setPlacing] = useState(false);
   const [search, setSearch] = useState("");
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([Menu.items(), Tables.list().catch(() => [])])
@@ -38,6 +40,15 @@ export default function NewOrderPage() {
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
+
+    // When launched from an organization's account, attach the order to it.
+    const org = new URLSearchParams(window.location.search).get("org");
+    if (org) {
+      setOrgId(org);
+      Organizations.get(org)
+        .then((o) => setOrgName(o?.name ?? null))
+        .catch(() => {});
+    }
   }, []);
 
   function add(item: Item) {
@@ -76,6 +87,7 @@ export default function NewOrderPage() {
       await Orders.create({
         employee_id: getUser()?.id,
         type: "cafe",
+        organization_id: orgId,
         table_number: tableNumber ? Number(tableNumber) : null,
         notes: notes || null,
         total_amount: total,
@@ -88,7 +100,7 @@ export default function NewOrderPage() {
         })),
       });
       toast.success("Order placed");
-      router.push("/dashboard/orders");
+      router.push(orgId ? `/dashboard/customers/${orgId}` : "/dashboard/orders");
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -104,7 +116,14 @@ export default function NewOrderPage() {
             <ArrowLeftIcon className="size-4" />
           </Link>
         </Button>
-        <PageHeader title="New Order" description="Build an order for this branch." />
+        <PageHeader
+          title="New Order"
+          description={
+            orgName
+              ? `Order on the account of ${orgName}.`
+              : "Build an order for this branch."
+          }
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">

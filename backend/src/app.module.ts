@@ -18,6 +18,7 @@ import { OrganizationModule } from "./modules/organization/organization.module";
 import { DevicesModule } from "./modules/devices/devices.module";
 import { BranchesModule } from "./modules/branches/branches.module";
 import { PlatformModule } from "./modules/platform/platform.module";
+import { ExpensesModule } from "./modules/expenses/expenses.module";
 import { DbModule } from "./db/db.module";
 import { AppController } from "./app.controller";
 
@@ -45,6 +46,7 @@ import { AppController } from "./app.controller";
     DevicesModule,
     BranchesModule,
     PlatformModule,
+    ExpensesModule,
   ],
   controllers: [AppController],
   providers: [],

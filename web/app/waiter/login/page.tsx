@@ -58,7 +58,7 @@ export default function WaiterLoginPage() {
       return;
     }
     if (isAuthenticated) {
-      router.replace("/waiter");
+      router.replace("/waiter/create-order");
       return;
     }
     const enrollment = getDeviceEnrollment();
@@ -111,7 +111,7 @@ export default function WaiterLoginPage() {
       try {
         const user = await login(selectedName.trim(), enteredPin);
         toast.success(`Welcome, ${user.full_name || user.username}`);
-        router.replace("/waiter");
+        router.replace("/waiter/create-order");
       } catch (err: any) {
         toast.error(err?.message || "Login failed");
         setPin("");

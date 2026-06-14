@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PlusIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, PencilIcon, Trash2Icon, UtensilsCrossedIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -22,6 +21,7 @@ import { DataTable, type Column } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { Menu } from "@/lib/resources";
 import { birr } from "@/lib/format";
+import { RecipeDialog } from "@/components/menu/recipe-dialog";
 
 type Item = {
   id: string;
@@ -32,7 +32,7 @@ type Item = {
   type: string | null;
   is_available: boolean;
 };
-type Category = { id: string; name: string; slug: string; type: string };
+type Category = { id: string; name: string; slug: string };
 
 export default function MenuPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -40,6 +40,7 @@ export default function MenuPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Item | null>(null);
   const [open, setOpen] = useState(false);
+  const [recipeItem, setRecipeItem] = useState<Item | null>(null);
   const [catName, setCatName] = useState("");
 
   function load() {
@@ -144,15 +145,6 @@ export default function MenuPage() {
   const categoryColumns: Column<Category>[] = [
     { key: "name", label: "Name", className: "font-medium" },
     { key: "slug", label: "Slug", className: "text-muted-foreground" },
-    {
-      key: "type",
-      label: "Type",
-      render: (c) => (
-        <Badge variant="muted" className="capitalize">
-          {c.type}
-        </Badge>
-      ),
-    },
   ];
 
   return (
@@ -202,6 +194,13 @@ export default function MenuPage() {
             ]}
             rowActions={(it) => (
               <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Recipe"
+                  onClick={() => setRecipeItem(it)}>
+                  <UtensilsCrossedIcon className="size-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -277,7 +276,7 @@ export default function MenuPage() {
                     onChange={(e) => setEditing({ ...editing, main_category: e.target.value })}>
                     <option value="">—</option>
                     {categories.map((c) => (
-                      <option key={c.id} value={c.slug}>{c.name}</option>
+                      <option key={c.slug} value={c.slug}>{c.name}</option>
                     ))}
                   </select>
                 </div>
@@ -297,6 +296,12 @@ export default function MenuPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <RecipeDialog
+        menuItem={recipeItem}
+        open={!!recipeItem}
+        onOpenChange={(v) => !v && setRecipeItem(null)}
+      />
     </div>
   );
 }

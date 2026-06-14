@@ -9,7 +9,10 @@ const del = { method: "DELETE" };
 
 export const Menu = {
   items: () => apiFetch("/menu").then((d) => d.data.menuItems ?? []),
-  categories: () => apiFetch("/menu/categories").then((d) => d.data.categories ?? []),
+  // Categories shown/managed here are "main categories" — the same table the
+  // create call writes to, and the source for a menu item's `main_category`.
+  categories: () =>
+    apiFetch("/menu/main-categories").then((d) => d.data.mainCategories ?? []),
   create: (b: any) => apiFetch("/menu", j(b)),
   update: (id: string, b: any) => apiFetch(`/menu/${id}`, put(b)),
   remove: (id: string) => apiFetch(`/menu/${id}`, del),
@@ -46,10 +49,34 @@ export const Users = {
   toggle: (id: string) => apiFetch(`/users/${id}/toggle-status`, patch({})),
 };
 
+export const Recipes = {
+  // The backend returns a single recipe (with ingredients) per menu item, or null.
+  forMenuItem: (menuItemId: string) =>
+    apiFetch(`/recipes/menu-item/${menuItemId}`).then((d) => d.data.recipe),
+  create: (b: any) => apiFetch("/recipes", j(b)),
+  update: (id: string, b: any) => apiFetch(`/recipes/${id}`, put(b)),
+  remove: (id: string) => apiFetch(`/recipes/${id}`, del),
+};
+
 export const Organizations = {
   list: () => apiFetch("/organizations").then((d) => d.data.organizations ?? []),
+  get: (id: string) =>
+    apiFetch(`/organizations/${id}`).then((d) => d.data.organization),
   create: (b: any) => apiFetch("/organizations", j(b)),
-  remove: (id: string) => apiFetch(`/organizations/${id}`, del),
+  update: (id: string, b: any) => apiFetch(`/organizations/${id}`, put(b)),
+  remove: (id: string) => apiFetch(`/organizations/${id}`, del), // deactivate
+  orders: (id: string) =>
+    apiFetch(`/organizations/${id}/orders`).then((d) => d.data.orders ?? []),
+  credit: (id: string) =>
+    apiFetch(`/organizations/${id}/credit`).then((d) => d.data),
+  payments: (id: string) =>
+    apiFetch(`/organizations/${id}/payments`).then((d) => d.data.payments ?? []),
+  addPayment: (id: string, b: any) =>
+    apiFetch(`/organizations/${id}/payments`, j(b)),
+  transactions: (id: string, params?: Record<string, any>) =>
+    apiFetch(`/organizations/${id}/transactions${qs(params)}`).then((d) => d.data),
+  addTransaction: (id: string, b: any) =>
+    apiFetch(`/organizations/${id}/transactions`, j(b)),
 };
 
 const qs = (params?: Record<string, any>) => {
@@ -78,6 +105,16 @@ export const Payments = {
     apiFetch(`/payments/${id}/confirm`, j({ processed_by })),
 };
 
+export const Expenses = {
+  list: (params?: Record<string, any>) =>
+    apiFetch(`/expenses${qs(params)}`).then((d) => d.data.expenses ?? []),
+  summary: (params?: Record<string, any>) =>
+    apiFetch(`/expenses/summary${qs(params)}`).then((d) => d.data),
+  create: (b: any) => apiFetch("/expenses", j(b)),
+  update: (id: string, b: any) => apiFetch(`/expenses/${id}`, put(b)),
+  remove: (id: string) => apiFetch(`/expenses/${id}`, del),
+};
+
 export const Settings = {
   paymentMethods: () =>
     apiFetch("/settings/payment-methods").then((d) => d.data.payment_methods ?? []),
@@ -89,6 +126,23 @@ export const Settings = {
   roles: () => apiFetch("/settings/roles").then((d) => d.data.roles ?? []),
   createRole: (b: any) => apiFetch("/settings/roles", j(b)),
   removeRole: (id: string) => apiFetch(`/settings/roles/${id}`, del),
+
+  // Per-branch POS behavior rules. All of these are scoped to the branch the
+  // owner has selected (sent as x-branch-id by apiFetch).
+  tableSelection: () =>
+    apiFetch("/settings/system/table-selection").then((d) => d.data),
+  updateTableSelection: (b: { force_table_selection: boolean }) =>
+    apiFetch("/settings/system/table-selection", put(b)).then((d) => d.data),
+  inventory: () => apiFetch("/settings/system/inventory").then((d) => d.data),
+  updateInventory: (b: { allow_low_stock_orders: boolean }) =>
+    apiFetch("/settings/system/inventory", put(b)).then((d) => d.data),
+  organizations: () =>
+    apiFetch("/settings/system/organizations").then((d) => d.data),
+  updateOrganizations: (b: { allow_cashier_manage_org_orders: boolean }) =>
+    apiFetch("/settings/system/organizations", put(b)).then((d) => d.data),
+  receipt: () => apiFetch("/settings/system/receipt").then((d) => d.data),
+  updateReceipt: (b: { enable_cashier_receipt: boolean }) =>
+    apiFetch("/settings/system/receipt", put(b)).then((d) => d.data),
 };
 
 export const Devices = {

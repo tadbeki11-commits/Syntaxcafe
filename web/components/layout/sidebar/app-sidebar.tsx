@@ -4,7 +4,6 @@ import * as React from "react";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useIsTablet } from "@/hooks/use-mobile";
-import Link from "next/link";
 
 import {
   Sidebar,
@@ -42,10 +41,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton
               asChild
               className="hover:text-foreground h-10 group-data-[collapsible=icon]:px-0! hover:bg-[var(--primary)]/5">
-              <Link href="/dashboard">
+              <div>
                 <Logo />
                 <span className="font-semibold">Platform Admin</span>
-              </Link>
+
+              </div>
+             
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

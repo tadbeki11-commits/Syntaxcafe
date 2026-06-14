@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { Orders, Payments, Menu } from "@/lib/resources";
+import { Orders, Payments, Menu, Expenses } from "@/lib/resources";
 import {
   INITIAL_REPORT_DATA,
   calculateReportData,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/reports";
 
 import { ReportsStats } from "@/components/reports/reports-stats";
+import { ProfitSummary } from "@/components/reports/profit-summary";
 import { RevenueTrend } from "@/components/reports/revenue-trend";
 import { PaymentMethodsBreakdown } from "@/components/reports/payment-methods-breakdown";
 import { CategorySales } from "@/components/reports/category-sales";
@@ -40,6 +41,7 @@ const inputCls = "border-input bg-background h-9 rounded-md border px-3 text-sm"
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<SourceData>({ orders: [], payments: [], menuItems: [] });
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [businessUnit, setBusinessUnit] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -48,16 +50,18 @@ export default function ReportsPage() {
   const loadSource = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [orders, payments, menuItems] = await Promise.all([
+      const [orders, payments, menuItems, expenseRows] = await Promise.all([
         Orders.list().catch(() => []),
         Payments.history().catch(() => []),
         Menu.items().catch(() => []),
+        Expenses.list().catch(() => []),
       ]);
       setSource({
         orders: Array.isArray(orders) ? orders : [],
         payments: Array.isArray(payments) ? payments : [],
         menuItems: Array.isArray(menuItems) ? menuItems : [],
       });
+      setExpenses(Array.isArray(expenseRows) ? expenseRows : []);
     } catch (e: any) {
       toast.error(e.message || "Failed to load report data");
     } finally {
@@ -161,6 +165,14 @@ export default function ReportsPage() {
       ) : (
         <>
           <ReportsStats reportData={reportData} />
+
+          <ProfitSummary
+            orders={source.orders}
+            payments={source.payments}
+            expenses={expenses}
+            from={dateFrom}
+            to={dateTo}
+          />
 
           <Tabs defaultValue="overview" className="space-y-5">
             <TabsList className="flex w-full flex-wrap">

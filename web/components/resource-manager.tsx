@@ -28,7 +28,7 @@ export type { Column, DataTableFilter, DateRangeFilter };
 export type Field = {
   key: string;
   label: string;
-  type?: "text" | "number" | "password" | "switch" | "select";
+  type?: "text" | "number" | "password" | "switch" | "select" | "auth";
   options?: { value: string; label: string }[];
   default?: any;
   required?: boolean;
@@ -75,6 +75,7 @@ export function ResourceManager<T extends { id: string }>({
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Record<string, any>>({});
+  const [authMode, setAuthMode] = useState<"password" | "pin">("password");
   const [editingId, setEditingId] = useState<string | null>(null);
   const visibleFields = (fields ?? []).filter((f) => !(editingId && f.createOnly));
 
@@ -97,6 +98,7 @@ export function ResourceManager<T extends { id: string }>({
     const init: Record<string, any> = {};
     fields?.forEach((f) => (init[f.key] = f.default ?? (f.type === "switch" ? true : "")));
     setForm(init);
+    setAuthMode("password");
     setEditingId(null);
     setOpen(true);
   }
@@ -206,6 +208,56 @@ export function ResourceManager<T extends { id: string }>({
                       />
                       <Label>{f.label}</Label>
                     </div>
+                  ) : f.type === "auth" ? (
+                    <>
+                      <Label>{f.label}</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={authMode === "password" ? "default" : "outline"}
+                          className="flex-1"
+                          onClick={() => {
+                            setAuthMode("password");
+                            setForm({ ...form, pin: "" });
+                          }}>
+                          Password
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={authMode === "pin" ? "default" : "outline"}
+                          className="flex-1"
+                          onClick={() => {
+                            setAuthMode("pin");
+                            setForm({ ...form, password: "" });
+                          }}>
+                          4-Digit PIN
+                        </Button>
+                      </div>
+                      {authMode === "password" ? (
+                        <Input
+                          type="password"
+                          placeholder="Min 6 characters"
+                          value={form.password ?? ""}
+                          onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        />
+                      ) : (
+                        <Input
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={4}
+                          placeholder="Enter 4-digit PIN"
+                          value={form.pin ?? ""}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              pin: e.target.value.replace(/\D/g, "").slice(0, 4),
+                            })
+                          }
+                        />
+                      )}
+                    </>
                   ) : f.type === "select" ? (
                     <>
                       <Label>{f.label}</Label>

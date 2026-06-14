@@ -21,6 +21,7 @@ import {
   LayoutDashboardIcon,
   ReceiptTextIcon,
   CreditCardIcon,
+  CoffeeIcon,
   UtensilsCrossedIcon,
   BoxesIcon,
   WarehouseIcon,
@@ -28,11 +29,13 @@ import {
   UsersIcon,
   Building2Icon,
   BarChart3Icon,
+  BanknoteIcon,
   WalletCardsIcon,
   ShieldIcon,
   MonitorSmartphoneIcon,
   ArmchairIcon,
   ScrollTextIcon,
+  SlidersHorizontalIcon,
   type LucideIcon,
 } from "lucide-react";
 import { getUser } from "@/lib/auth";
@@ -88,6 +91,7 @@ const ownerNav: NavGroup[] = [
     items: [
       { title: "Orders", href: "/dashboard/orders", icon: ReceiptTextIcon },
       { title: "Payments", href: "/dashboard/payments", icon: CreditCardIcon },
+      { title: "Items Sold", href: "/dashboard/payments/items", icon: CoffeeIcon },
       { title: "Tables", href: "/dashboard/tables", icon: ArmchairIcon }
     ]
   },
@@ -104,16 +108,20 @@ const ownerNav: NavGroup[] = [
     title: "People",
     items: [
       { title: "Staff", href: "/dashboard/staff", icon: UsersIcon },
-      { title: "Customers", href: "/dashboard/customers", icon: Building2Icon }
+      { title: "Organizations", href: "/dashboard/customers", icon: Building2Icon }
     ]
   },
   {
     title: "Insights",
-    items: [{ title: "Reports", href: "/dashboard/reports", icon: BarChart3Icon }]
+    items: [
+      { title: "Reports", href: "/dashboard/reports", icon: BarChart3Icon },
+      { title: "Expenses", href: "/dashboard/expenses", icon: BanknoteIcon }
+    ]
   },
   {
     title: "Settings",
     items: [
+      { title: "Order Rules", href: "/dashboard/settings/preferences", icon: SlidersHorizontalIcon },
       { title: "Payment Methods", href: "/dashboard/settings/payment-methods", icon: WalletCardsIcon },
       { title: "Roles", href: "/dashboard/settings/roles", icon: ShieldIcon },
       { title: "Devices", href: "/dashboard/settings/devices", icon: MonitorSmartphoneIcon }

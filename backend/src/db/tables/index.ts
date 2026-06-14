@@ -29,4 +29,5 @@ export * from "./dining-tables.table";
 export * from "./organizations.table";
 export * from "./org-credit-payments.table";
 export * from "./org-credit-transactions.table";
+export * from "./expenses.table";
 

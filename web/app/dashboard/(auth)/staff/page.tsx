@@ -67,7 +67,7 @@ function StaffAccounts() {
       fields={[
         { key: "full_name", label: "Full name", required: true },
         { key: "username", label: "Username", required: true },
-        { key: "password", label: "Password", type: "password", required: true, createOnly: true },
+        { key: "password", label: "Authentication method", type: "auth", required: true, createOnly: true },
         {
           key: "role",
           label: "Role",

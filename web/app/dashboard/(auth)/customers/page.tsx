@@ -1,6 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowUpRightIcon } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ResourceManager, type Column } from "@/components/resource-manager";
 import { Organizations } from "@/lib/resources";
 import { birr } from "@/lib/format";
@@ -55,10 +59,20 @@ export default function CustomersPage() {
         { key: "contact_name", label: "Contact name" },
         { key: "phone", label: "Phone" },
         { key: "email", label: "Email" },
+        { key: "address", label: "Address" },
+        { key: "notes", label: "Notes" },
       ]}
       load={Organizations.list}
       create={Organizations.create}
+      update={Organizations.update}
       remove={Organizations.remove}
+      rowActions={(r) => (
+        <Button variant="ghost" size="icon" asChild title="Open account">
+          <Link href={`/dashboard/customers/${r.id}`}>
+            <ArrowUpRightIcon className="size-4" />
+          </Link>
+        </Button>
+      )}
     />
   );
 }
