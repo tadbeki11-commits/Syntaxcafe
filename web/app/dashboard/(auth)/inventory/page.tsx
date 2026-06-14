@@ -11,8 +11,10 @@ import {
   ChevronRightIcon,
   CoffeeIcon,
   MapPinIcon,
+  MinusIcon,
   PackageIcon,
   PlusIcon,
+  RefreshCwIcon,
   WarehouseIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -52,8 +54,16 @@ type Item = {
   name: string;
   unit: string;
   base_unit: string;
+  pieces_per_unit?: number;
   min_quantity: number;
   stock_by_location?: StockEntry[];
+};
+
+type AdjustState = {
+  item: Item;
+  mode: "set" | "delta";
+  value: string;
+  unit: "base" | "purchase";
 };
 
 type Loc = {
@@ -181,7 +191,7 @@ export default function InventoryPage() {
   const [onlyInStock, setOnlyInStock] = useState(false);
 
   // dialogs
-  const [adjust, setAdjust] = useState<{ item: Item; value: string } | null>(null);
+  const [adjust, setAdjust] = useState<AdjustState | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -258,16 +268,32 @@ export default function InventoryPage() {
   // ── actions ──
   async function submitAdjust() {
     if (!adjust || !selectedLoc) return;
-    const quantity = Number(adjust.value);
-    if (Number.isNaN(quantity) || quantity < 0) {
+    const piecesPerUnit = Math.max(1, Number(adjust.item.pieces_per_unit || 1));
+    const entered = Number(adjust.value);
+    if (Number.isNaN(entered)) {
       toast.error("Enter a valid quantity.");
       return;
     }
+    // Always send base units to the API; convert from purchase units when needed.
+    const baseValue = adjust.unit === "purchase" ? entered * piecesPerUnit : entered;
+    const body: { location_id: string; quantity?: number; delta?: number } = {
+      location_id: selectedLoc.id,
+    };
+    if (adjust.mode === "delta") {
+      if (baseValue === 0) {
+        toast.error("Enter an amount to add or subtract.");
+        return;
+      }
+      body.delta = baseValue;
+    } else {
+      if (baseValue < 0) {
+        toast.error("Quantity can't be negative.");
+        return;
+      }
+      body.quantity = baseValue;
+    }
     try {
-      await Inventory.setQuantity(adjust.item.id, {
-        quantity,
-        location_id: selectedLoc.id,
-      });
+      await Inventory.setQuantity(adjust.item.id, body);
       toast.success("Stock updated");
       setAdjust(null);
       await reload();
@@ -341,6 +367,14 @@ export default function InventoryPage() {
     },
     { key: "min_quantity", label: "Min", render: (r) => r.min_quantity ?? 0 },
   ];
+
+  // ── derived values for the adjust dialog ──
+  const adjPieces = Math.max(1, Number(adjust?.item.pieces_per_unit || 1));
+  const adjCurrent = adjust && selectedLoc ? qtyAt(adjust.item, selectedLoc.id) : 0;
+  const adjEntered = Number(adjust?.value || 0) || 0;
+  const adjBase = adjust?.unit === "purchase" ? adjEntered * adjPieces : adjEntered;
+  const adjBaseUnit = adjust?.item.base_unit || "pieces";
+  const adjPurchaseUnit = adjust?.item.unit || "box";
 
   // ── render ──
   return (
@@ -470,7 +504,12 @@ export default function InventoryPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() =>
-                    setAdjust({ item: row, value: String(qtyAt(row, selectedLoc.id)) })
+                    setAdjust({
+                      item: row,
+                      mode: "set",
+                      value: String(qtyAt(row, selectedLoc.id)),
+                      unit: "base",
+                    })
                   }>
                   Adjust
                 </Button>
@@ -491,31 +530,146 @@ export default function InventoryPage() {
       <Dialog open={adjust !== null} onOpenChange={(o) => !o && setAdjust(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Set stock — {adjust?.item.name}</DialogTitle>
+            <DialogTitle>Update stock quantity</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-              <PackageIcon className="size-4" />
-              {selectedLoc?.name}
-            </p>
+          <div className="space-y-4">
+            <div className="rounded-lg bg-muted/50 p-3 text-sm">
+              <p>
+                <span className="text-muted-foreground">Item:</span>{" "}
+                <span className="font-semibold">{adjust?.item.name}</span>
+              </p>
+              <p className="mt-1 flex items-center gap-1.5">
+                <PackageIcon className="size-4 text-muted-foreground" />
+                <span className="text-muted-foreground">{selectedLoc?.name} —</span>{" "}
+                <span className="font-semibold">
+                  {adjCurrent} {adjBaseUnit}
+                </span>{" "}
+                <span className="text-muted-foreground">in stock</span>
+              </p>
+            </div>
+
             <div className="space-y-2">
-              <Label>Quantity ({adjust?.item.base_unit})</Label>
-              <Input
-                type="number"
-                min={0}
-                value={adjust?.value ?? ""}
-                onChange={(e) =>
-                  setAdjust((a) => (a ? { ...a, value: e.target.value } : a))
-                }
-                autoFocus
-              />
+              <Label>What would you like to do?</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  {
+                    value: "set" as const,
+                    icon: RefreshCwIcon,
+                    title: "Set exact quantity",
+                    description: "Replace current stock",
+                  },
+                  {
+                    value: "delta" as const,
+                    icon: PlusIcon,
+                    title: "Add / Subtract",
+                    description: "Increase or decrease",
+                  },
+                ]).map((opt) => {
+                  const Icon = opt.icon;
+                  const active = adjust?.mode === opt.value;
+                  return (
+                    <button
+                      type="button"
+                      key={opt.value}
+                      onClick={() =>
+                        setAdjust((a) => (a ? { ...a, mode: opt.value } : a))
+                      }
+                      className={`flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-colors ${
+                        active
+                          ? "border-primary bg-primary/10"
+                          : "border-muted bg-muted/30 hover:bg-muted/50"
+                      }`}>
+                      <Icon className="size-5" />
+                      <div>
+                        <div className="text-sm font-medium">{opt.title}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {opt.description}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                {adjust?.mode === "delta"
+                  ? "Quantity to add / subtract"
+                  : "New total quantity"}
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  step="1"
+                  min={adjust?.mode === "delta" ? undefined : 0}
+                  value={adjust?.value ?? ""}
+                  placeholder={
+                    adjust?.mode === "delta" ? "e.g. 5 to add, -2 to remove" : ""
+                  }
+                  onChange={(e) =>
+                    setAdjust((a) => (a ? { ...a, value: e.target.value } : a))
+                  }
+                  autoFocus
+                />
+                <select
+                  value={adjust?.unit ?? "base"}
+                  onChange={(e) =>
+                    setAdjust((a) =>
+                      a ? { ...a, unit: e.target.value as "base" | "purchase" } : a,
+                    )
+                  }
+                  className="h-10 rounded-md border border-input bg-background px-2 text-sm">
+                  <option value="base">{adjBaseUnit}</option>
+                  <option value="purchase">{adjPurchaseUnit}</option>
+                </select>
+              </div>
+
+              {adjust?.mode === "delta" ? (
+                <div className="flex gap-4 text-xs">
+                  <span className="flex items-center text-emerald-600 dark:text-emerald-400">
+                    <PlusIcon className="mr-1 size-3" />
+                    positive adds
+                  </span>
+                  <span className="flex items-center text-destructive">
+                    <MinusIcon className="mr-1 size-3" />
+                    negative removes
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  This replaces the current stock of {adjCurrent} {adjBaseUnit}.
+                </p>
+              )}
+
+              {adjust?.unit === "purchase" && adjPieces > 1 && (
+                <div className="rounded bg-muted/50 p-2 text-xs text-muted-foreground">
+                  System will record:{" "}
+                  <strong>
+                    {adjBase} {adjBaseUnit}
+                  </strong>
+                  <br />
+                  (1 {adjPurchaseUnit} = {adjPieces} {adjBaseUnit})
+                </div>
+              )}
+
+              {adjust?.mode === "delta" && adjBase !== 0 && (
+                <div className="rounded bg-muted/50 p-2 text-sm">
+                  New total will be:{" "}
+                  <strong>
+                    {adjCurrent + adjBase} {adjBaseUnit}
+                  </strong>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAdjust(null)}>
               Cancel
             </Button>
-            <Button onClick={submitAdjust}>Save</Button>
+            <Button onClick={submitAdjust}>
+              {adjust?.mode === "delta" ? "Update stock" : "Set quantity"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
