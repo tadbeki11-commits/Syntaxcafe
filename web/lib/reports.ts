@@ -596,6 +596,101 @@ export const calculateReportData = (
   };
 };
 
+// ---------------------------------------------------------------------------
+// Period stats — drives the single date-dependent summary card on the report
+// page. Computed from the full source set (independent of the date-range
+// picker) so the Today / This Month / This Year toggle is the sole driver.
+// ---------------------------------------------------------------------------
+
+export type StatsPeriod = "today" | "month" | "year";
+
+export interface PeriodStats {
+  totalOrders: number;
+  paidOrders: number;
+  pendingOrders: number;
+  voidedOrders: number;
+  paidRevenue: number;
+  avgPaidOrderValue: number;
+}
+
+export const PERIOD_LABELS: Record<StatsPeriod, string> = {
+  today: "Today",
+  month: "This Month",
+  year: "This Year",
+};
+
+export const getPeriodRange = (period: StatsPeriod, now: Date = new Date()) => {
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+  const endOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  const to = endOfDay(now);
+  if (period === "month") return { from: new Date(now.getFullYear(), now.getMonth(), 1), to };
+  if (period === "year") return { from: new Date(now.getFullYear(), 0, 1), to };
+  return { from: startOfDay(now), to };
+};
+
+export const calculatePeriodStats = (
+  ordersRaw: any[],
+  paymentsRaw: any[],
+  menuItemsRaw: any[],
+  unitRaw: string,
+  period: StatsPeriod,
+): PeriodStats => {
+  const unit = String(unitRaw || "all").trim().toLowerCase() || "all";
+  const orders = Array.isArray(ordersRaw) ? ordersRaw : [];
+  const payments = Array.isArray(paymentsRaw) ? paymentsRaw : [];
+  const menuItems = Array.isArray(menuItemsRaw) ? menuItemsRaw : [];
+
+  const getItemDepartment = makeGetItemDepartment(menuItems);
+  const getOrderSubtotalForUnit = makeGetOrderSubtotalForUnit(getItemDepartment);
+  const paidPayments = payments.filter((p) => normalizeStatus(p?.status) === "paid");
+  const paidOrderIdSet = new Set(paidPayments.map((p) => normalizeId(p?.order_id)).filter(Boolean));
+  const isPaidOrder = makeIsPaidOrder(paidOrderIdSet);
+
+  const getDerivedStatus = (order: any) => {
+    if (isVoidedOrderStatus(order?.status)) return "voided";
+    if (isPaidOrder(order)) return "paid";
+    return "pending";
+  };
+  const orderMatchesUnit = (order: any) => {
+    if (unit === "all") return true;
+    return getOrderSubtotalForUnit(order, unit) > 0;
+  };
+  const getOrderTotalForSelectedUnit = (order: any) =>
+    unit === "all" ? getOrderSubtotalForUnit(order, "all") : getOrderSubtotalForUnit(order, unit);
+
+  const { from, to } = getPeriodRange(period);
+  const within = (iso: string) => {
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return false;
+    return dt >= from && dt <= to;
+  };
+
+  let totalOrders = 0;
+  let paidOrders = 0;
+  let pendingOrders = 0;
+  let voidedOrders = 0;
+  let paidRevenue = 0;
+  for (const o of orders) {
+    if (!within(o?.created_at)) continue;
+    if (!orderMatchesUnit(o)) continue;
+    const status = getDerivedStatus(o);
+    if (status === "voided") {
+      voidedOrders += 1;
+      continue;
+    }
+    totalOrders += 1;
+    if (status === "paid") {
+      paidOrders += 1;
+      paidRevenue += getOrderTotalForSelectedUnit(o);
+    } else {
+      pendingOrders += 1;
+    }
+  }
+  const avgPaidOrderValue = paidOrders > 0 ? paidRevenue / paidOrders : 0;
+  return { totalOrders, paidOrders, pendingOrders, voidedOrders, paidRevenue, avgPaidOrderValue };
+};
+
 export const generateCSVReport = (metricsData: ReportData): string => {
   const headers = ["Metric", "Value", "Period"];
   const rows: (string | number)[][] = [

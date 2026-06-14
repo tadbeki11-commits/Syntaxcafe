@@ -164,7 +164,7 @@ export default function ReportsPage() {
         </div>
       ) : (
         <>
-          <ReportsStats reportData={reportData} />
+          <ReportsStats source={source} unit={businessUnit} />
 
           <ProfitSummary
             orders={source.orders}

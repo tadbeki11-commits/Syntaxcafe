@@ -441,6 +441,48 @@ export class PlatformService {
     return { groups, total_users: userRows.length };
   }
 
+  /**
+   * Reset any user's password to a new value. Super-admin only — no knowledge of
+   * the current password is required. The new hash overwrites password_hash and
+   * the action is recorded in the audit trail (never the password itself).
+   */
+  async resetUserPassword(userId: string, newPassword: string) {
+    const password = String(newPassword || "");
+    if (password.length < 4) {
+      throw new BadRequestException(
+        "Password must be at least 4 characters long",
+      );
+    }
+
+    const [user] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        username: users.username,
+        business_id: users.business_id,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!user) throw new NotFoundException("User not found");
+
+    const passwordHash = await hash(password, BCRYPT_ROUNDS);
+    await db
+      .update(users)
+      .set({ password_hash: passwordHash, updated_at: new Date() })
+      .where(eq(users.id, userId));
+
+    await this.recordAudit({
+      action: "user.reset_password",
+      target_type: "user",
+      target_id: user.id,
+      target_label: user.username ?? user.name,
+      business_id: user.business_id,
+    });
+
+    return { id: user.id, reset: true };
+  }
+
   /** Recent super-admin audit entries, newest first. */
   async listAudit(limit = 200) {
     const rows = await db

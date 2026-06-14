@@ -37,6 +37,12 @@ export class PlatformController {
     return this.platform.listAllUsers();
   }
 
+  @ApiOperation({ summary: "Reset a user's password" })
+  @Post("users/:id/reset-password")
+  resetUserPassword(@Param("id") id: string, @Body() body: any) {
+    return this.platform.resetUserPassword(id, body?.password);
+  }
+
   @ApiOperation({ summary: "All enrolled devices with online state" })
   @Get("devices")
   listDevices() {

@@ -5,6 +5,15 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DataTable, type Column } from "@/components/data-table";
 import { apiFetch } from "@/lib/api";
 
@@ -35,6 +44,35 @@ export default function PlatformUsersPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Reset-password dialog state. `resetTarget` holds the user being edited.
+  const [resetTarget, setResetTarget] = useState<Row | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  async function submitReset() {
+    if (!resetTarget) return;
+    if (newPassword.length < 4) {
+      toast.error("Password must be at least 4 characters long");
+      return;
+    }
+    setResetting(true);
+    try {
+      await apiFetch(`/platform/users/${resetTarget.id}/reset-password`, {
+        method: "POST",
+        body: JSON.stringify({ password: newPassword }),
+      });
+      toast.success(
+        `Password reset for ${resetTarget.username ?? resetTarget.name}`,
+      );
+      setResetTarget(null);
+      setNewPassword("");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setResetting(false);
+    }
+  }
 
   useEffect(() => {
     apiFetch<{ groups: Group[]; total_users: number }>("/platform/users")
@@ -120,6 +158,23 @@ export default function PlatformUsersPage() {
         </Badge>
       ),
     },
+    {
+      key: "actions",
+      label: "",
+      render: (r) => (
+        <div className="text-right">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setResetTarget(r);
+              setNewPassword("");
+            }}>
+            Reset password
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   const businessOptions = useMemo(() => {
@@ -183,6 +238,56 @@ export default function PlatformUsersPage() {
           },
         ]}
       />
+
+      <Dialog
+        open={resetTarget != null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setResetTarget(null);
+            setNewPassword("");
+          }
+        }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Reset password
+              {resetTarget
+                ? ` — ${resetTarget.username ?? resetTarget.name}`
+                : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">New password</label>
+            <Input
+              type="text"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter a new password"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitReset();
+              }}
+            />
+            <p className="text-muted-foreground text-xs">
+              The user will sign in with this password immediately. They are not
+              notified automatically.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResetTarget(null);
+                setNewPassword("");
+              }}>
+              Cancel
+            </Button>
+            <Button onClick={submitReset} disabled={resetting}>
+              {resetting ? "Resetting…" : "Reset password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
