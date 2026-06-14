@@ -146,6 +146,9 @@ export const Settings = {
 };
 
 export const Devices = {
+  // The devices enrolled to a branch, with an online flag.
+  list: (branch_id: string) =>
+    apiFetch(`/devices?branch_id=${encodeURIComponent(branch_id)}`),
   // Reusable per-branch enrollment code: view the current one, or rotate it.
   getEnrollmentCode: (branch_id: string) =>
     apiFetch(`/devices/enrollment-codes?branch_id=${encodeURIComponent(branch_id)}`),

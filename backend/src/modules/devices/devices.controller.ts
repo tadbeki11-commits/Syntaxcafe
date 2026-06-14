@@ -8,6 +8,14 @@ export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}
 
   @ApiOperation({
+    summary: "List the devices enrolled to a branch (owner/platform)",
+  })
+  @Get()
+  list(@Query("branch_id") branchId: string) {
+    return this.devicesService.listForBranch(branchId);
+  }
+
+  @ApiOperation({
     summary: "Get a branch's current reusable enrollment code (owner/platform)",
   })
   @Get("enrollment-codes")

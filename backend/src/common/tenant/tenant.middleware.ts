@@ -69,6 +69,13 @@ export class TenantMiddleware implements NestMiddleware {
             ctx.branchId = selected;
           }
         }
+
+        // Owner hasn't picked a branch yet (fresh login, before the switcher
+        // sets x-branch-id) — fall back to their first branch so branch-scoped
+        // reads/writes don't crash. The switcher reconciles the selection.
+        if (!ctx.branchId && ctx.scope === "owner" && ctx.businessId) {
+          ctx.branchId = await this.branches.firstBranchId(ctx.businessId);
+        }
         return ctx;
       } catch {
         // Invalid/expired token: fall through to header/default resolution.

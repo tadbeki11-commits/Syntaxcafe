@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import db from "../../db/drizzle";
 import { branchDevices } from "../../db/tables/branch-devices.table";
 import { branches } from "../../db/tables/branches.table";
@@ -18,6 +18,9 @@ export interface DeviceTenant {
 
 const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
+
+// A device is "online" if it has checked in within this window.
+const DEVICE_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 @Injectable()
 export class DevicesService {
@@ -45,6 +48,41 @@ export class DevicesService {
       throw new ForbiddenException("Branch does not belong to your business.");
     }
     return branch;
+  }
+
+  /**
+   * Lists the devices enrolled to a branch with a computed online flag, scoped
+   * to the owner's business (or any branch for platform admins).
+   */
+  async listForBranch(branchId: string) {
+    const branch = await this.getManageableBranch(branchId);
+
+    const rows = await db
+      .select({
+        id: branchDevices.id,
+        name: branchDevices.name,
+        status: branchDevices.status,
+        last_seen_at: branchDevices.last_seen_at,
+        created_at: branchDevices.created_at,
+      })
+      .from(branchDevices)
+      .where(eq(branchDevices.branch_id, branch.id))
+      .orderBy(desc(branchDevices.last_seen_at));
+
+    const now = Date.now();
+    const devices = rows.map((d) => ({
+      ...d,
+      online:
+        d.last_seen_at != null &&
+        now - new Date(d.last_seen_at).getTime() < DEVICE_ONLINE_WINDOW_MS,
+    }));
+
+    return {
+      branch_id: branch.id,
+      devices,
+      online_count: devices.filter((d) => d.online).length,
+      total: devices.length,
+    };
   }
 
   /** Returns the branch's current reusable enrollment code (owner/platform). */
