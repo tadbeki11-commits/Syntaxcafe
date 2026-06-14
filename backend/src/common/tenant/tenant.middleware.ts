@@ -54,6 +54,7 @@ export class TenantMiddleware implements NestMiddleware {
           branchId: p.branch_id ?? null,
           scope: (p.scope as TenantScope) ?? "branch",
           userId: p.sub ?? null,
+          username: p.username ?? null,
         };
 
         // Owners/platform admins aren't pinned to a branch — they pick one via

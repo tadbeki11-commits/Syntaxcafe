@@ -2,6 +2,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import { isDeviceEnrolled, loadDeviceEnrollment } from '@/shared/utils/deviceToken';
+import EnrollmentPage from './pages/EnrollmentPage';
 
 // Import migrated pages
 import LoginPage from './pages/LoginPage';
@@ -175,13 +177,46 @@ const AppContent = () => {
   );
 };
 
+// First-run gate: until this device redeems an enrollment code for a device
+// token, it can't be pinned to a branch — so block the rest of the app (which
+// makes branch-scoped API/sync calls) behind the enrollment screen. The token
+// lives in SQLite, so we hydrate it once before deciding what to show.
+const EnrollmentGate = ({ children }: { children: React.ReactNode }) => {
+  const [ready, setReady] = React.useState<boolean>(false);
+  const [enrolled, setEnrolled] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    let active = true;
+    loadDeviceEnrollment().finally(() => {
+      if (!active) return;
+      setEnrolled(isDeviceEnrolled());
+      setReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!ready) {
+    return <LoadingSpinner />;
+  }
+
+  if (!enrolled) {
+    return <EnrollmentPage onEnrolled={() => setEnrolled(true)} />;
+  }
+
+  return <>{children}</>;
+};
+
 function App() {
   return (
-    <AuthProvider>
-      <div className="App">
-        <AppContent />
-      </div>
-    </AuthProvider>
+    <EnrollmentGate>
+      <AuthProvider>
+        <div className="App">
+          <AppContent />
+        </div>
+      </AuthProvider>
+    </EnrollmentGate>
   );
 }
 

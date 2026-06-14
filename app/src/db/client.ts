@@ -2,6 +2,7 @@ import Database from "@tauri-apps/plugin-sql";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { localDbTables } from "./schema";
 import migration0000 from "../../drizzle/0000_stale_texas_twister.sql?raw";
+import migration0001 from "../../drizzle/0001_device_enrollment.sql?raw";
 
 import migrationJournal from "../../drizzle/meta/_journal.json";
 import { getApproximateServerNow } from "@/shared/utils/serverTime";
@@ -10,6 +11,7 @@ export type LocalDbDrizzle = ReturnType<typeof drizzle<typeof localDbTables>>;
 
 const migrationSqlByTag: Record<string, string> = {
   "0000_stale_texas_twister": migration0000,
+  "0001_device_enrollment": migration0001,
 };
 const isAlreadyExistsError = (error: unknown): boolean => {
   const seen = new WeakSet<object>();

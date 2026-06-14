@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import api, { API_BASE_URL } from "@/application";
+import api from "@/application";
 import toast from "react-hot-toast";
 import { getActivePrinterName } from "@/pages/cashier/PrinterSettings";
 import { getApproximateServerNow } from "@/shared/utils/serverTime";
+import { orderSocket } from "@/infrastructure/realtime/order-socket";
 
 interface PrintingProps {
   refreshDashboardData: () => Promise<void>;
@@ -18,7 +19,6 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
 
   const printingRef = useRef(new Set());
   const pollIntervalRef = useRef<any>(null);
-  const orderStreamRef = useRef<any>(null);
   const isPollingUnprintedRef = useRef(false);
   const qzPollDelayMsRef = useRef(2000);
   const lastQzPollErrorLogAtRef = useRef(0);
@@ -254,35 +254,22 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
     };
   }, [pollUnprintedOrders]);
 
-  // EventSource SSE Order Stream Listener
+  // Real-time order stream (WebSocket). While online, the device keeps an
+  // active branch-scoped socket to the backend; an order created by a waiter
+  // arrives instantly and triggers an immediate refresh + auto-print pass.
   useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const base = String(API_BASE_URL || "").trim();
-      const streamUrl = `${base.replace(/\/+$/, "")}/orders/stream`;
-      const src = new EventSource(streamUrl);
-      orderStreamRef.current = src;
+    const unsubscribe = orderSocket.subscribeNewOrder(async () => {
+      try {
+        refreshDashboardData();
+        await pollUnprintedOrders();
+      } catch (e) {
+        // ignore
+      }
+    });
 
-      src.addEventListener("new_order", async () => {
-        try {
-          refreshDashboardData();
-          await pollUnprintedOrders();
-        } catch (e) {
-          // ignore
-        }
-      });
-
-      return () => {
-        try {
-          src.close();
-        } catch (e) {
-          // ignore
-        }
-        orderStreamRef.current = null;
-      };
-    } catch (e) {
-      // ignore
-    }
+    return () => {
+      unsubscribe();
+    };
   }, [pollUnprintedOrders, refreshDashboardData]);
 
   // Diagnostic Printer testing utility

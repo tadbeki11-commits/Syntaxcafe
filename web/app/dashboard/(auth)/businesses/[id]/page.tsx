@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeftIcon, PlusIcon, StoreIcon } from "lucide-react";
+import { ArrowLeftIcon, PlusIcon, StoreIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ type Business = {
 
 export default function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [biz, setBiz] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [branchName, setBranchName] = useState("");
@@ -64,6 +65,41 @@ export default function BusinessDetailPage() {
     } catch (err: any) {
       toast.error(err.message);
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteBranch(branchId: string, branchName: string) {
+    if (!confirm(`Delete branch "${branchName}"? This removes its devices and cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/platform/businesses/${id}/branches/${branchId}`, {
+        method: "DELETE",
+      });
+      toast.success("Branch deleted");
+      await load();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteBusiness() {
+    if (!biz) return;
+    if (
+      !confirm(
+        `Delete "${biz.name}"? This permanently removes the business, its ${biz.branches.length} branch(es) and all of its staff. This cannot be undone.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await apiFetch(`/platform/businesses/${id}`, { method: "DELETE" });
+      toast.success("Business deleted");
+      router.push("/dashboard/businesses");
+    } catch (err: any) {
+      toast.error(err.message);
       setBusy(false);
     }
   }
@@ -102,12 +138,18 @@ export default function BusinessDetailPage() {
             <p className="text-muted-foreground text-sm">{biz.slug}</p>
           </div>
         </div>
-        <Button
-          variant={biz.is_active ? "outline" : "default"}
-          onClick={toggleActive}
-          disabled={busy}>
-          {biz.is_active ? "Suspend" : "Activate"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={biz.is_active ? "outline" : "default"}
+            onClick={toggleActive}
+            disabled={busy}>
+            {biz.is_active ? "Suspend" : "Activate"}
+          </Button>
+          <Button variant="destructive" onClick={deleteBusiness} disabled={busy}>
+            <Trash2Icon className="size-4" />
+            Delete
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -177,6 +219,14 @@ export default function BusinessDetailPage() {
                   <span className="text-muted-foreground text-xs">
                     {br.is_active ? "Active" : "Inactive"}
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    disabled={busy}
+                    onClick={() => deleteBranch(br.id, br.name)}>
+                    <Trash2Icon className="size-4" />
+                  </Button>
                 </div>
               ))
             )}

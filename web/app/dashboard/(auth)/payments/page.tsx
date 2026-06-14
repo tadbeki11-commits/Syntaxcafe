@@ -27,6 +27,19 @@ export default function PaymentsPage() {
       title="Payments"
       description="Payment history for this branch."
       columns={columns}
+      searchKeys={["id", "payment_method", "status"]}
+      searchPlaceholder="Search payments…"
+      filters={[
+        {
+          key: "status",
+          label: "Status",
+          options: [
+            { value: "paid", label: "Paid" },
+            { value: "pending", label: "Pending" },
+            { value: "failed", label: "Failed" },
+          ],
+        },
+      ]}
       load={Payments.history}
     />
   );

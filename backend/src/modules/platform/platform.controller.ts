@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -30,6 +31,24 @@ export class PlatformController {
     return this.platform.listBusinesses();
   }
 
+  @ApiOperation({ summary: "All users across the platform, grouped by business" })
+  @Get("users")
+  listUsers() {
+    return this.platform.listAllUsers();
+  }
+
+  @ApiOperation({ summary: "All enrolled devices with online state" })
+  @Get("devices")
+  listDevices() {
+    return this.platform.listDevices();
+  }
+
+  @ApiOperation({ summary: "Recent super-admin audit log" })
+  @Get("audit")
+  listAudit() {
+    return this.platform.listAudit();
+  }
+
   @ApiOperation({ summary: "Create a business and provision its owner" })
   @Post("businesses")
   createBusiness(@Body() body: any) {
@@ -52,5 +71,20 @@ export class PlatformController {
   @Post("businesses/:id/branches")
   createBranch(@Param("id") id: string, @Body() body: any) {
     return this.platform.createBranch(id, body);
+  }
+
+  @ApiOperation({ summary: "Delete a branch" })
+  @Delete("businesses/:id/branches/:branchId")
+  deleteBranch(
+    @Param("id") id: string,
+    @Param("branchId") branchId: string,
+  ) {
+    return this.platform.deleteBranch(id, branchId);
+  }
+
+  @ApiOperation({ summary: "Delete a business and all its branches/staff" })
+  @Delete("businesses/:id")
+  deleteBusiness(@Param("id") id: string) {
+    return this.platform.deleteBusiness(id);
   }
 }

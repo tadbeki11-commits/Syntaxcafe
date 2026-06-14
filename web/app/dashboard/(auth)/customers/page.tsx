@@ -37,6 +37,19 @@ export default function CustomersPage() {
       description="Corporate / credit accounts (organizations)."
       createLabel="New customer"
       columns={columns}
+      searchKeys={["name", "contact_name", "phone"]}
+      searchPlaceholder="Search customers…"
+      filters={[
+        {
+          key: "is_active",
+          label: "Status",
+          options: [
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ],
+          match: (r, v) => (v === "active" ? r.is_active : !r.is_active),
+        },
+      ]}
       fields={[
         { key: "name", label: "Name", required: true },
         { key: "contact_name", label: "Contact name" },

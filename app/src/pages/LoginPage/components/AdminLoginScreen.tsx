@@ -30,23 +30,15 @@ export const AdminLoginScreen: React.FC<AdminLoginScreenProps> = ({
   onPasswordChange,
   onTogglePassword,
   onSubmit,
-  onBack
 }) => {
   return (
     <div className="space-y-6 animate-fade-in">
-      <LoginHeader
-        title="Staff Sign In"
-        subtitle="Enter your operational credentials"
-        showBackButton={true}
-        onBack={onBack}
-      />
-
       <Card className="border-0 shadow-xl bg-gradient-to-br from-white/95 to-white/80 dark:from-slate-900/95 dark:to-slate-900/80 backdrop-blur-sm">
         <CardContent className="pt-6">
           <form onSubmit={onSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="admin-username" className="text-xs uppercase font-bold text-muted-foreground">
-                Username or Full Name
+                Username
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />

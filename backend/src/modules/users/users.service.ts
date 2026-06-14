@@ -12,6 +12,9 @@ export class UsersService {
     if (!items || items.length === 0) return {};
 
     const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
+    // Tenancy is derived from the device token (the sync caller), never the
+    // client payload, so synced staff are scoped to the device's business.
+    const businessId = requireBusinessId();
     const updatedIds: string[] = [];
     const createdRows: Array<typeof users.$inferSelect> = [];
 
@@ -41,6 +44,7 @@ export class UsersService {
             .insert(users)
             .values({
               ...(item.id ? { id: item.id } : {}),
+              business_id: businessId,
               username: item.username || `user_${Date.now()}`,
               name: item.name || item.full_name || item.username || "Staff",
               password_hash: hashed,
@@ -254,7 +258,9 @@ export class UsersService {
     const existingUser = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.username, username))
+      .where(
+        and(eq(users.business_id, requireBusinessId()), eq(users.username, username)),
+      )
       .limit(1);
     if (existingUser.length > 0) {
       throw new Error("Username already exists");
@@ -272,6 +278,7 @@ export class UsersService {
     const [created] = await db
       .insert(users)
       .values({
+        business_id: requireBusinessId(),
         username,
         name: full_name || [fname, lname].filter(Boolean).join(" ") || username,
         password_hash,

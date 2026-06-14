@@ -8,16 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -26,13 +16,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
+import { DataTable, type Column, type DataTableFilter } from "@/components/data-table";
 
-export type Column<T> = {
-  key: string;
-  label: string;
-  render?: (row: T) => React.ReactNode;
-  className?: string;
-};
+export type { Column, DataTableFilter };
 
 export type Field = {
   key: string;
@@ -53,6 +39,10 @@ export function ResourceManager<T extends { id: string }>({
   remove,
   rowActions,
   createLabel = "New",
+  searchKeys,
+  searchPlaceholder,
+  filters,
+  pageSize,
 }: {
   title: string;
   description?: string;
@@ -63,6 +53,10 @@ export function ResourceManager<T extends { id: string }>({
   remove?: (id: string) => Promise<any>;
   rowActions?: (row: T, reload: () => Promise<void>) => React.ReactNode;
   createLabel?: string;
+  searchKeys?: string[];
+  searchPlaceholder?: string;
+  filters?: DataTableFilter<T>[];
+  pageSize?: number;
 }) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,59 +125,29 @@ export function ResourceManager<T extends { id: string }>({
         }
       />
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {columns.map((c) => (
-                  <TableHead key={c.key} className={c.className}>
-                    {c.label}
-                  </TableHead>
-                ))}
-                {showActions && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length + 1}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length + 1}
-                    className="text-muted-foreground py-8 text-center">
-                    Nothing here yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {columns.map((c) => (
-                      <TableCell key={c.key} className={c.className}>
-                        {c.render ? c.render(row) : ((row as any)[c.key] ?? "—")}
-                      </TableCell>
-                    ))}
-                    {showActions && (
-                      <TableCell className="text-right">
-                        {rowActions?.(row, reload)}
-                        {remove && (
-                          <Button variant="ghost" size="icon" onClick={() => onDelete(row.id)}>
-                            <Trash2Icon className="text-destructive size-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable<T>
+        columns={columns}
+        rows={rows}
+        loading={loading}
+        searchKeys={searchKeys}
+        searchPlaceholder={searchPlaceholder}
+        filters={filters}
+        pageSize={pageSize}
+        rowActions={
+          showActions
+            ? (row) => (
+                <>
+                  {rowActions?.(row, reload)}
+                  {remove && (
+                    <Button variant="ghost" size="icon" onClick={() => onDelete(row.id)}>
+                      <Trash2Icon className="text-destructive size-4" />
+                    </Button>
+                  )}
+                </>
+              )
+            : undefined
+        }
+      />
 
       {create && fields && (
         <Dialog open={open} onOpenChange={setOpen}>

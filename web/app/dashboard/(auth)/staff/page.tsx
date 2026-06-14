@@ -15,7 +15,7 @@ type U = {
 };
 
 const columns: Column<U>[] = [
-  { key: "name", label: "Name", render: (r) => <span className="font-medium">{r.name}</span> },
+  // { key: "name", label: "Name", render: (r) => <span className="font-medium">{r.name}</span> },
   { key: "username", label: "Username", className: "text-muted-foreground" },
   { key: "role", label: "Role", render: (r) => <Badge variant="muted" className="capitalize">{r.role}</Badge> },
   {
@@ -36,6 +36,29 @@ export default function StaffPage() {
       description="Employees who can sign in to the POS."
       createLabel="New staff"
       columns={columns}
+      searchKeys={["name", "username", "role"]}
+      searchPlaceholder="Search staff…"
+      filters={[
+        {
+          key: "role",
+          label: "Role",
+          options: [
+            { value: "admin", label: "Admin" },
+            { value: "cashier", label: "Cashier" },
+            { value: "kitchen_staff", label: "Kitchen staff" },
+            { value: "cafe_waiter", label: "Waiter" },
+          ],
+        },
+        {
+          key: "is_active",
+          label: "Status",
+          options: [
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ],
+          match: (r, v) => (v === "active" ? r.is_active : !r.is_active),
+        },
+      ]}
       fields={[
         { key: "name", label: "Full name", required: true },
         { key: "username", label: "Username", required: true },

@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { DevicesService } from "./devices.service";
 
@@ -8,15 +8,23 @@ export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}
 
   @ApiOperation({
-    summary: "Mint a one-time device enrollment code for a branch (owner/platform)",
+    summary: "Get a branch's current reusable enrollment code (owner/platform)",
   })
-  @Post("enrollment-codes")
-  createEnrollmentCode(@Body() body: { branch_id: string; name?: string }) {
-    return this.devicesService.createEnrollmentCode(body?.branch_id, body?.name);
+  @Get("enrollment-codes")
+  getEnrollmentCode(@Query("branch_id") branchId: string) {
+    return this.devicesService.getEnrollmentCode(branchId);
   }
 
   @ApiOperation({
-    summary: "Redeem an enrollment code for a long-lived device token",
+    summary: "Set/rotate a branch's reusable enrollment code (owner/platform)",
+  })
+  @Post("enrollment-codes")
+  rotateEnrollmentCode(@Body() body: { branch_id: string }) {
+    return this.devicesService.rotateEnrollmentCode(body?.branch_id);
+  }
+
+  @ApiOperation({
+    summary: "Redeem a branch enrollment code for a long-lived device token",
   })
   @Post("enroll")
   enroll(@Body() body: { code: string; device_name?: string }) {

@@ -1,14 +1,9 @@
-import Image from "next/image";
+import { StoreIcon } from "lucide-react";
 
 export default function Logo() {
   return (
-    <Image
-      src="/logo.png"
-      width={30}
-      height={30}
-      className="me-1 rounded-[5px] transition-all group-data-collapsible:size-7 group-data-[collapsible=icon]:size-8"
-      alt="shadcn ui kit logo"
-      unoptimized
-    />
+    <div className="bg-primary text-primary-foreground me-1 flex size-7 items-center justify-center rounded-[6px]">
+      <StoreIcon className="size-4" />
+    </div>
   );
 }

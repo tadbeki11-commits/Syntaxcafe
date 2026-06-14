@@ -13,11 +13,15 @@ import { randomUUID } from "crypto";
 import { OrderInventoryService } from "./order-inventory.service";
 import { emitCreated, emitUpdated } from "../sync/sync-emit.util";
 import { requireBranchId, tenantInsert } from "../../common/tenant/tenant-context";
+import { OrdersGateway } from "./orders.gateway";
 
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly orderInventoryService: OrderInventoryService) {}
+  constructor(
+    private readonly orderInventoryService: OrderInventoryService,
+    private readonly ordersGateway: OrdersGateway,
+  ) {}
 
   private normalizeTableNumber(tableNumber: any): number | null {
     return tableNumber == null || tableNumber === "" ? null : tableNumber;
@@ -95,7 +99,7 @@ export class OrderService {
       }
     }
 
-    const [createdOrder] = await db.transaction(async (tx: any) => {
+    const createdOrder = await db.transaction(async (tx: any) => {
       const [order] = await tx
         .insert(orders)
         .values({
@@ -125,6 +129,11 @@ export class OrderService {
       const fullOrder = await this.findById(createdOrder.id);
       if (fullOrder) {
         await emitCreated(db, "order", "ORDER_CREATED", fullOrder as any);
+        // Push to any cashier/kitchen clients watching this branch in real time.
+        this.ordersGateway.notifyNewOrder(
+          (fullOrder as any).branch_id,
+          fullOrder,
+        );
       }
       return fullOrder;
     }

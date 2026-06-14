@@ -32,6 +32,7 @@ import {
   ShieldIcon,
   MonitorSmartphoneIcon,
   ArmchairIcon,
+  ScrollTextIcon,
   type LucideIcon,
 } from "lucide-react";
 import { getUser } from "@/lib/auth";
@@ -67,7 +68,10 @@ const platformNav: NavGroup[] = [
     title: "Platform",
     items: [
       { title: "Overview", href: "/dashboard/overview", icon: GaugeIcon },
-      { title: "Businesses", href: "/dashboard/businesses", icon: ShoppingBagIcon }
+      { title: "Businesses", href: "/dashboard/businesses", icon: ShoppingBagIcon },
+      { title: "Users", href: "/dashboard/users", icon: UsersIcon },
+      { title: "Devices", href: "/dashboard/devices", icon: MonitorSmartphoneIcon },
+      { title: "Audit log", href: "/dashboard/audit", icon: ScrollTextIcon }
     ]
   }
 ];

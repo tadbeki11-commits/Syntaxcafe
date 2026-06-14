@@ -15,6 +15,7 @@ export interface TenantContext {
   branchId: string | null;
   scope: TenantScope;
   userId?: string | null;
+  username?: string | null;
 }
 
 const storage = new AsyncLocalStorage<TenantContext>();

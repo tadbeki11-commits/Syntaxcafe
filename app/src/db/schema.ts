@@ -263,6 +263,18 @@ export const systemSettingsTable = sqliteTable('systemSettings', {
   updated_at: text('updated_at')
 });
 
+// Device enrollment: a single local-only row holding this install's device token
+// and the branch it's pinned to. Deliberately NOT cleared by clearAllLocalData so
+// the device stays enrolled across logins; only an explicit reset removes it.
+export const deviceEnrollmentTable = sqliteTable('device_enrollment', {
+  id: integer('id').primaryKey(),
+  token: text('token').notNull(),
+  business_id: text('business_id'),
+  branch_id: text('branch_id'),
+  device_name: text('device_name'),
+  enrolled_at: text('enrolled_at')
+});
+
 export const localDbTables = {
   users: usersTable,
   roles: rolesTable,
@@ -286,5 +298,6 @@ export const localDbTables = {
   systemSettings: systemSettingsTable,
   organizations: organizationsTable,
   expenses: expensesTable,
+  deviceEnrollment: deviceEnrollmentTable,
 };
 

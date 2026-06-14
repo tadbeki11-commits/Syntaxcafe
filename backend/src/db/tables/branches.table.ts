@@ -33,6 +33,10 @@ export const branches = pgTable(
     currency: varchar("currency", { length: 8 }).default("ETB"),
     address: text("address"),
     phone: varchar("phone", { length: 50 }),
+    // Reusable enrollment code for this branch. Any device enrolls with it to get
+    // its own long-lived token; stays valid until the owner rotates it (null = not
+    // set yet). Stored in plaintext so the owner can view/share it repeatedly.
+    enrollment_code: varchar("enrollment_code", { length: 40 }),
     is_active: boolean("is_active").default(true).notNull(),
     meta: jsonb("meta").default({}),
     version: integer("version").default(1).notNull(),

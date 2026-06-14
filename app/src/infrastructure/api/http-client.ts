@@ -6,6 +6,7 @@ import axios, {
 import toast from "react-hot-toast";
 import { getSessionUser } from "@/shared/utils/sessionUser";
 import { getApproximateServerNow } from "@/shared/utils/serverTime";
+import { getDeviceToken } from "@/shared/utils/deviceToken";
 
 export const normalizeBaseUrl = (url?: string): string => {
   const s = String(url || "").trim();
@@ -128,6 +129,18 @@ export function generateEscPosBase64(order: any, waiterName: string): string {
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    try {
+      // Pin every request to this device's branch (multi-tenant). The backend
+      // TenantMiddleware resolves x-device-token -> business/branch; without it
+      // requests fall back to the default branch.
+      const deviceToken = getDeviceToken();
+      if (deviceToken) {
+        config.headers.set("x-device-token", deviceToken);
+      }
+    } catch (error) {
+      console.error("Error adding device token to request:", error);
+    }
+
     try {
       const sessionUser = getSessionUser();
       const skipAuthRoutes = ["/auth/", "/health"];

@@ -8,9 +8,14 @@ import { ThemeProvider } from 'next-themes';
 import { bootstrapApp } from './bootstrap/container';
 import { startSyncServices } from './bootstrap/sync';
 import { registerClearMenuOnClose } from './bootstrap/clear-menu-on-close';
+import { loadDeviceEnrollment } from '@/shared/utils/deviceToken';
 import '@/infrastructure/sync/sync-engine';
 
-void bootstrapApp().then(() => startSyncServices());
+// Hydrate the device token from SQLite before sync starts so every request
+// carries x-device-token from the first call.
+void bootstrapApp()
+  .then(() => loadDeviceEnrollment())
+  .then(() => startSyncServices());
 void registerClearMenuOnClose();
 
 

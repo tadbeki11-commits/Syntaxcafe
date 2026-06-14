@@ -54,10 +54,16 @@ export const Organizations = {
 
 export const Orders = {
   list: () => apiFetch("/orders").then((d) => d.data.orders ?? []),
+  forPayment: () =>
+    apiFetch("/orders/for-payment").then((d) => d.data.orders ?? []),
+  create: (b: any) => apiFetch("/orders", j(b)),
 };
 
 export const Payments = {
   history: () => apiFetch("/payments/history").then((d) => d.data.payments ?? []),
+  create: (b: any) => apiFetch("/payments", j(b)).then((d) => d.data.payment),
+  confirm: (id: string, processed_by?: string) =>
+    apiFetch(`/payments/${id}/confirm`, j({ processed_by })),
 };
 
 export const Settings = {
@@ -74,6 +80,9 @@ export const Settings = {
 };
 
 export const Devices = {
-  createEnrollmentCode: (branch_id: string, name?: string) =>
-    apiFetch("/devices/enrollment-codes", j({ branch_id, name })),
+  // Reusable per-branch enrollment code: view the current one, or rotate it.
+  getEnrollmentCode: (branch_id: string) =>
+    apiFetch(`/devices/enrollment-codes?branch_id=${encodeURIComponent(branch_id)}`),
+  rotateEnrollmentCode: (branch_id: string) =>
+    apiFetch("/devices/enrollment-codes", j({ branch_id })),
 };

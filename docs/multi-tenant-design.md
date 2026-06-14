@@ -1,7 +1,15 @@
 # Multi-Business / Multi-Branch Design
 
-Status: **In progress** · Last updated: 2026-06-12
-Progress: Phase 1 (schema), Phase 2 (tenant context + scoping), Phase 3 (sync partitioning + device tokens) — **done**. Next: Phase 4 (web admin).
+Status: **In progress** · Last updated: 2026-06-14
+Progress: Phase 1 (schema), Phase 2 (tenant context + scoping), Phase 3 (sync
+partitioning + device tokens), Phase 4 (web admin), Phase 5 (platform console) —
+**done**. Next: Phase 6 (self-serve onboarding + billing).
+
+Phase 5 delivered: platform console can create/suspend/**delete** businesses,
+provision owners, set plans/branch limits, manage **and delete** branches, view
+**all users grouped by business**, monitor **devices** (last-seen/online state),
+and an append-only **super-admin audit log** of every business/branch change.
+Not yet done (deferred, optional in §7a): impersonate / "view as" owner.
 
 ## Goal
 
@@ -241,8 +249,8 @@ Zero data loss; the current cafe becomes "Business #1 / Branch #1."
 | **1** | `businesses`/`branches` tables; add `business_id`/`branch_id` columns (nullable); backfill; set `NOT NULL`. No behavior change. |
 | **2** | Tenant context guard + scope every backend service query; JWT changes. |
 | **3** | Sync partitioning (`branch_id` on `sync_events`, filtered `getChanges`, device tokens, enrollment). |
-| **4** | Web admin app — reporting first, then menu/staff/inventory management. |
-| **5** | **Platform console** (super admin): create/suspend businesses, provision owners, set plans/branch limits, manage all branches, audit log. |
+| **4** | ✅ Web admin app — reporting first, then menu/staff/inventory management. |
+| **5** | ✅ **Platform console** (super admin): create/suspend/delete businesses, provision owners, set plans/branch limits, manage/delete all branches, users-by-business view, device monitoring, audit log. (Impersonation deferred.) |
 | **6** | Self-serve business/branch onboarding (owners create branches within plan limits); billing/plan enforcement if desired. |
 
 Phases 1–3 are backend-only and establish the foundation without major desktop UI change.

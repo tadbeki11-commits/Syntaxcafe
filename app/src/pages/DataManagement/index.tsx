@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, AlertTriangle, Database, Package, MapPin, Receipt } from 'lucide-react';
+import { Trash2, AlertTriangle, Database, Package, MapPin, Receipt, MonitorSmartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import PageHeader from '@/components/layout/PageHeader';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import apiService from '@/application';
 import { toast } from 'react-hot-toast';
-import { getLocalDb, localDbTables } from '@/db/localDb';
+import { getLocalDb, localDbTables, clearAllLocalData } from '@/db/localDb';
 import OfflineBanner from '@/components/OfflineBanner';
 import { useSyncOnline } from '@/hooks/useSyncOnline';
+import { getDeviceEnrollment, clearDeviceEnrollment } from '@/shared/utils/deviceToken';
+import { clearSessionUser } from '@/shared/utils/sessionUser';
 
 const DataManagement = () => {
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -19,6 +21,9 @@ const DataManagement = () => {
     const [savingDiningSettings, setSavingDiningSettings] = useState(false);
     const [enableCashierReceipt, setEnableCashierReceipt] = useState(false);
     const [savingReceiptSettings, setSavingReceiptSettings] = useState(false);
+    const [isResetDeviceOpen, setIsResetDeviceOpen] = useState(false);
+    const [resettingDevice, setResettingDevice] = useState(false);
+    const enrollment = getDeviceEnrollment();
     const online = useSyncOnline();
 
     useEffect(() => {
@@ -108,6 +113,31 @@ const DataManagement = () => {
             toast.error(errorMsg);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleResetDevice = async () => {
+        setResettingDevice(true);
+        try {
+            // Switching branches: drop this device's token and all cached
+            // branch-scoped data, then send the operator back to enrollment.
+            clearSessionUser();
+            await clearAllLocalData();
+            // clearAllLocalData() leaves orders/payments/expenses (it protects
+            // unsynced records on logout); a device reset is a deliberate full
+            // wipe, so clear those too. No transactions on the pooled SQLite
+            // connection — run deletes sequentially.
+            const db = await getLocalDb();
+            await db.delete(localDbTables.orders);
+            await db.delete(localDbTables.payments);
+            await db.delete(localDbTables.expenses);
+            await clearDeviceEnrollment();
+            toast.success('Device unenrolled. Restarting setup…');
+            setTimeout(() => window.location.reload(), 600);
+        } catch (error) {
+            console.error('Device reset failed:', error);
+            toast.error('Failed to reset device. Please try again.');
+            setResettingDevice(false);
         }
     };
 
@@ -262,6 +292,42 @@ const DataManagement = () => {
                     </CardContent>
                 </Card>
 
+                {/* Device Enrollment */}
+                <Card>
+                    <CardHeader className="pb-3 border-b">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <MonitorSmartphone className="h-5 w-5 text-primary" />
+                            Device Enrollment
+                        </CardTitle>
+                        <CardDescription>
+                            This device is linked to a branch via a device token sent on every request.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-background gap-4">
+                            <div className="space-y-1">
+                                <h4 className="font-medium text-sm">
+                                    {enrollment?.deviceName || 'Enrolled device'}
+                                </h4>
+                                <p className="text-xs text-muted-foreground font-mono">
+                                    Branch: {enrollment?.branchId || '—'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Resetting unlinks this device and returns to the enrollment screen so it can be set up for a different branch. All local data is cleared.
+                                </p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsResetDeviceOpen(true)}
+                                className="w-full sm:w-auto shrink-0"
+                            >
+                                Reset / Re-enroll
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Danger Zone */}
                 <Card className="border-destructive/20 bg-destructive/5">
                     <CardHeader>
@@ -314,6 +380,26 @@ const DataManagement = () => {
                         </Button>
                         <Button variant="destructive" onClick={handleCleanup} disabled={loading}>
                             {loading ? 'Cleaning up...' : 'Yes, Delete Everything'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isResetDeviceOpen} onOpenChange={setIsResetDeviceOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Reset device enrollment?</DialogTitle>
+                        <DialogDescription>
+                            This unlinks the device from its current branch and clears all local data.
+                            You'll need a new enrollment code to set it up again. This cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsResetDeviceOpen(false)} disabled={resettingDevice}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleResetDevice} disabled={resettingDevice}>
+                            {resettingDevice ? 'Resetting…' : 'Yes, Reset Device'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

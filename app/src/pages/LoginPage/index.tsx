@@ -3,8 +3,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useLoginForm } from './hooks/useLoginForm';
 import { useLoginPhase } from './hooks/useLoginPhase';
-import { UserSelectionScreen } from './components/UserSelectionScreen';
-import { PinEntryScreen } from './components/PinEntryScreen';
 import { AdminLoginScreen } from './components/AdminLoginScreen';
 import syncEngine, { AUTO_SYNC_TASKS } from '@/infrastructure/sync/sync-engine';
 import { WifiOff, RefreshCw } from 'lucide-react';
@@ -170,32 +168,6 @@ const LoginPageContainer = () => {
         )}
         {/* ─────────────────────────────────────────────────────────────── */}
 
-        {loginPhase === 'user-selection' && (
-          <UserSelectionScreen
-            employees={employees}
-            isLoading={form.isLoading}
-            isOffline={!isOnline}
-            onSelectUser={handleUserSelect}
-            onAdminLogin={goToAdminLogin}
-          />
-        )}
-
-        {loginPhase === 'pin-entry' && selectedUser && (
-          <PinEntryScreen
-            selectedUser={selectedUser}
-            formData={{ username: form.formData.username, pin: form.formData.pin }}
-            errors={form.errors}
-            isLoading={form.isLoading}
-            onUsernameChange={form.handleChange}
-            onPinInput={form.handlePinInput}
-            onPinClear={form.clearPin}
-            onPinBackspace={form.handlePinBackspace}
-            onSubmit={handleSubmit}
-            onBack={handleBack}
-            usernameRef={usernameRef}
-            disabled={!isOnline}
-          />
-        )}
 
         {loginPhase === 'admin' && (
           <AdminLoginScreen

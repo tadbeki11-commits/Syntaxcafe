@@ -26,15 +26,12 @@ export class DevicesService {
   // or an explicit cache bust; acceptable for the device count we expect.)
   private readonly tokenCache = new Map<string, DeviceTenant>();
 
-  /**
-   * Owner/platform mints a one-time enrollment code for a branch. The plaintext
-   * code is returned once; only its hash is stored.
-   */
-  async createEnrollmentCode(branchId: string, name?: string) {
+  /** Loads a branch and asserts the caller (owner/platform) may manage it. */
+  private async getManageableBranch(branchId: string) {
     const tenant = getTenant();
     if (!tenant || (tenant.scope !== "owner" && tenant.scope !== "platform")) {
       throw new ForbiddenException(
-        "Only an owner or platform admin can enroll devices.",
+        "Only an owner or platform admin can manage device enrollment.",
       );
     }
 
@@ -47,71 +44,67 @@ export class DevicesService {
     if (tenant.scope === "owner" && branch.business_id !== tenant.businessId) {
       throw new ForbiddenException("Branch does not belong to your business.");
     }
+    return branch;
+  }
 
-    const code = randomBytes(6).toString("hex").toUpperCase(); // 12 chars
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
-
-    const [device] = await db
-      .insert(branchDevices)
-      .values({
-        business_id: branch.business_id,
-        branch_id: branch.id,
-        name: name ?? null,
-        code_hash: sha256(code),
-        code_expires_at: expiresAt,
-        status: "pending",
-      })
-      .returning();
-
-    return {
-      device_id: device.id,
-      branch_id: branch.id,
-      code,
-      expires_at: expiresAt,
-    };
+  /** Returns the branch's current reusable enrollment code (owner/platform). */
+  async getEnrollmentCode(branchId: string) {
+    const branch = await this.getManageableBranch(branchId);
+    return { branch_id: branch.id, code: branch.enrollment_code ?? null };
   }
 
   /**
-   * A device redeems an enrollment code for a long-lived token. Public endpoint:
-   * possession of a valid, unexpired code is the credential.
+   * Owner/platform sets (or rotates) the branch's reusable enrollment code.
+   * Devices enroll with it any number of times until it's rotated again; rotating
+   * does not revoke already-enrolled devices (their tokens stay valid).
+   */
+  async rotateEnrollmentCode(branchId: string) {
+    const branch = await this.getManageableBranch(branchId);
+
+    const code = randomBytes(6).toString("hex").toUpperCase(); // 12 chars
+    await db
+      .update(branches)
+      .set({ enrollment_code: code, updated_at: new Date() })
+      .where(eq(branches.id, branch.id));
+
+    return { branch_id: branch.id, code };
+  }
+
+  /**
+   * A device redeems its branch's enrollment code for a long-lived token. Public
+   * endpoint: possession of a valid code is the credential. The code is reusable,
+   * so each call provisions a new device record/token.
    */
   async enroll(code: string, deviceName?: string) {
-    if (!code) throw new BadRequestException("Enrollment code is required");
+    const trimmed = code?.trim().toUpperCase();
+    if (!trimmed) throw new BadRequestException("Enrollment code is required");
 
-    const [device] = await db
+    const [branch] = await db
       .select()
-      .from(branchDevices)
+      .from(branches)
       .where(
         and(
-          eq(branchDevices.code_hash, sha256(code.trim().toUpperCase())),
-          eq(branchDevices.status, "pending"),
+          eq(branches.enrollment_code, trimmed),
+          eq(branches.is_active, true),
         ),
       )
       .limit(1);
-
-    if (!device) throw new BadRequestException("Invalid enrollment code");
-    if (device.code_expires_at && device.code_expires_at < new Date()) {
-      throw new BadRequestException("Enrollment code has expired");
-    }
+    if (!branch) throw new BadRequestException("Invalid enrollment code");
 
     const token = randomBytes(32).toString("hex"); // 64 chars
-    await db
-      .update(branchDevices)
-      .set({
-        token_hash: sha256(token),
-        code_hash: null,
-        code_expires_at: null,
-        status: "active",
-        name: deviceName ?? device.name,
-        last_seen_at: new Date(),
-        updated_at: new Date(),
-      })
-      .where(eq(branchDevices.id, device.id));
+    await db.insert(branchDevices).values({
+      business_id: branch.business_id,
+      branch_id: branch.id,
+      name: deviceName?.trim() || null,
+      token_hash: sha256(token),
+      status: "active",
+      last_seen_at: new Date(),
+    });
 
     return {
       token,
-      business_id: device.business_id,
-      branch_id: device.branch_id,
+      business_id: branch.business_id,
+      branch_id: branch.id,
     };
   }
 
