@@ -371,12 +371,6 @@ const PrinterSettings: React.FC = () => {
                       <span className="font-bold text-sm text-foreground truncate">
                         {printer.name}
                       </span>
-                      {assignedDepartmentOptions.map((dept) => (
-                        <Badge key={dept.slug} className="bg-primary/15 text-primary border-primary/30 font-bold text-[10px] px-1.5 py-0">
-                          <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
-                          {dept.name}
-                        </Badge>
-                      ))}
                       <Badge
                         variant="outline"
                         className={`text-[10px] font-bold px-1.5 py-0 border-none ${
