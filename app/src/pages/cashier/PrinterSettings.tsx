@@ -413,7 +413,7 @@ const PrinterSettings: React.FC = () => {
                           >
                             <span className="truncate">
                               {assignedDepartmentOptions.length > 0
-                                ? assignedDepartmentOptions.map((dept) => dept.name).join(', ')
+                                ? assignedDepartmentOptions.slice(0, 2).map((dept) => dept.name).join(', ') + (assignedDepartmentOptions.length > 2 ? '...' : '')
                                 : 'Assign departments'}
                             </span>
                             <ChevronsUpDown className="w-3.5 h-3.5 ml-1.5 shrink-0 opacity-60" />
@@ -477,7 +477,7 @@ const PrinterSettings: React.FC = () => {
                     <Badge variant="outline" className="h-8 px-2.5 text-[11px] font-bold border-dashed">
                       <Printer className="w-3 h-3 mr-1" />
                       {hasAssignment
-                        ? `Prints ${assignedDepartmentOptions.map((dept) => dept.name).join(', ')}`
+                        ? `Prints ${assignedDepartmentOptions.slice(0, 2).map((dept) => dept.name).join(', ') + (assignedDepartmentOptions.length > 2 ? '...' : '')}`
                         : 'Not assigned'}
                     </Badge>
                   </div>
