@@ -59,26 +59,17 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
       const items = order?.items || [];
 
       const sections: any[] = [
-        { Title: { text: format.receiptTitle } },
         { Text: { text: format.businessName, align: 'Center' } },
         { Text: { text: format.businessAddress, align: 'Center' } },
         { Text: { text: format.businessPhone, align: 'Center' } },
         { Text: { text: '--------------------------------', align: 'Center' } },
-        { Text: { text: `Receipt #: ${order.order_number ?? uuidToDisplayId(order.id)}`, align: 'Center' } },
+        { Text: { text: `Receipt #: ${order.order_number}`, align: 'Center' } },
         { Text: { text: `Date: ${new Date().toLocaleDateString('en-GB')}`, align: 'Center' } },
         { Text: { text: `Time: ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, align: 'Center' } },
-        { Text: { text: `Order #: ${order.order_number ?? uuidToDisplayId(order.id)}`, align: 'Center' } },
       ];
 
-      if (order.table_number) {
-        sections.push({ Text: { text: `Table: ${order.table_number}`, align: 'Center' } });
-      }
-      if (order.employee_id) {
-        sections.push({ Text: { text: `Cashier: #${order.employee_id}`, align: 'Center' } });
-      }
 
       sections.push({ Text: { text: '--------------------------------', align: 'Center' } });
-      sections.push({ Text: { text: 'This is only used for demo purposes.', align: 'Center', style: 'bold' } });
       sections.push({ Text: { text: 'Don\'t use this for commercial purposes.', align: 'Center', style: 'bold' } });
       sections.push({ Text: { text: '--------------------------------', align: 'Center' } });
       sections.push({
@@ -115,6 +106,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
       if (format.showRefundPolicy) {
         sections.push({ Text: { text: format.showRefundPolicy, align: 'Center' } });
       }
+      sections.push({ Text: { text: 'This is only for internal managment purposes.', align: 'Center', style: 'bold' } });
 
       sections.push({ Feed: { feed_type: 'lines', value: 3 } });
       sections.push({ Cut: { mode: 'partial', feed: 0 } });
