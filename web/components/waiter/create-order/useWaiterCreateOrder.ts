@@ -118,8 +118,12 @@ export const useWaiterCreateOrder = () => {
       if (tablesResult.status === "fulfilled") {
         const allTablesResponse = tablesResult.value as any;
         const tables = allTablesResponse?.data?.data?.tables ?? [];
+        // The backend returns the raw `table_number` column; the ported UI reads
+        // `table.number`. Normalize so selection doesn't produce "undefined".
         const tablesArray = Array.isArray(tables)
-          ? tables.sort((a, b) => a.number - b.number)
+          ? tables
+              .map((t: any) => ({ ...t, number: t.number ?? t.table_number }))
+              .sort((a, b) => a.number - b.number)
           : [];
         setAllTables(tablesArray);
       }
