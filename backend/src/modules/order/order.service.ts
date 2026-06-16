@@ -941,6 +941,7 @@ export class OrderService {
     return {
       ...order,
       employee_name: this.formatEmployeeName(employee),
+      employee_role: employee?.role ?? null,
       items,
     };
   }

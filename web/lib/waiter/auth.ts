@@ -54,7 +54,14 @@ export async function waiterLogin(
     throw new Error("This portal is for café waiters only.");
   }
 
-  document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${12 * 3600}; samesite=lax`;
+  // Mobile Safari/Chrome drop SameSite=Lax cookies set from JS over HTTPS unless
+  // `Secure` is present, which made a fresh tab look logged out. Match the
+  // attribute handling used for the back-office session in lib/auth.ts.
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:"
+      ? " Secure;"
+      : "";
+  document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${12 * 3600}; SameSite=Lax;${secure}`;
   localStorage.setItem(USER_KEY, JSON.stringify(data.user));
   return data.user;
 }

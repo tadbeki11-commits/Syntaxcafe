@@ -7,6 +7,22 @@ export type SessionUser = {
   full_name?: string;
 };
 
+// Writes a persistent, cross-tab cookie. Mobile Safari/Chrome are strict about
+// SameSite=Lax cookies set from JS over HTTPS: without `Secure` they may be
+// dropped, which is why a fresh tab on a phone looked "logged out". Mirrors the
+// attribute handling in components/active-theme.tsx.
+function setCookie(name: string, value: string, maxAgeSeconds: number) {
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:"
+      ? " Secure;"
+      : "";
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax;${secure}`;
+}
+
+// Keep the back-office session around for a week so reopening the app / new tabs
+// on mobile doesn't force a re-login mid-day.
+const SESSION_MAX_AGE = 7 * 24 * 3600;
+
 // Token lives in a JS-readable cookie so middleware can guard routes and the API
 // client can attach it. This is a back-office tool; if you later need stronger
 // protection, move to an httpOnly cookie set by a Next route handler.
@@ -25,7 +41,7 @@ export async function login(
     throw new Error("This portal is for platform admins and business owners.");
   }
 
-  document.cookie = `pa_token=${encodeURIComponent(token)}; path=/; max-age=${8 * 3600}; samesite=lax`;
+  setCookie("pa_token", token, SESSION_MAX_AGE);
   localStorage.setItem("pa_user", JSON.stringify(data.user));
   return data.user;
 }

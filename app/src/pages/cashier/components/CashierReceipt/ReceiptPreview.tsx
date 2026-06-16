@@ -63,14 +63,12 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         { Text: { text: format.businessAddress, align: 'Center' } },
         { Text: { text: format.businessPhone, align: 'Center' } },
         { Text: { text: '--------------------------------', align: 'Center' } },
-        { Text: { text: `Receipt #: ${order.order_number}`, align: 'Center' } },
         { Text: { text: `Date: ${new Date().toLocaleDateString('en-GB')}`, align: 'Center' } },
         { Text: { text: `Time: ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, align: 'Center' } },
       ];
 
 
       sections.push({ Text: { text: '--------------------------------', align: 'Center' } });
-      sections.push({ Text: { text: 'Don\'t use this for commercial purposes.', align: 'Center', style: 'bold' } });
       sections.push({ Text: { text: '--------------------------------', align: 'Center' } });
       sections.push({
         Table: {
@@ -107,7 +105,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         sections.push({ Text: { text: format.showRefundPolicy, align: 'Center' } });
       }
       sections.push({ Text: { text: 'This is only for internal managment purposes.', align: 'Center', style: 'bold' } });
-
+      sections.push({ Text: { text: 'Don\'t use this for commercial purposes.', align: 'Center', style: 'bold' } });
       sections.push({ Feed: { feed_type: 'lines', value: 3 } });
       sections.push({ Cut: { mode: 'partial', feed: 0 } });
 
