@@ -30,6 +30,7 @@ import TableManagement from './pages/TableManagement/index';
 import EmployeeManagement from './pages/EmployeeManagement/index';
 import UserManagement from './pages/UserManagement/index';
 import MenuManagement from './pages/MenuManagement/index';
+import BulkMenuImport from './pages/MenuManagement/bulk-import/index';
 import Profile from './pages/Profile/index';
 import PaymentManagement from './pages/PaymentManagement/index';
 import OrderManagement from './pages/OrderManagement/index';
@@ -119,6 +120,7 @@ const DashboardRouter = () => {
         <Route path="users" element={<ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>} />
         <Route path="employees" element={<ProtectedRoute allowedRoles={['admin']}><EmployeeManagement /></ProtectedRoute>} />
         <Route path="menu" element={<ProtectedRoute allowedRoles={['admin', 'cafe_waiter', 'kitchen_staff']}><MenuManagement /></ProtectedRoute>} />
+        <Route path="menu/bulk-import" element={<ProtectedRoute allowedRoles={['admin']}><BulkMenuImport /></ProtectedRoute>} />
         <Route path="inventory" element={<ProtectedRoute allowedRoles={['admin']}><InventoryManagement /></ProtectedRoute>} />
         <Route path="inventory/locations" element={<ProtectedRoute allowedRoles={['admin']}><StockLocationManagement /></ProtectedRoute>} />
         <Route path="inventory/transfers" element={<ProtectedRoute allowedRoles={['admin']}><StockTransferManagement /></ProtectedRoute>} />

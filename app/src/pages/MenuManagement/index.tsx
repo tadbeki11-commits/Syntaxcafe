@@ -1,4 +1,5 @@
-import { Plus } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/layout/PageHeader';
 import OfflineBanner from '@/components/OfflineBanner';
@@ -11,6 +12,7 @@ import { FASTING_SUB } from './constants';
 import { isFasting, normCat } from './utils';
 
 const MenuManagement = () => {
+  const navigate = useNavigate();
   const {
     isAdmin,
     loading,
@@ -55,6 +57,14 @@ const MenuManagement = () => {
         description={isAdmin ? 'Manage bakery and café menu items' : 'Browse available café menu items'}
         actions={isAdmin ? (
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/dashboard/menu/bulk-import')}
+              disabled={!syncStatus.online}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Bulk Import
+            </Button>
             <Button onClick={openAdd} disabled={!syncStatus.online}>
               <Plus className="h-4 w-4 mr-2" />
               Add Menu Item

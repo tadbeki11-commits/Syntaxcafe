@@ -14,6 +14,9 @@ export const Menu = {
   categories: () =>
     apiFetch("/menu/main-categories").then((d) => d.data.mainCategories ?? []),
   create: (b: any) => apiFetch("/menu", j(b)),
+  // Bulk create/update. The backend upserts each item and emits sync events,
+  // scoped to the branch from the X-Branch-Id header.
+  bulkSync: (menuItems: any[]) => apiFetch("/menu/sync", j({ menuItems })),
   update: (id: string, b: any) => apiFetch(`/menu/${id}`, put(b)),
   remove: (id: string) => apiFetch(`/menu/${id}`, del),
   toggle: (id: string) => apiFetch(`/menu/${id}/toggle-availability`, { method: "POST" }),

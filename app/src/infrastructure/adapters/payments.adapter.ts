@@ -60,7 +60,11 @@ export const paymentsAdapter = {
             };
           });
 
-          console.log("[Payments Sync] Upserting", syncedPayments.length, "payments");
+          console.log(
+            "[Payments Sync] Upserting",
+            syncedPayments.length,
+            "payments",
+          );
           for (const payment of syncedPayments) {
             try {
               await upsertPayment(payment);
@@ -70,7 +74,7 @@ export const paymentsAdapter = {
             }
           }
 
-          // Read fresh local payments which now includes the upserted remote payments 
+          // Read fresh local payments which now includes the upserted remote payments
           // plus any local unsynced payments
           const freshLocalPayments = await readPayments();
           let updated = false;
@@ -82,7 +86,9 @@ export const paymentsAdapter = {
               updated = true;
             }
           }
-          const finalPayments = updated ? await readPayments() : freshLocalPayments;
+          const finalPayments = updated
+            ? await readPayments()
+            : freshLocalPayments;
 
           return {
             data: { status: "success", data: { payments: finalPayments } },
@@ -160,15 +166,23 @@ export const paymentsAdapter = {
   create: async (paymentData: any) => {
     const paymentStatus = String(paymentData.status || "paid").toLowerCase();
     const isConfirmed = ["paid", "confirmed"].includes(paymentStatus);
-    const isDeleted  = paymentStatus === "deleted";
+    const isDeleted = paymentStatus === "deleted";
 
     // Helper: update local order status after a payment action
     const syncOrderLocally = async (orderId: string, synced: 0 | 1) => {
       if (!orderId) return;
       const localOrder = await findOrder(orderId);
       if (localOrder?.id) {
-        const newStatus        = isConfirmed ? "paid"      : isDeleted ? "cancelled" : localOrder.status;
-        const newPaymentStatus = isConfirmed ? "paid"      : isDeleted ? "cancelled" : localOrder.payment_status;
+        const newStatus = isConfirmed
+          ? "paid"
+          : isDeleted
+            ? "cancelled"
+            : localOrder.status;
+        const newPaymentStatus = isConfirmed
+          ? "paid"
+          : isDeleted
+            ? "cancelled"
+            : localOrder.payment_status;
         await upsertOrder({
           ...localOrder,
           status: newStatus,
@@ -202,8 +216,14 @@ export const paymentsAdapter = {
         await syncOrderLocally(paymentData.order_id, 1);
 
         return {
-          data: { status: "success", data: { payment: syncPayload, ...syncPayload } },
-          status: 200, statusText: "OK", headers: {}, config: {} as any,
+          data: {
+            status: "success",
+            data: { payment: syncPayload, ...syncPayload },
+          },
+          status: 200,
+          statusText: "OK",
+          headers: {},
+          config: {} as any,
         } as any;
       } catch {
         // fall through to offline path
@@ -231,7 +251,11 @@ export const paymentsAdapter = {
     return {
       data: {
         status: "success",
-        data: { payment: { id: paymentId, ...localPayment }, id: paymentId, ...localPayment },
+        data: {
+          payment: { id: paymentId, ...localPayment },
+          id: paymentId,
+          ...localPayment,
+        },
       },
       status: 200,
       statusText: "OK",
@@ -338,12 +362,6 @@ export const paymentsAdapter = {
         // ignore
       }
     }
-
-    // Inventory deduction is backend-authoritative — the server deducts stock
-    // when the order/payment syncs. No local deduction here.
-
-    // Offline manual sync enforcement: Don't hit the live API
-    // Let the syncEngine handle it when the user presses Sync
 
     return {
       data: {

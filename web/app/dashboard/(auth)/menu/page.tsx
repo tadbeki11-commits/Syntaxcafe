@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PlusIcon, PencilIcon, Trash2Icon, UtensilsCrossedIcon } from "lucide-react";
+import { PlusIcon, PencilIcon, Trash2Icon, UtensilsCrossedIcon, UploadIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ type Item = {
 type Category = { id: string; name: string; slug: string };
 
 export default function MenuPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,10 +155,18 @@ export default function MenuPage() {
         title="Menu"
         description="Items and categories for this branch."
         action={
-          <Button onClick={openNew}>
-            <PlusIcon className="size-4" />
-            New item
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/dashboard/menu/bulk-import")}>
+              <UploadIcon className="size-4" />
+              Bulk import
+            </Button>
+            <Button onClick={openNew}>
+              <PlusIcon className="size-4" />
+              New item
+            </Button>
+          </div>
         }
       />
 
