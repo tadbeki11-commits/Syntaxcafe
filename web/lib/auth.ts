@@ -59,3 +59,24 @@ export function getUser(): SessionUser | null {
     return null;
   }
 }
+
+// Persist edits to the signed-in user (e.g. after a profile update) so the
+// sidebar and other reads reflect the change without a re-login.
+export function setUser(user: SessionUser) {
+  localStorage.setItem("pa_user", JSON.stringify(user));
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Platform Admin",
+  owner: "Owner",
+  business_admin: "Business Admin",
+  admin: "Administrator",
+  cashier: "Cashier",
+  kitchen_staff: "Kitchen Staff",
+  cafe_waiter: "Waiter",
+};
+
+export function roleLabel(role?: string): string {
+  if (!role) return "—";
+  return ROLE_LABELS[role] ?? role.replace(/_/g, " ");
+}

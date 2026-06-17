@@ -3,13 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, sql, sum } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import db from "../../db/drizzle";
 import { businesses } from "../../db/tables/businesses.table";
 import { branches } from "../../db/tables/branches.table";
 import { branchDevices } from "../../db/tables/branch-devices.table";
 import { users } from "../../db/tables/users.table";
+import { orders } from "../../db/tables/orders.table";
 import { platformAuditLogs } from "../../db/tables/platform-audit-logs.table";
 import {
   DEFAULT_BRANCH_ID,
@@ -30,6 +31,20 @@ interface AuditInput {
 }
 
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
+
+// Roles a super admin may provision under a business. Branch-scoped roles must
+// be pinned to a branch; business-wide roles (owner/admin) carry no branch.
+const BRANCH_SCOPED_ROLES = ["cashier", "kitchen_staff", "cafe_waiter"] as const;
+const BUSINESS_WIDE_ROLES = ["owner", "business_admin", "admin"] as const;
+const ASSIGNABLE_ROLES = [
+  ...BUSINESS_WIDE_ROLES,
+  ...BRANCH_SCOPED_ROLES,
+] as const;
+type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
+
+// Revenue counts every order that wasn't cancelled/voided. total_amount is whole
+// birr (see orders.table.ts); we coalesce nulls so the SUM never returns null.
+const REVENUE_FILTER = sql`lower(coalesce(${orders.status}, '')) not in ('cancelled', 'canceled', 'voided', 'void')`;
 
 const slugify = (value: string) =>
   String(value || "")
@@ -62,7 +77,19 @@ export class PlatformService {
   }
 
   async overview() {
-    const [[biz], [activeBiz], [branchRows], [deviceRows]] = await Promise.all([
+    // Midnight today (server local time) for the "today" slice of orders/revenue.
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [
+      [biz],
+      [activeBiz],
+      [branchRows],
+      [deviceRows],
+      [userRows],
+      [orderRows],
+      [todayRows],
+    ] = await Promise.all([
       db.select({ c: count() }).from(businesses),
       db
         .select({ c: count() })
@@ -70,32 +97,72 @@ export class PlatformService {
         .where(eq(businesses.is_active, true)),
       db.select({ c: count() }).from(branches),
       db.select({ c: count() }).from(branchDevices),
+      db.select({ c: count() }).from(users),
+      db
+        .select({ c: count(), revenue: sum(orders.total_amount) })
+        .from(orders)
+        .where(REVENUE_FILTER),
+      db
+        .select({ c: count(), revenue: sum(orders.total_amount) })
+        .from(orders)
+        .where(
+          and(REVENUE_FILTER, sql`${orders.created_at} >= ${startOfToday}`),
+        ),
     ]);
     return {
       businesses: Number(biz.c),
       active_businesses: Number(activeBiz.c),
       branches: Number(branchRows.c),
       devices: Number(deviceRows.c),
+      users: Number(userRows.c),
+      orders: Number(orderRows.c),
+      revenue: Number(orderRows.revenue ?? 0),
+      orders_today: Number(todayRows.c),
+      revenue_today: Number(todayRows.revenue ?? 0),
     };
   }
 
   async listBusinesses() {
-    const rows = await db
-      .select()
-      .from(businesses)
-      .orderBy(asc(businesses.created_at));
+    const [rows, branchCounts, userCounts, orderStats] = await Promise.all([
+      db.select().from(businesses).orderBy(asc(businesses.created_at)),
+      db
+        .select({ business_id: branches.business_id, c: count() })
+        .from(branches)
+        .groupBy(branches.business_id),
+      db
+        .select({ business_id: users.business_id, c: count() })
+        .from(users)
+        .groupBy(users.business_id),
+      db
+        .select({
+          business_id: orders.business_id,
+          c: count(),
+          revenue: sum(orders.total_amount),
+        })
+        .from(orders)
+        .where(REVENUE_FILTER)
+        .groupBy(orders.business_id),
+    ]);
 
-    const branchCounts = await db
-      .select({ business_id: branches.business_id, c: count() })
-      .from(branches)
-      .groupBy(branches.business_id);
     const branchMap = new Map(
       branchCounts.map((r) => [r.business_id, Number(r.c)]),
+    );
+    const userMap = new Map(
+      userCounts.map((r) => [r.business_id, Number(r.c)]),
+    );
+    const orderMap = new Map(
+      orderStats.map((r) => [
+        r.business_id,
+        { orders: Number(r.c), revenue: Number(r.revenue ?? 0) },
+      ]),
     );
 
     return rows.map((b) => ({
       ...b,
       branch_count: branchMap.get(b.id) ?? 0,
+      user_count: userMap.get(b.id) ?? 0,
+      order_count: orderMap.get(b.id)?.orders ?? 0,
+      revenue: orderMap.get(b.id)?.revenue ?? 0,
     }));
   }
 
@@ -113,23 +180,63 @@ export class PlatformService {
       .where(eq(branches.business_id, id))
       .orderBy(asc(branches.created_at));
 
+    const [staff, [orderStats], [todayStats]] = await Promise.all([
+      db
+        .select({
+          id: users.id,
+          name: users.name,
+          username: users.username,
+          role: users.role,
+          is_active: users.is_active,
+          branch_id: users.branch_id,
+          phone: users.phone,
+          created_at: users.created_at,
+        })
+        .from(users)
+        .where(eq(users.business_id, id))
+        .orderBy(asc(users.created_at)),
+      db
+        .select({ c: count(), revenue: sum(orders.total_amount) })
+        .from(orders)
+        .where(and(eq(orders.business_id, id), REVENUE_FILTER)),
+      (() => {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        return db
+          .select({ c: count(), revenue: sum(orders.total_amount) })
+          .from(orders)
+          .where(
+            and(
+              eq(orders.business_id, id),
+              REVENUE_FILTER,
+              sql`${orders.created_at} >= ${startOfToday}`,
+            ),
+          );
+      })(),
+    ]);
+
+    const branchNameById = new Map(businessBranches.map((b) => [b.id, b.name]));
     const owner = business.owner_user_id
-      ? (
-          await db
-            .select({
-              id: users.id,
-              name: users.name,
-              username: users.username,
-              role: users.role,
-              is_active: users.is_active,
-            })
-            .from(users)
-            .where(eq(users.id, business.owner_user_id))
-            .limit(1)
-        )[0]
+      ? staff.find((u) => u.id === business.owner_user_id) ?? null
       : null;
 
-    return { ...business, branches: businessBranches, owner };
+    return {
+      ...business,
+      branches: businessBranches,
+      owner,
+      users: staff.map((u) => ({
+        ...u,
+        branch_name: u.branch_id ? branchNameById.get(u.branch_id) ?? null : null,
+      })),
+      stats: {
+        orders: Number(orderStats.c),
+        revenue: Number(orderStats.revenue ?? 0),
+        orders_today: Number(todayStats.c),
+        revenue_today: Number(todayStats.revenue ?? 0),
+        users: staff.length,
+        branches: businessBranches.length,
+      },
+    };
   }
 
   /** Create a business and provision its initial owner account in one transaction. */
@@ -481,6 +588,178 @@ export class PlatformService {
     });
 
     return { id: user.id, reset: true };
+  }
+
+  /**
+   * Provision a staff/owner account under a specific business (and branch, for
+   * branch-scoped roles). Super-admin only. Mirrors the uniqueness rules the
+   * users table enforces: branch-scoped staff are unique within their branch,
+   * business-wide accounts within their business.
+   */
+  async createUser(input: {
+    business_id: string;
+    branch_id?: string | null;
+    name?: string;
+    username: string;
+    password: string;
+    role: string;
+    phone?: string;
+  }) {
+    const username = String(input?.username || "").trim();
+    const password = String(input?.password || "");
+    const role = String(input?.role || "").trim() as AssignableRole;
+
+    if (!username) throw new BadRequestException("Username is required");
+    if (password.length < 4) {
+      throw new BadRequestException(
+        "Password must be at least 4 characters long",
+      );
+    }
+    if (!ASSIGNABLE_ROLES.includes(role)) {
+      throw new BadRequestException(
+        `Role must be one of: ${ASSIGNABLE_ROLES.join(", ")}`,
+      );
+    }
+
+    const [business] = await db
+      .select({ id: businesses.id, name: businesses.name })
+      .from(businesses)
+      .where(eq(businesses.id, input.business_id))
+      .limit(1);
+    if (!business) throw new NotFoundException("Business not found");
+
+    const branchScoped = (BRANCH_SCOPED_ROLES as readonly string[]).includes(
+      role,
+    );
+    let branchId: string | null = null;
+    let branchName: string | null = null;
+
+    if (branchScoped) {
+      if (!input.branch_id) {
+        throw new BadRequestException(
+          `A branch is required for the "${role}" role`,
+        );
+      }
+      const [branch] = await db
+        .select({ id: branches.id, name: branches.name, business_id: branches.business_id })
+        .from(branches)
+        .where(eq(branches.id, input.branch_id))
+        .limit(1);
+      if (!branch || branch.business_id !== business.id) {
+        throw new NotFoundException("Branch not found for this business");
+      }
+      branchId = branch.id;
+      branchName = branch.name;
+    }
+
+    // Reject duplicate usernames within the same scope before hitting the DB
+    // constraint, so the caller gets a clean message instead of a 500.
+    const dupConditions = branchId
+      ? and(eq(users.branch_id, branchId), eq(users.username, username))
+      : and(eq(users.business_id, business.id), eq(users.username, username));
+    const [dup] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(dupConditions)
+      .limit(1);
+    if (dup) {
+      throw new BadRequestException(
+        `Username "${username}" is already taken in this ${branchId ? "branch" : "business"}`,
+      );
+    }
+
+    const passwordHash = await hash(password, BCRYPT_ROUNDS);
+    const [created] = await db
+      .insert(users)
+      .values({
+        business_id: business.id,
+        branch_id: branchId,
+        name: String(input.name || username).trim(),
+        username,
+        password_hash: passwordHash,
+        role,
+        phone: input.phone ?? null,
+        is_active: true,
+      })
+      .returning({
+        id: users.id,
+        name: users.name,
+        username: users.username,
+        role: users.role,
+        is_active: users.is_active,
+        branch_id: users.branch_id,
+        business_id: users.business_id,
+      });
+
+    await this.recordAudit({
+      action: "user.create",
+      target_type: "user",
+      target_id: created.id,
+      target_label: created.username ?? created.name,
+      business_id: business.id,
+      metadata: { role, branch_id: branchId, branch_name: branchName },
+    });
+
+    return { ...created, branch_name: branchName };
+  }
+
+  /** Enable or disable a user account (suspend without deleting). */
+  async setUserActive(userId: string, isActive: boolean) {
+    const [user] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        username: users.username,
+        business_id: users.business_id,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!user) throw new NotFoundException("User not found");
+
+    await db
+      .update(users)
+      .set({ is_active: isActive, updated_at: new Date() })
+      .where(eq(users.id, userId));
+
+    await this.recordAudit({
+      action: isActive ? "user.activate" : "user.deactivate",
+      target_type: "user",
+      target_id: user.id,
+      target_label: user.username ?? user.name,
+      business_id: user.business_id,
+    });
+    return { id: user.id, is_active: isActive };
+  }
+
+  /** Hard-delete a user account. */
+  async deleteUser(userId: string) {
+    const [user] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        username: users.username,
+        role: users.role,
+        business_id: users.business_id,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!user) throw new NotFoundException("User not found");
+    if (user.role === "super_admin") {
+      throw new BadRequestException("Platform super admins cannot be deleted here");
+    }
+
+    await db.delete(users).where(eq(users.id, userId));
+
+    await this.recordAudit({
+      action: "user.delete",
+      target_type: "user",
+      target_id: user.id,
+      target_label: user.username ?? user.name,
+      business_id: user.business_id,
+    });
+    return { id: user.id, deleted: true };
   }
 
   /** Recent super-admin audit entries, newest first. */

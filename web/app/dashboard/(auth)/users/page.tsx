@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,25 @@ type Row = User & {
   branch_label: string;
 };
 
+// Roles a super admin may create. Branch-scoped roles must be pinned to a branch.
+const BRANCH_SCOPED_ROLES = ["cashier", "kitchen_staff", "cafe_waiter"];
+const ROLE_OPTIONS = [
+  { value: "owner", label: "Owner (business-wide)" },
+  { value: "admin", label: "Admin (business-wide)" },
+  { value: "cashier", label: "Cashier (branch)" },
+  { value: "kitchen_staff", label: "Kitchen staff (branch)" },
+  { value: "cafe_waiter", label: "Waiter (branch)" },
+];
+
+const emptyForm = {
+  business_id: "",
+  branch_id: "",
+  role: "cashier",
+  name: "",
+  username: "",
+  password: "",
+};
+
 export default function PlatformUsersPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [total, setTotal] = useState(0);
@@ -49,6 +69,65 @@ export default function PlatformUsersPage() {
   const [resetTarget, setResetTarget] = useState<Row | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [resetting, setResetting] = useState(false);
+
+  // Add-user dialog state.
+  const [addOpen, setAddOpen] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [creating, setCreating] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    return apiFetch<{ groups: Group[]; total_users: number }>("/platform/users")
+      .then((d) => {
+        setGroups(d.groups ?? []);
+        setTotal(d.total_users ?? 0);
+      })
+      .catch((e) => toast.error(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const selectedBusiness = groups.find(
+    (g) => g.business?.id === form.business_id,
+  );
+  const roleNeedsBranch = BRANCH_SCOPED_ROLES.includes(form.role);
+
+  async function submitCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.business_id) {
+      toast.error("Select a business");
+      return;
+    }
+    if (!form.username.trim() || form.password.length < 4) {
+      toast.error("Username and a password of 4+ characters are required");
+      return;
+    }
+    if (roleNeedsBranch && !form.branch_id) {
+      toast.error("This role must be assigned to a branch");
+      return;
+    }
+    setCreating(true);
+    try {
+      await apiFetch("/platform/users", {
+        method: "POST",
+        body: JSON.stringify({
+          business_id: form.business_id,
+          branch_id: roleNeedsBranch ? form.branch_id : null,
+          name: form.name.trim() || form.username.trim(),
+          username: form.username.trim(),
+          password: form.password,
+          role: form.role,
+        }),
+      });
+      toast.success(`User "${form.username.trim()}" created`);
+      setAddOpen(false);
+      setForm(emptyForm);
+      await load();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function submitReset() {
     if (!resetTarget) return;
@@ -75,14 +154,8 @@ export default function PlatformUsersPage() {
   }
 
   useEffect(() => {
-    apiFetch<{ groups: Group[]; total_users: number }>("/platform/users")
-      .then((d) => {
-        setGroups(d.groups ?? []);
-        setTotal(d.total_users ?? 0);
-      })
-      .catch((e) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    load();
+  }, [load]);
 
   const rows: Row[] = useMemo(
     () =>
@@ -191,12 +264,18 @@ export default function PlatformUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
-        <p className="text-muted-foreground text-sm">
-          {total} user{total === 1 ? "" : "s"} across {groups.length} group
-          {groups.length === 1 ? "" : "s"}.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+          <p className="text-muted-foreground text-sm">
+            {total} user{total === 1 ? "" : "s"} across {groups.length} group
+            {groups.length === 1 ? "" : "s"}.
+          </p>
+        </div>
+        <Button onClick={() => { setForm(emptyForm); setAddOpen(true); }}>
+          <PlusIcon className="size-4" />
+          Add user
+        </Button>
       </div>
 
       <DataTable<Row>
@@ -238,6 +317,106 @@ export default function PlatformUsersPage() {
           },
         ]}
       />
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add user</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={submitCreate} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Business</label>
+              <select
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={form.business_id}
+                onChange={(e) =>
+                  setForm({ ...form, business_id: e.target.value, branch_id: "" })
+                }>
+                <option value="">Select business…</option>
+                {groups
+                  .filter((g) => g.business)
+                  .map((g) => (
+                    <option key={g.business!.id} value={g.business!.id}>
+                      {g.business!.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Role</label>
+                <select
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  Branch{roleNeedsBranch ? "" : " (n/a)"}
+                </label>
+                <select
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm disabled:opacity-50"
+                  disabled={!roleNeedsBranch || !selectedBusiness}
+                  value={form.branch_id}
+                  onChange={(e) => setForm({ ...form, branch_id: e.target.value })}>
+                  <option value="">Select branch…</option>
+                  {selectedBusiness?.branches.map((br) => (
+                    <option key={br.id} value={br.id}>
+                      {br.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Full name</label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="e.g. Abel Tesfaye"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Username</label>
+                <Input
+                  value={form.username}
+                  autoComplete="off"
+                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  placeholder="login name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Password</label>
+                <Input
+                  type="text"
+                  autoComplete="new-password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="min 4 characters"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? "Creating…" : "Create user"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={resetTarget != null}

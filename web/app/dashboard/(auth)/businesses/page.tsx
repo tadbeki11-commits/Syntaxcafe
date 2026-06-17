@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data-table";
 import { apiFetch } from "@/lib/api";
+import { birr } from "@/lib/format";
 
 type Business = {
   id: string;
@@ -17,6 +18,9 @@ type Business = {
   max_branches: number | null;
   is_active: boolean;
   branch_count: number;
+  user_count: number;
+  order_count: number;
+  revenue: number;
 };
 
 const columns: Column<Business>[] = [
@@ -47,6 +51,17 @@ const columns: Column<Business>[] = [
         )}
       </>
     ),
+  },
+  { key: "user_count", label: "Users", render: (b) => b.user_count },
+  {
+    key: "order_count",
+    label: "Orders",
+    render: (b) => b.order_count.toLocaleString(),
+  },
+  {
+    key: "revenue",
+    label: "Revenue",
+    render: (b) => <span className="font-medium">{birr(b.revenue)}</span>,
   },
   {
     key: "is_active",

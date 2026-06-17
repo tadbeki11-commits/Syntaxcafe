@@ -36,6 +36,7 @@ import {
   ArmchairIcon,
   ScrollTextIcon,
   SlidersHorizontalIcon,
+  SettingsIcon,
   type LucideIcon,
 } from "lucide-react";
 import { getUser } from "@/lib/auth";
@@ -121,6 +122,7 @@ const ownerNav: NavGroup[] = [
   {
     title: "Settings",
     items: [
+      { title: "All Settings", href: "/dashboard/settings", icon: SettingsIcon },
       { title: "Order Rules", href: "/dashboard/settings/preferences", icon: SlidersHorizontalIcon },
       { title: "Payment Methods", href: "/dashboard/settings/payment-methods", icon: WalletCardsIcon },
       { title: "Roles", href: "/dashboard/settings/roles", icon: ShieldIcon },

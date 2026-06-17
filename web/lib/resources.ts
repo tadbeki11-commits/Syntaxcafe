@@ -145,6 +145,15 @@ export const Settings = {
     apiFetch("/settings/system/receipt", put(b)).then((d) => d.data),
 };
 
+export const Account = {
+  // Update the signed-in user's profile. The backend splits full_name into
+  // first/last and returns the refreshed user under `user`.
+  updateProfile: (userId: string, b: { full_name: string; username: string }) =>
+    apiFetch(`/auth/profile/${userId}`, put(b)).then((d) => d.user),
+  changePassword: (userId: string, current_password: string, new_password: string) =>
+    apiFetch(`/users/${userId}/change-password`, j({ current_password, new_password })),
+};
+
 export const Devices = {
   // The devices enrolled to a branch, with an online flag.
   list: (branch_id: string) =>

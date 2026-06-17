@@ -37,10 +37,28 @@ export class PlatformController {
     return this.platform.listAllUsers();
   }
 
+  @ApiOperation({ summary: "Create a user under a business (and branch)" })
+  @Post("users")
+  createUser(@Body() body: any) {
+    return this.platform.createUser(body);
+  }
+
   @ApiOperation({ summary: "Reset a user's password" })
   @Post("users/:id/reset-password")
   resetUserPassword(@Param("id") id: string, @Body() body: any) {
     return this.platform.resetUserPassword(id, body?.password);
+  }
+
+  @ApiOperation({ summary: "Enable or disable a user account" })
+  @Patch("users/:id")
+  updateUser(@Param("id") id: string, @Body() body: any) {
+    return this.platform.setUserActive(id, !!body?.is_active);
+  }
+
+  @ApiOperation({ summary: "Delete a user account" })
+  @Delete("users/:id")
+  deleteUser(@Param("id") id: string) {
+    return this.platform.deleteUser(id);
   }
 
   @ApiOperation({ summary: "All enrolled devices with online state" })

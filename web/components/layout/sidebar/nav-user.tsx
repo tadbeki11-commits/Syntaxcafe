@@ -17,7 +17,8 @@ import {
   SidebarMenuItem,
   useSidebar
 } from "@/components/ui/sidebar";
-import { LogOutIcon } from "lucide-react";
+import Link from "next/link";
+import { LogOutIcon, UserIcon } from "lucide-react";
 import { DotsVerticalIcon } from "@radix-ui/react-icons";
 import { getUser, logout, type SessionUser } from "@/lib/auth";
 
@@ -66,6 +67,13 @@ export function NavUser() {
             <DropdownMenuLabel className="text-sm font-normal">
               {user?.username}
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/profile">
+                <UserIcon />
+                Profile
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onLogout}>
               <LogOutIcon />
