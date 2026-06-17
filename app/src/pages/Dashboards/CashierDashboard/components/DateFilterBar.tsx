@@ -19,7 +19,7 @@ export const DateFilterBar: React.FC<DateFilterBarProps> = ({
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-muted/40 border p-3 rounded-2xl">
       <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-hide">
-        {['all', 'today', 'yesterday', 'week', 'month', 'custom'].map((rng) => (
+        {['today', 'yesterday'].map((rng) => (
           <Button
             key={rng}
             variant={statsRange === rng ? 'secondary' : 'ghost'}

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Search, X, MapPin, ChevronDown } from 'lucide-react';
+import { Search, X, MapPin, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -49,6 +49,18 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
   const [mainCategoryMenuOpen, setMainCategoryMenuOpen] = useState(false);
   const [subCategoryMenuOpen, setSubCategoryMenuOpen] = useState(false);
+
+  // Collapse the bulky table/category controls on short or small screens so the
+  // menu list still gets vertical room. The search bar stays visible regardless.
+  const [filtersExpanded, setFiltersExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(min-height: 620px) and (min-width: 768px)').matches;
+  });
+
+  const activeFilterCount =
+    (selectedTable ? 1 : 0) +
+    (selectedMainCategory && selectedMainCategory !== 'all' ? 1 : 0) +
+    (showSubCategories && selectedSubCategory && selectedSubCategory !== 'all' ? 1 : 0);
 
   const mainCategoryOptions = useMemo(
     () => [
@@ -104,21 +116,59 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
 
   return (
     <Card className="shrink-0 border-border/80 bg-background/90 shadow-sm shadow-amber-100/20">
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex flex-col gap-3">
+      <CardContent className="p-2 sm:p-2.5">
+        {/* ── Always-visible row: search + filters toggle ───────────────── */}
+        <div className="flex items-center gap-2">
+          <div className="relative w-full rounded-full border border-border bg-muted p-1.5">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="h-8 rounded-full border-none bg-background pl-10 pr-10 text-xs sm:text-sm font-medium text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-amber-400"
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label="Clear search"
+                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground/80"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
 
-          {/* ── Row 1: Table controls + Search ─────────────────────────── */}
-          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-3">
+          <button
+            type="button"
+            onClick={() => setFiltersExpanded((v) => !v)}
+            aria-expanded={filtersExpanded}
+            className="group inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-3 text-xs font-semibold text-foreground/80 transition-all duration-200 hover:border-amber-200 hover:bg-amber-50/70 active:scale-95"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Filters</span>
+            {activeFilterCount > 0 ? (
+              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-warning">
+                {activeFilterCount}
+              </span>
+            ) : null}
+            <ChevronDown
+              className={`h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200 ${filtersExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+        </div>
 
-            {/* Table selection area */}
-            <div className="flex-1 rounded-2xl border border-border/80 bg-muted/40 p-2.5">
-              {/* All table controls in one wrapping row */}
-              <div className="flex flex-wrap items-center gap-2">
+        {/* ── Collapsible table + category controls ─────────────────────── */}
+        {filtersExpanded ? (
+        <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-start">
+
+          {/* ── Group 1: Table + category controls (single wrapping row) ── */}
+          <div className="flex flex-1 flex-wrap items-center gap-1.5">
                   <>
                     <button
                       type="button"
                       onClick={() => handleSelectTable(selectedTable === 'takeaway' ? '' : 'takeaway')}
-                      className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border px-3 text-xs font-bold transition-all duration-200 active:scale-95 ${selectedTable === 'takeaway'
+                      className={`inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 text-xs font-bold transition-all duration-200 active:scale-95 ${selectedTable === 'takeaway'
                         ? 'border-transparent bg-foreground/90 text-background shadow-md'
                         : 'border-border bg-background text-foreground/80 hover:bg-muted/30'
                         }`}
@@ -135,7 +185,7 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
                     <button
                       type="button"
                       onClick={() => handleSelectTable(selectedTable === 'beu' ? '' : 'beu')}
-                      className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border px-3 text-xs font-bold transition-all duration-200 active:scale-95 ${selectedTable === 'beu'
+                      className={`inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 text-xs font-bold transition-all duration-200 active:scale-95 ${selectedTable === 'beu'
                         ? 'border-transparent bg-info text-info-foreground shadow-md'
                         : 'border-border bg-background text-foreground/80 hover:bg-muted/30'
                         }`}
@@ -155,7 +205,7 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="group inline-flex h-9 min-w-[120px] items-center justify-between gap-2 rounded-full border border-border bg-background/90 px-3 text-xs font-semibold text-foreground/80 transition-all duration-200 hover:border-amber-200 hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 data-[state=open]:border-amber-300 data-[state=open]:bg-background data-[state=open]:shadow-sm"
+                        className="group inline-flex h-8 min-w-[120px] items-center justify-between gap-2 rounded-full border border-border bg-background/90 px-3 text-xs font-semibold text-foreground/80 transition-all duration-200 hover:border-amber-200 hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 data-[state=open]:border-amber-300 data-[state=open]:bg-background data-[state=open]:shadow-sm"
                       >
                         <span className="flex items-center gap-1.5 truncate">
                           <MapPin className="h-3.5 w-3.5 shrink-0 text-warning" />
@@ -208,13 +258,13 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSelectTable('')}
-                  className="inline-flex h-9 items-center rounded-full border border-border bg-background px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/30 active:scale-95"
+                  className="inline-flex h-8 items-center rounded-full border border-border bg-background px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/30 active:scale-95"
                 >
                   Clear
                 </button>
 
                 {selectedTable ? (
-                  <div className="inline-flex h-9 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+                  <div className="inline-flex h-8 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm animate-in fade-in zoom-in-95 duration-200">
                     <span className="relative flex h-2 w-2 shrink-0">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -228,40 +278,13 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
                     </span>
                   </div>
                 ) : null}
-              </div>
-            </div>
 
-            {/* Search bar */}
-            <div className="relative w-full rounded-full border border-border bg-muted p-1.5 lg:w-72 xl:w-80 shrink-0">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="h-9 rounded-full border-none bg-background pl-10 pr-10 text-xs sm:text-sm font-medium text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-amber-400"
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  aria-label="Clear search"
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground/80"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          {/* ── Row 2: Category filters ──────────────────────────────────── */}
-          <div className="rounded-2xl border border-border bg-background p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Main category dropdown */}
+                {/* Main category dropdown */}
               <DropdownMenu open={mainCategoryMenuOpen} onOpenChange={setMainCategoryMenuOpen}>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="group inline-flex h-9 flex-1 min-w-[160px] items-center justify-between rounded-full border border-border bg-background/90 px-4 text-xs font-semibold text-foreground/80 transition-all duration-200 hover:border-amber-200 hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 data-[state=open]:border-amber-300 data-[state=open]:bg-background data-[state=open]:shadow-sm"
+                    className="group inline-flex h-8 flex-1 min-w-[160px] items-center justify-between rounded-full border border-border bg-background/90 px-4 text-xs font-semibold text-foreground/80 transition-all duration-200 hover:border-amber-200 hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 data-[state=open]:border-amber-300 data-[state=open]:bg-background data-[state=open]:shadow-sm"
                   >
                     <span className="flex items-center gap-2 truncate">
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-warning shrink-0">Main</span>
@@ -309,7 +332,7 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="group inline-flex h-9 flex-1 min-w-[160px] items-center justify-between rounded-full border border-border bg-background/90 px-4 text-xs font-semibold text-foreground/80 transition-all duration-200 hover:border-amber-200 hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 data-[state=open]:border-amber-300 data-[state=open]:bg-background data-[state=open]:shadow-sm"
+                      className="group inline-flex h-8 flex-1 min-w-[160px] items-center justify-between rounded-full border border-border bg-background/90 px-4 text-xs font-semibold text-foreground/80 transition-all duration-200 hover:border-amber-200 hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 data-[state=open]:border-amber-300 data-[state=open]:bg-background data-[state=open]:shadow-sm"
                     >
                       <span className="flex items-center gap-2 truncate">
                         <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-info shrink-0">Sub</span>
@@ -359,14 +382,13 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
                   handleSelectMainCategory('all');
                   if (showSubCategories) handleSelectSubCategory('all');
                 }}
-                className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-background px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/30 active:scale-95 shrink-0"
+                className="inline-flex h-8 items-center gap-1 rounded-full border border-border bg-background px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/30 active:scale-95 shrink-0"
               >
                 Reset
               </button>
-            </div>
           </div>
-
         </div>
+        ) : null}
       </CardContent>
     </Card>
   );
