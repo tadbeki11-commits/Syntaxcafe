@@ -19,8 +19,7 @@ export const useCashierData = ({
   pollUnprintedOrders,
 }: DataProps) => {
   const resolveOrderId = useCallback((entry: any) => {
-    const directOrderId =
-      entry?.order_id != null ? entry.order_id : null;
+    const directOrderId = entry?.order_id != null ? entry.order_id : null;
     if (directOrderId != null && directOrderId !== "") return directOrderId;
 
     const nestedOrderId = entry?.order?.id != null ? entry.order.id : null;
@@ -35,7 +34,9 @@ export const useCashierData = ({
     if (metaOrderIdAlt != null && metaOrderIdAlt !== "") return metaOrderIdAlt;
 
     const orderLocalId =
-      entry?.orderLocalId != null ? entry.orderLocalId : entry?.order_local_id ?? null;
+      entry?.orderLocalId != null
+        ? entry.orderLocalId
+        : (entry?.order_local_id ?? null);
     if (orderLocalId != null && String(orderLocalId).trim() !== "") {
       const parsed = String(orderLocalId);
       if (Number.isFinite(parsed)) return parsed;
@@ -71,7 +72,7 @@ export const useCashierData = ({
         .select()
         .from(localDbTables.systemSettings)
         .where(eq(localDbTables.systemSettings.key, "cancel_password"));
-      
+
       const hp = settingRows[0]?.value || null;
       setAdminHashedPassword(hp);
       return hp;
@@ -217,7 +218,7 @@ export const useCashierData = ({
         const next = {} as any;
         for (const it of items) {
           const id = it?.id != null ? it.id : null;
-          if ((id === "")) continue;
+          if (id === "") continue;
           const main = String(it?.main_category || "")
             .trim()
             .toLowerCase();
@@ -296,7 +297,8 @@ export const useCashierData = ({
             if (o?.id != null) byId[o.id] = o;
             if (o?.remote_id != null) byRemoteId[o.remote_id] = o;
             if (o?.localId != null) byLocalId[String(o.localId)] = o;
-            if (o?.order_local_id != null) byLocalId[String(o.order_local_id)] = o;
+            if (o?.order_local_id != null)
+              byLocalId[String(o.order_local_id)] = o;
           }
           setOrderIndex({ byId, byRemoteId, byLocalId });
         } catch (e) {
@@ -391,10 +393,7 @@ export const useCashierData = ({
         order_id: order.id,
         amount: order.total_amount,
         payment_method: paymentMethodOverride || paymentMethod || "cash",
-        status:
-          (paymentMethodOverride || paymentMethod || "cash") === "cash"
-            ? "paid"
-            : "pending",
+        status: "paid",
         processed_by: user.id,
       };
 
@@ -591,7 +590,8 @@ export const useCashierData = ({
               if (o?.id != null) byId[o.id] = o;
               if (o?.remote_id != null) byRemoteId[o.remote_id] = o;
               if (o?.localId != null) byLocalId[String(o.localId)] = o;
-              if (o?.order_local_id != null) byLocalId[String(o.order_local_id)] = o;
+              if (o?.order_local_id != null)
+                byLocalId[String(o.order_local_id)] = o;
             }
             setOrderIndex({ byId, byRemoteId, byLocalId });
           } catch (e) {

@@ -97,16 +97,53 @@ export class ExpensesService {
     const amount = this.normalizeAmount(payload?.amount);
     const tenant = getTenant();
 
+    const fields = {
+      category,
+      description: payload?.description?.trim() || null,
+      amount,
+      amount_cents: Number(payload?.amount_cents ?? 0) || 0,
+      payment_method: payload?.payment_method?.trim() || null,
+      expense_date: this.parseDate(payload?.expense_date) ?? new Date(),
+    };
+
+    // Offline clients send their own UUID so sync retries are idempotent: the
+    // same local id maps to the same backend row. If it already exists, treat
+    // the push as an edit (this also propagates edits made offline).
+    const clientId =
+      typeof payload?.id === "string" && UUID_RE.test(payload.id)
+        ? payload.id
+        : null;
+
+    if (clientId) {
+      const [existing] = await db
+        .select()
+        .from(expenses)
+        .where(
+          and(eq(expenses.id, clientId), eq(expenses.branch_id, requireBranchId())),
+        )
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db
+          .update(expenses)
+          .set({
+            ...fields,
+            deleted_at: null,
+            updated_at: new Date(),
+            version: (existing.version ?? 1) + 1,
+          })
+          .where(eq(expenses.id, clientId))
+          .returning();
+        return updated;
+      }
+    }
+
     const [created] = await db
       .insert(expenses)
       .values({
+        ...(clientId ? { id: clientId } : {}),
         ...tenantInsert(),
-        category,
-        description: payload?.description?.trim() || null,
-        amount,
-        amount_cents: Number(payload?.amount_cents ?? 0) || 0,
-        payment_method: payload?.payment_method?.trim() || null,
-        expense_date: this.parseDate(payload?.expense_date) ?? new Date(),
+        ...fields,
         recorded_by: tenant?.userId ?? null,
         recorded_by_name: tenant?.username ?? null,
       })

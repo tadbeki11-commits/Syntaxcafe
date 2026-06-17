@@ -25,11 +25,17 @@ export const AUTO_SYNC_TASKS: readonly string[] = [
   // offline is flushed to the server as soon as we're back online.
   'orders',
   'orders_pull',
+  // Flush locally-recorded expenses so they appear in the admin/web reports.
+  'expenses',
 ];
 
 // Tasks run automatically when connectivity is restored mid-session: flush any
-// offline-created orders to the server, then reconcile today's list.
-export const RECONNECT_SYNC_TASKS: readonly string[] = ['orders', 'orders_pull'];
+// offline-created orders/expenses to the server, then reconcile today's list.
+export const RECONNECT_SYNC_TASKS: readonly string[] = [
+  'orders',
+  'orders_pull',
+  'expenses',
+];
 
 class SimpleSyncEngine {
   private online: boolean =

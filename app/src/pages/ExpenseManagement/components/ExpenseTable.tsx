@@ -47,18 +47,29 @@ export const ExpenseTable: React.FC<ExpenseTableProps> = ({
                 </TableCell>
               </TableRow>
             ) : (
-              expenses.map((expense) => (
+              expenses.map((expense) => {
+                const items = Array.isArray(expense.items) ? expense.items : [];
+                // Cashier batch entries have no title/category — surface their
+                // line items so the admin view isn't blank.
+                const isBatch = items.length > 0 && !expense.title;
+                const itemSummary = items.map((it) => it?.item).filter(Boolean).join(', ');
+                return (
                 <TableRow key={expense.id}>
                   <TableCell>
-                    <div className="font-semibold text-sm">{expense.title}</div>
+                    <div className="font-semibold text-sm">
+                      {expense.title || (isBatch ? `${items.length} item${items.length > 1 ? 's' : ''}` : '—')}
+                    </div>
+                    {isBatch && itemSummary && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 max-w-sm line-clamp-2">{itemSummary}</p>
+                    )}
                     {expense.notes && <p className="text-[10px] text-muted-foreground mt-0.5 max-w-sm line-clamp-1">{expense.notes}</p>}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <Badge variant="secondary" className="text-[10px]">{expense.category}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">{expense.category || (isBatch ? 'cashier' : '—')}</Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{expense.paid_to || '—'}</TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <Badge variant="info" className="text-[10px]">{expense.payment_method}</Badge>
+                    <Badge variant="info" className="text-[10px]">{expense.payment_method || '—'}</Badge>
                   </TableCell>
                   <TableCell className="text-right font-bold text-destructive">{formatCurrency(expense.amount || expense.total)}</TableCell>
                   <TableCell className="hidden md:table-cell text-xs text-muted-foreground">{formatDateTime(expense.created_at)}</TableCell>
@@ -79,7 +90,8 @@ export const ExpenseTable: React.FC<ExpenseTableProps> = ({
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>

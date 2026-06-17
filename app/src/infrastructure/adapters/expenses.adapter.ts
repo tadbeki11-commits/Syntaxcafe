@@ -95,8 +95,10 @@ export const expensesAdapter = {
   },
 
   update: async (id: number | string, input: any = {}) => {
-    const numericId = Number(id);
-    const existing = await findById(localDbTables.expenses, numericId);
+    // Local ids are UUID strings (see generateLocalId) — never coerce to Number,
+    // or findById matches nothing and the edit silently no-ops.
+    const expenseId = String(id);
+    const existing = await findById(localDbTables.expenses, expenseId);
     if (!existing?.id) return ok({ expense: null });
 
     const merged = { ...existing, ...input };
@@ -127,7 +129,8 @@ export const expensesAdapter = {
   },
 
   delete: async (id: number | string) => {
-    await deleteById(localDbTables.expenses, Number(id));
+    // Match update(): ids are UUID strings, so pass through as-is.
+    await deleteById(localDbTables.expenses, String(id));
     return ok({ success: true });
   },
 };

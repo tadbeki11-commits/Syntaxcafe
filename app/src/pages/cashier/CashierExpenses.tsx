@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Save } from 'lucide-react';
 import api from '@/application';
@@ -21,11 +21,39 @@ import ExpenseEntryCard from './components/CashierExpense/ExpenseEntryCard';
 
 const emptyRow = (): ExpenseRow => ({ item: '', cost: '' });
 
+const sumRows = (rows: ExpenseRow[]) =>
+  (rows || []).reduce((sum, r) => {
+    const n = parseFloat(r?.cost);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+
+const startOfLocalDay = (d: Date) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
+
+const endOfLocalDay = (d: Date) => {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+};
+
+const inRange = (entryDate: Date, from: Date | null, to: Date | null) => {
+  const t = entryDate.getTime();
+  if (Number.isNaN(t)) return false;
+  if (from && t < from.getTime()) return false;
+  if (to && t > to.getTime()) return false;
+  return true;
+};
+
 const CashierExpenses = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<ExpenseRow[]>([emptyRow()]);
-  const [saved, setSaved] = useState<any[]>([]);
+  const [saved, setSaved] = useState<ExpenseEntry[]>([]);
+
+  // Filters
   const [savedFilter, setSavedFilter] = useState('today');
   const [customMode, setCustomMode] = useState('specific');
   const [customDate, setCustomDate] = useState('');
@@ -33,92 +61,54 @@ const CashierExpenses = () => {
   const [customTo, setCustomTo] = useState('');
   const [search, setSearch] = useState('');
 
-  // Edit / delete state for saved entries
-  const [editId, setEditId] = useState<number | null>(null);
+  // Edit / delete state for saved entries (ids are UUID strings)
+  const [editId, setEditId] = useState<string | null>(null);
   const [editRows, setEditRows] = useState<ExpenseRow[]>([emptyRow()]);
   const [savingEdit, setSavingEdit] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const total = useMemo(() => {
-    return (rows || []).reduce((sum, r) => {
-      const n = parseFloat(r?.cost);
-      return sum + (Number.isFinite(n) ? n : 0);
-    }, 0);
-  }, [rows]);
-
-  const editTotal = useMemo(() => {
-    return (editRows || []).reduce((sum, r) => {
-      const n = parseFloat(r?.cost);
-      return sum + (Number.isFinite(n) ? n : 0);
-    }, 0);
-  }, [editRows]);
+  const total = useMemo(() => sumRows(rows), [rows]);
+  const editTotal = useMemo(() => sumRows(editRows), [editRows]);
 
   const filteredSaved = useMemo(() => {
     const list = Array.isArray(saved) ? saved : [];
-
-    const startOfLocalDay = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x;
-    };
-
-    const endOfLocalDay = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(23, 59, 59, 999);
-      return x;
-    };
-
-    const inRange = (entryDate: Date | null, from: Date | null, to: Date | null) => {
-      if (!entryDate) return false;
-      const t = entryDate.getTime();
-      const ft = from ? from.getTime() : null;
-      const tt = to ? to.getTime() : null;
-      if (ft != null && t < ft) return false;
-      if (tt != null && t > tt) return false;
-      return true;
-    };
-
     const now = getApproximateServerDate();
 
-    let byDate = list;
+    let from: Date | null = null;
+    let to: Date | null = null;
+
     if (savedFilter === 'today') {
-      const from = startOfLocalDay(now);
-      const to = endOfLocalDay(now);
-      byDate = list.filter((e) => inRange(new Date(e?.created_at || 0), from, to));
+      from = startOfLocalDay(now);
+      to = endOfLocalDay(now);
     } else if (savedFilter === 'yesterday') {
       const y = new Date(now);
       y.setDate(y.getDate() - 1);
-      const from = startOfLocalDay(y);
-      const to = endOfLocalDay(y);
-      byDate = list.filter((e) => inRange(new Date(e?.created_at || 0), from, to));
+      from = startOfLocalDay(y);
+      to = endOfLocalDay(y);
     } else if (savedFilter === 'custom') {
-      if (customMode === 'specific') {
-        if (customDate) {
-          const d = new Date(customDate);
-          const from = startOfLocalDay(d);
-          const to = endOfLocalDay(d);
-          byDate = list.filter((e) => inRange(new Date(e?.created_at || 0), from, to));
-        }
-      } else {
-        const from = customFrom ? startOfLocalDay(new Date(customFrom)) : null;
-        const to = customTo ? endOfLocalDay(new Date(customTo)) : null;
-        if (from || to) {
-          byDate = list.filter((e) => inRange(new Date(e?.created_at || 0), from, to));
-        }
+      if (customMode === 'specific' && customDate) {
+        from = startOfLocalDay(new Date(customDate));
+        to = endOfLocalDay(new Date(customDate));
+      } else if (customMode === 'range') {
+        from = customFrom ? startOfLocalDay(new Date(customFrom)) : null;
+        to = customTo ? endOfLocalDay(new Date(customTo)) : null;
       }
     }
+
+    const byDate =
+      from || to
+        ? list.filter((e) => inRange(new Date(e?.created_at || 0), from, to))
+        : list;
 
     const term = search.trim().toLowerCase();
     if (!term) return byDate;
     return byDate.filter((e) =>
-      (e?.items || []).some((it: any) =>
-        String(it?.item || '').toLowerCase().includes(term),
-      ),
+      (e?.items || []).some((it) => String(it?.item || '').toLowerCase().includes(term)),
     );
   }, [customDate, customFrom, customMode, customTo, saved, savedFilter, search]);
 
   const grandTotal = useMemo(
-    () => (filteredSaved || []).reduce((sum, e) => sum + (Number(e?.total) || 0), 0),
+    () => filteredSaved.reduce((sum, e) => sum + (Number(e?.total) || 0), 0),
     [filteredSaved],
   );
 
@@ -128,7 +118,7 @@ const CashierExpenses = () => {
       const resp = await api.expenses.getAll();
       const list = (resp as any)?.data?.data?.expenses ?? (resp as any)?.data?.expenses ?? [];
       setSaved(Array.isArray(list) ? list : []);
-    } catch (e) {
+    } catch {
       setSaved([]);
     } finally {
       setLoading(false);
@@ -139,23 +129,14 @@ const CashierExpenses = () => {
     loadExpenses();
   }, [loadExpenses]);
 
-
+  // Validate + parse rows into { item, cost } pairs, or null (with a toast) if empty.
   const collectValidRows = (source: ExpenseRow[]) => {
-    const valid = (source || [])
-      .map((r) => ({ item: String(r?.item || '').trim(), cost: String(r?.cost || '').trim() }))
-      .filter((r) => r.item && r.cost);
-
-    if (valid.length === 0) {
-      toast.error('Enter at least one expense (item + cost)');
-      return null;
-    }
-
-    const parsed = valid
-      .map((r) => ({ item: r.item, cost: parseFloat(r.cost) }))
+    const parsed = (source || [])
+      .map((r) => ({ item: String(r?.item || '').trim(), cost: parseFloat(r?.cost) }))
       .filter((r) => r.item && Number.isFinite(r.cost));
 
     if (parsed.length === 0) {
-      toast.error('Costs must be valid numbers');
+      toast.error('Enter at least one expense with a valid cost');
       return null;
     }
     return parsed;
@@ -178,13 +159,12 @@ const CashierExpenses = () => {
     }
   };
 
-  // ---- Edit ----
   const openEdit = (entry: ExpenseEntry) => {
     setEditId(entry?.id ?? null);
     const items = Array.isArray(entry?.items) ? entry.items : [];
     setEditRows(
       items.length
-        ? items.map((it: any) => ({ item: String(it?.item ?? ''), cost: String(it?.cost ?? '') }))
+        ? items.map((it) => ({ item: String(it?.item ?? ''), cost: String(it?.cost ?? '') }))
         : [emptyRow()],
     );
   };
@@ -212,7 +192,6 @@ const CashierExpenses = () => {
     }
   };
 
-  // ---- Delete ----
   const handleDelete = async (entry: ExpenseEntry) => {
     if (entry?.id == null) return;
     if (!window.confirm('Delete this expense entry? This cannot be undone.')) return;
@@ -246,7 +225,7 @@ const CashierExpenses = () => {
       />
 
       <div className="rounded-lg border">
-        <div className="flex flex-col gap-4 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <h3 className="text-base font-semibold">Saved Expenses</h3>
           <ExpenseFilters
             savedFilter={savedFilter}
@@ -269,7 +248,7 @@ const CashierExpenses = () => {
             <LoadingSpinner text="Loading expenses..." />
           ) : (
             <ExpenseLog
-              entries={filteredSaved as ExpenseEntry[]}
+              entries={filteredSaved}
               grandTotal={grandTotal}
               onEdit={openEdit}
               onDelete={handleDelete}
@@ -289,7 +268,7 @@ const CashierExpenses = () => {
             rows={editRows}
             onChange={setEditRows}
             total={editTotal}
-            showTotal={true}
+            showTotal
             disabled={savingEdit}
           />
 

@@ -1,3 +1,8 @@
+export interface ExpenseLineItem {
+  item: string;
+  cost: number | string;
+}
+
 export interface Expense {
   id: number;
   title: string;
@@ -9,6 +14,9 @@ export interface Expense {
   payment_method: string;
   created_at: string;
   user_id?: number | null;
+  // Cashier "batch" entries store their line items here instead of a single
+  // title/category/amount. Present only for those entries.
+  items?: ExpenseLineItem[];
 }
 
 export interface ExpenseFormData {

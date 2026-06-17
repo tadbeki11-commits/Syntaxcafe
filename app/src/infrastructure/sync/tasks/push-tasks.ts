@@ -3,12 +3,86 @@ import {
   ordersAdapter,
   extractPersistedOrderIds,
 } from "@/infrastructure/adapters/orders.adapter";
+import { api as apiClient } from "@/infrastructure/api/http-client";
 import { readRows, upsertRow } from "@/infrastructure/database/local-db-query";
 import type { SyncTask } from "./types";
 
 const BATCH_SIZE = 50;
 
 const isUnsynced = (row: any) => Number(row?.synced ?? 0) === 0;
+
+// The backend expenses table stores a single record (no line items) and is keyed
+// by a UUID. Local ids are UUIDs (generateLocalId); the rare non-UUID fallback id
+// can't be mapped to the backend column, so those rows are skipped.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const syncableExpenseId = (row: any) => UUID_RE.test(String(row?.id ?? ""));
+
+// Backend categories are a fixed set; map the app's free-text/admin categories
+// onto the nearest one. Cashier batch entries have no category → "supplies".
+const BACKEND_EXPENSE_CATEGORIES = [
+  "rent",
+  "utilities",
+  "salaries",
+  "supplies",
+  "maintenance",
+  "other",
+];
+
+const mapExpenseCategory = (raw: any): string => {
+  const c = String(raw ?? "").trim().toLowerCase();
+  if (!c) return "other";
+  if (BACKEND_EXPENSE_CATEGORIES.includes(c)) return c;
+  if (c.includes("rent")) return "rent";
+  if (c.includes("util")) return "utilities";
+  if (c.includes("salar") || c.includes("payroll") || c.includes("wage"))
+    return "salaries";
+  if (c.includes("maint")) return "maintenance";
+  if (
+    c.includes("supply") ||
+    c.includes("supplies") ||
+    c.includes("ingredient") ||
+    c.includes("food") ||
+    c.includes("beverage") ||
+    c.includes("clean") ||
+    c.includes("equipment")
+  )
+    return "supplies";
+  return "other";
+};
+
+const normalizeExpenseForBackend = (row: any) => {
+  const items = Array.isArray(row?.items) ? row.items : [];
+  const total = Number(row?.total ?? row?.amount ?? 0) || 0;
+
+  // Batch (cashier) entries: serialize the line items into the description so
+  // the web admin can show what was purchased, and bucket them under "supplies".
+  let description: string | undefined;
+  let category: string;
+  if (items.length) {
+    description = items
+      .map((it: any) => `${String(it?.item ?? "").trim()} (${Number(it?.cost) || 0})`)
+      .filter((s: string) => s && !s.startsWith(" ("))
+      .join(", ");
+    category = row?.category ? mapExpenseCategory(row.category) : "supplies";
+  } else {
+    const paidTo = row?.paid_to ? `Paid to: ${row.paid_to}` : "";
+    description =
+      [row?.title, paidTo, row?.notes].filter(Boolean).join(" — ") || undefined;
+    category = mapExpenseCategory(row?.category);
+  }
+
+  const whole = Math.floor(total);
+  return {
+    id: String(row.id),
+    category,
+    amount: whole,
+    amount_cents: Math.max(0, Math.round((total - whole) * 100)),
+    payment_method: row?.payment_method ? String(row.payment_method) : undefined,
+    description: description || undefined,
+    expense_date: row?.created_at || undefined,
+  };
+};
 
 const normalizeOrderPayload = (order: any) => ({
   id: order.id,
@@ -242,4 +316,40 @@ const paymentsPushTask: SyncTask = {
   },
 };
 
-export const pushTasks: SyncTask[] = [ordersPushTask, paymentsPushTask];
+const expensesPushTask: SyncTask = {
+  name: "expenses",
+  async push() {
+    const unsynced = (await readRows(localDbTables.expenses)).filter(
+      (row) => isUnsynced(row) && syncableExpenseId(row),
+    );
+    if (unsynced.length === 0) return 0;
+
+    let pushed = 0;
+    for (const row of unsynced) {
+      try {
+        // POST is an idempotent upsert keyed by the local UUID, so this also
+        // propagates offline edits without creating duplicates on retry.
+        await apiClient.post("/expenses", normalizeExpenseForBackend(row));
+        await upsertRow(localDbTables.expenses, { ...row, synced: 1 });
+        pushed += 1;
+      } catch (error) {
+        console.error("[sync] Failed to push expense; kept unsynced", {
+          id: row?.id,
+          error,
+        });
+      }
+    }
+    return pushed;
+  },
+  async countUnsynced() {
+    return (await readRows(localDbTables.expenses)).filter(
+      (row) => isUnsynced(row) && syncableExpenseId(row),
+    ).length;
+  },
+};
+
+export const pushTasks: SyncTask[] = [
+  ordersPushTask,
+  paymentsPushTask,
+  expensesPushTask,
+];
