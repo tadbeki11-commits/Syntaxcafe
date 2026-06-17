@@ -320,7 +320,7 @@ const expensesPushTask: SyncTask = {
   name: "expenses",
   async push() {
     const unsynced = (await readRows(localDbTables.expenses)).filter(
-      (row) => isUnsynced(row) && syncableExpenseId(row),
+      (row: any) => isUnsynced(row) && syncableExpenseId(row),
     );
     if (unsynced.length === 0) return 0;
 
@@ -343,7 +343,7 @@ const expensesPushTask: SyncTask = {
   },
   async countUnsynced() {
     return (await readRows(localDbTables.expenses)).filter(
-      (row) => isUnsynced(row) && syncableExpenseId(row),
+      (row: any) => isUnsynced(row) && syncableExpenseId(row),
     ).length;
   },
 };
