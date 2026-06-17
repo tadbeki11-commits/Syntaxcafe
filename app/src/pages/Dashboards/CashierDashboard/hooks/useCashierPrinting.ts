@@ -15,8 +15,6 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
     connected: true,
     error: null,
   });
-  const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
-  const [selectedPrinter, setSelectedPrinter] = useState<string>("");
 
   const printingRef = useRef(new Set());
   const pollIntervalRef = useRef<any>(null);
@@ -28,22 +26,6 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
   );
 
   const lastErrorToastAtRef = useRef(0);
-
-  // const fetchAvailablePrinters = useCallback(async () => {
-  //   try {
-  //     const { list_thermal_printers } = await import("tauri-plugin-thermal-printer");
-  //     const printers = (await list_thermal_printers()) as any;
-  //     const printerNames = printers.map((p: any) => 
-  //       typeof p === "string" ? p : p.name || p.address || ""
-  //     ).filter((p: string) => p.trim() !== "");
-  //     setAvailablePrinters(printerNames);
-  //     if (printerNames.length > 0 && !selectedPrinter) {
-  //       setSelectedPrinter(printerNames[0]);
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to fetch printers:", err);
-  //   }
-  // }, [selectedPrinter]);
 
   const tryAcquirePrintLeadership = useCallback(() => {
     if (typeof window === "undefined") return true;
@@ -100,11 +82,6 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
       window.removeEventListener("beforeunload", onUnload);
     };
   }, [tryAcquirePrintLeadership]);
-
-  // Fetch available printers on mount
-  // useEffect(() => {
-  //   fetchAvailablePrinters();
-  // }, [fetchAvailablePrinters]);
 
   const maybeToastError = useCallback((err: any) => {
     const now = getApproximateServerNow();
@@ -307,9 +284,5 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
     testQzPrint,
     printOrderImmediately,
     pollUnprintedOrders,
-    availablePrinters,
-    selectedPrinter,
-    setSelectedPrinter,
-    // fetchAvailablePrinters,
   };
 };

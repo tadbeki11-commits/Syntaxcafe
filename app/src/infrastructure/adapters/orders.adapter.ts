@@ -25,6 +25,7 @@ import {
 import { checkOrderInventoryAvailability } from "@/application/inventory/order-inventory.service";
 import { settingsAdapter } from "@/infrastructure/adapters/settings.adapter";
 import { renderReceiptImage, ReceiptBlock } from "@/utils/receiptImage";
+import { formatOrderNumber } from "@/lib/utils";
 
 const DEFAULT_WAITER_NAME = "Waiter";
 const DEFAULT_CATEGORY = "cafe";
@@ -834,13 +835,20 @@ const ordersAdapterImpl = {
           align: "center",
           bold: true,
         },
-        { kind: "text", text: "OFFLINE ORDER TICKET", align: "center" },
+        { kind: "text", text: "OFFLINE ORDER TICKET", align: "center", bold: true },
+        {
+          kind: "text",
+          text: `Order: ${formatOrderNumber(order)}`,
+          align: "center",
+          bold: true,
+          large: true,
+        },
         { kind: "divider" },
         order.table_number
-          ? { kind: "text", text: `Table: #${order.table_number}`, align: "center" }
-          : { kind: "text", text: "Type: Take Away", align: "center" },
-        { kind: "text", text: `Waiter: ${waiterName}`, align: "center" },
-        { kind: "text", text: `Date: ${printedAtDate.toLocaleString()}`, align: "center" },
+          ? { kind: "text", text: `Table: #${order.table_number}`, align: "center", bold: true }
+          : { kind: "text", text: "Type: Take Away", align: "center", bold: true },
+        { kind: "text", text: `Waiter: ${waiterName}`, align: "center", bold: true },
+        { kind: "text", text: `Date: ${printedAtDate.toLocaleString()}`, align: "center", bold: true },
         { kind: "divider" },
         {
           kind: "row",
@@ -854,6 +862,7 @@ const ordersAdapterImpl = {
             kind: "row",
             widths: colWidths,
             align: colAligns,
+            bold: true,
             cells: r,
           }),
         ),
@@ -878,7 +887,7 @@ const ordersAdapterImpl = {
       }
 
       blocks.push({ kind: "gap", height: 8 });
-      blocks.push({ kind: "text", text: "Thank You!", align: "center" });
+      blocks.push({ kind: "text", text: "Thank You!", align: "center", bold: true });
 
       const imageData = await renderReceiptImage(blocks);
       const printerKey = String(deptPrinter || "").trim();
