@@ -358,20 +358,41 @@ export class OrderService {
 
     const finalProcessedBy = this.validateUserId(processed_by, validUserIds, syncUserId);
 
-    await tx.insert(payments).values({
-      ...tenantInsert(),
-      id,
-      order_id,
-      amount,
-      amount_cents: amount,
-      payment_method,
-      method: payment_method,
-      status: status || "paid",
-      processed_by: finalProcessedBy,
-      paid_at: paid_at ? new Date(paid_at) : new Date(),
-      description: description || null,
-      meta: {},
-    });
+    const resolvedStatus = status || "paid";
+    const resolvedPaidAt = paid_at ? new Date(paid_at) : new Date();
+
+    await tx
+      .insert(payments)
+      .values({
+        ...tenantInsert(),
+        id,
+        order_id,
+        amount,
+        amount_cents: amount,
+        payment_method,
+        method: payment_method,
+        status: resolvedStatus,
+        processed_by: finalProcessedBy,
+        paid_at: resolvedPaidAt,
+        description: description || null,
+        meta: {},
+      })
+      // A payment can reach the server twice: once as "pending" when it is
+      // first created online, then again as "paid" after it is confirmed (the
+      // dedicated confirm call can fail or race). Without this upsert the
+      // second push hits a primary-key conflict (409) and the corrected status
+      // is silently dropped, leaving a confirmed order stuck as "pending".
+      .onConflictDoUpdate({
+        target: payments.id,
+        set: {
+          status: resolvedStatus,
+          payment_method,
+          method: payment_method,
+          processed_by: finalProcessedBy,
+          paid_at: resolvedPaidAt,
+          updated_at: new Date(),
+        },
+      });
 
     if (status === "paid" || !status) {
       const [existingSaleMovement] = await tx
