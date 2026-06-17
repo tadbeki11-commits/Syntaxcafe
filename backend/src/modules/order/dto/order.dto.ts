@@ -18,6 +18,9 @@ export class OrderItemDto {
 
   @ApiPropertyOptional()
   main_category?: string;
+
+  @ApiPropertyOptional()
+  note?: string;
 }
 
 export class OrderRequestDto {

@@ -8,6 +8,7 @@ import {
   Put,
   UnauthorizedException,
   ForbiddenException,
+  BadRequestException,
   Headers,
   NotFoundException,
   Delete,
@@ -367,5 +368,39 @@ export class SettingsController {
       enable_cashier_receipt: Boolean(body.enable_cashier_receipt),
     });
     return { status: "success", data };
+  }
+
+  @ApiOperation({
+    summary: "Get whether a branch cancel-order password is set",
+  })
+  @Get("system/cancel-password")
+  async getCancelPasswordStatus(
+    @Headers("x-app-client") appClient: string,
+  ) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    const data = await this.settingsService.getCancelPasswordStatus();
+    return { status: "success", data };
+  }
+
+  @ApiOperation({ summary: "Set the branch cancel-order password (owner)" })
+  @ApiBody({ type: CancelPasswordRequestDto })
+  @Put("system/cancel-password")
+  async updateSystemCancelPassword(
+    @Headers("x-app-client") appClient: string,
+    @Body() body: CancelPasswordRequestDto,
+  ) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    try {
+      const data = await this.settingsService.updateSystemCancelPassword(
+        body.cancel_password,
+      );
+      return { status: "success", data };
+    } catch (error: any) {
+      throw new BadRequestException(error.message);
+    }
   }
 }

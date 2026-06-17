@@ -27,5 +27,6 @@ export const order_items = pgTable("order_items", {
   subtotal: integer("subtotal"),
   item_type: varchar("item_type", { length: 50 }),
   main_category: varchar("main_category", { length: 50 }),
+  note: varchar("note", { length: 300 }),
   created_at: timestamp("created_at").defaultNow(),
 });

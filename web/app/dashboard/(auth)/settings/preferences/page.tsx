@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { SlidersHorizontalIcon } from "lucide-react";
+import { KeyRoundIcon, SlidersHorizontalIcon } from "lucide-react";
 
 import {
   Card,
@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { Settings } from "@/lib/resources";
 import { getBranchId } from "@/lib/api";
@@ -71,6 +74,115 @@ const RULES: Rule[] = [
       Settings.updateReceipt({ enable_cashier_receipt: enabled }),
   },
 ];
+
+// Branch cancel-order override password. Mirrors the desktop admin's "Cancel
+// Order Password" card: staff are prompted for this password before cancelling
+// an order. We only ever learn whether one is set, never its value.
+function CancelPasswordCard() {
+  const [isSet, setIsSet] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Settings.cancelPassword()
+      .then((d) => setIsSet(!!d.is_set))
+      .catch((e: any) => toast.error(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await Settings.updateCancelPassword(password);
+      setIsSet(true);
+      setPassword("");
+      setConfirm("");
+      toast.success("Cancel password updated");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <KeyRoundIcon className="size-5" />
+          Cancel order password
+        </CardTitle>
+        <CardDescription>
+          Staff must enter this password to cancel an order on the POS.{" "}
+          {!loading &&
+            (isSet
+              ? "A password is currently set. Enter a new one to change it."
+              : "No password is set yet for this branch.")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-9 w-full max-w-sm" />
+            <Skeleton className="h-9 w-full max-w-sm" />
+          </div>
+        ) : (
+          <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="newCancelPassword">New password</Label>
+              <Input
+                id="newCancelPassword"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmCancelPassword">Confirm password</Label>
+              <Input
+                id="confirmCancelPassword"
+                type="password"
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                disabled={saving}
+              />
+            </div>
+            {error && (
+              <p className="text-destructive text-sm font-medium sm:col-span-2">
+                {error}
+              </p>
+            )}
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={saving || !password}>
+                {saving
+                  ? "Saving…"
+                  : isSet
+                    ? "Update password"
+                    : "Set password"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function PreferencesPage() {
   const [values, setValues] = useState<Record<string, boolean>>({});
@@ -177,6 +289,8 @@ export default function PreferencesPage() {
             ))}
         </CardContent>
       </Card>
+
+      {hasBranch && <CancelPasswordCard />}
     </div>
   );
 }

@@ -13,11 +13,7 @@ interface DataProps {
   pollUnprintedOrders: () => Promise<void>;
 }
 
-export const useCashierData = ({
-  user,
-  printOrderImmediately,
-  pollUnprintedOrders,
-}: DataProps) => {
+export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
   const resolveOrderId = useCallback((entry: any) => {
     const directOrderId = entry?.order_id != null ? entry.order_id : null;
     if (directOrderId != null && directOrderId !== "") return directOrderId;

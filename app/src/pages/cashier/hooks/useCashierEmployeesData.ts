@@ -4,7 +4,6 @@ import { eq } from "drizzle-orm";
 import api from "@/application";
 import { getLocalDb, localDbTables } from "@/db/localDb";
 import { useAuth } from "@/context/AuthContext";
-import { getActivePrinterName } from "@/pages/cashier/PrinterSettings";
 import { getApproximateServerDate } from "@/shared/utils/serverTime";
 
 export const useCashierEmployeesData = () => {
@@ -90,7 +89,7 @@ export const useCashierEmployeesData = () => {
 
   const selectedEmployee = useMemo(() => {
     const id = selectedEmployeeId ? selectedEmployeeId : null;
-    if (id === null || (id === "")) return null;
+    if (id === null || id === "") return null;
     return employees.find((e) => e.id === id) || null;
   }, [employees, selectedEmployeeId]);
 
@@ -166,7 +165,7 @@ export const useCashierEmployeesData = () => {
       if (!order) return [];
       const id = order?.id != null ? order.id : null;
       const fromCache =
-        id !== null && (id !== null && id !== undefined && id !== "")
+        id !== null && id !== null && id !== undefined && id !== ""
           ? orderDetailsById?.[id]?.items
           : null;
       const items = fromCache ?? order?.items;
@@ -212,7 +211,7 @@ export const useCashierEmployeesData = () => {
             (resp as any)?.data?.data?.order ?? (resp as any)?.data?.order;
           if (order?.id == null) return;
           const oid = order.id;
-          if ((oid === "")) return;
+          if (oid === "") return;
           setOrderDetailsById((prev) => ({ ...(prev || {}), [oid]: order }));
           fetchedOrderIdsRef.current.add(oid);
         })
@@ -249,7 +248,7 @@ export const useCashierEmployeesData = () => {
   useEffect(() => {
     const loadEmployeeView = async () => {
       const id = selectedEmployeeId ? selectedEmployeeId : null;
-      if (id === null || (id === "")) {
+      if (id === null || id === "") {
         setOrdersForPayment([]);
         setEmployeeOrders([]);
         return;
@@ -361,7 +360,7 @@ export const useCashierEmployeesData = () => {
   // Auto-refresh employee details
   useEffect(() => {
     const id = selectedEmployeeId ? selectedEmployeeId : null;
-    if (id === null || (id === "")) return;
+    if (id === null || id === "") return;
 
     const refreshInterval = setInterval(() => {
       fetchEmployeeData(id).catch((err) => {
@@ -443,7 +442,13 @@ export const useCashierEmployeesData = () => {
         });
       }
     },
-    [user.id, selectedEmployeeId, fetchEmployeeData, processingOrders, paymentMethod],
+    [
+      user.id,
+      selectedEmployeeId,
+      fetchEmployeeData,
+      processingOrders,
+      paymentMethod,
+    ],
   );
 
   const handleProcessPaymentYes = async () => {

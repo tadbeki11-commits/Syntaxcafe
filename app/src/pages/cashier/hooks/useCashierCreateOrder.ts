@@ -20,6 +20,7 @@ export const useCashierCreateOrder = () => {
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [selectedTable, setSelectedTable] = useState("");
   const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [notes, setNotes] = useState("");
   const [allTables, setAllTables] = useState<any[]>([]);
   const [forceTableSelection, setForceTableSelection] = useState(false);
 
@@ -117,19 +118,19 @@ export const useCashierCreateOrder = () => {
     const normalizeMenuItems = (rawItems: any[]) => {
       const normalizedItems = Array.isArray(rawItems)
         ? rawItems.map((item) => ({
-          ...item,
-          main_category: item.meta?.main_category || item.main_category,
-          category: item.category,
-          sub_category:
-            item.meta?.sub_category ||
-            item.sub_category ||
-            item.category ||
-            "",
-          is_available:
-            typeof item.is_available === "boolean"
-              ? item.is_available
-              : (item.available ?? true),
-        }))
+            ...item,
+            main_category: item.meta?.main_category || item.main_category,
+            category: item.category,
+            sub_category:
+              item.meta?.sub_category ||
+              item.sub_category ||
+              item.category ||
+              "",
+            is_available:
+              typeof item.is_available === "boolean"
+                ? item.is_available
+                : (item.available ?? true),
+          }))
         : [];
       return normalizedItems.filter((item) => item.is_available);
     };
@@ -139,11 +140,12 @@ export const useCashierCreateOrder = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [menuResult, tablesResult, settingsResult] = await Promise.allSettled([
-          api.menu.getCafeMenu(),
-          api.tables.getAll(),
-          api.settings.getTableSelectionSettings(),
-        ]);
+        const [menuResult, tablesResult, settingsResult] =
+          await Promise.allSettled([
+            api.menu.getCafeMenu(),
+            api.tables.getAll(),
+            api.settings.getTableSelectionSettings(),
+          ]);
 
         if (cancelled) return;
 
@@ -188,7 +190,9 @@ export const useCashierCreateOrder = () => {
         }
 
         if (settingsResult.status === "fulfilled") {
-          setForceTableSelection(Boolean((settingsResult.value as any)?.force_table_selection));
+          setForceTableSelection(
+            Boolean((settingsResult.value as any)?.force_table_selection),
+          );
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -211,8 +215,8 @@ export const useCashierCreateOrder = () => {
       selectedMainCategory === "all"
         ? menuItems
         : menuItems.filter((item) =>
-          itemHasCategory(item, selectedMainCategory),
-        );
+            itemHasCategory(item, selectedMainCategory),
+          );
 
     const matchesSearch = (item: any) => {
       if (!searchTerm) return true;
@@ -357,6 +361,14 @@ export const useCashierCreateOrder = () => {
     );
   }, []);
 
+  const updateItemNote = useCallback((menuItemId: any, note: string) => {
+    setOrderItems((prev) =>
+      prev.map((item) =>
+        item.menu_item_id === menuItemId ? { ...item, note } : item,
+      ),
+    );
+  }, []);
+
   const calculateTotal = useCallback(() => {
     return orderItems
       .reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0)
@@ -386,9 +398,7 @@ export const useCashierCreateOrder = () => {
       const orderData: any = {
         employee_id: waiter.id,
         waiter_id: waiter.id,
-        created_by_id: user?.id
-          ? user.id
-          : waiter.id,
+        created_by_id: user?.id ? user.id : waiter.id,
         type: "cafe",
         items: orderItems.map((item) => {
           const unitPrice = parseFloat(item.price);
@@ -402,9 +412,11 @@ export const useCashierCreateOrder = () => {
             subtotal: unitPrice * quantity,
             main_category: item.main_category || "cafe",
             item_type: item.main_category || "cafe",
+            note: item.note?.trim() || undefined,
           };
         }),
         total_amount: parseFloat(calculateTotal()),
+        notes: notes.trim() || undefined,
       };
 
       const isTableSelected =
@@ -435,6 +447,7 @@ export const useCashierCreateOrder = () => {
 
       setSelectedTable("");
       setOrderItems([]);
+      setNotes("");
       navigate("/dashboard");
     } catch (e: any) {
       console.error("Create order error:", e);
@@ -452,14 +465,14 @@ export const useCashierCreateOrder = () => {
     creatingOrder,
     navigate,
     orderItems,
+    notes,
     selectedTable,
     waiter?.id,
     user?.id,
     forceTableSelection,
   ]);
 
-  const waiterName =
-    waiter?.full_name || waiter?.name || waiter?.username || "Waiter";
+  const waiterName = waiter?.full_name || waiter?.name || waiter?.username;
 
   const mappedMainCategories = useMemo(() => {
     return getMainCategories().map((c) => ({
@@ -507,6 +520,8 @@ export const useCashierCreateOrder = () => {
     selectedTable,
     setSelectedTable,
     orderItems,
+    notes,
+    setNotes,
     allTables,
     isOnline,
     waiter,
@@ -518,6 +533,7 @@ export const useCashierCreateOrder = () => {
     addToOrder,
     removeFromOrder,
     updateQuantity,
+    updateItemNote,
     calculateTotal,
     handleSubmitOrder,
     forceTableSelection,

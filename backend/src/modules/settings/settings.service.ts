@@ -378,4 +378,21 @@ export class SettingsService {
     await this.setSystemSetting("enable_cashier_receipt", data.enable_cashier_receipt ? "true" : "false");
     return { enable_cashier_receipt: data.enable_cashier_receipt };
   }
+
+  // Branch-scoped cancellation override password, settable from the owner web
+  // dashboard. We never return the stored hash — only whether one is set — so
+  // it can't leak to the browser.
+  async getCancelPasswordStatus(): Promise<{ is_set: boolean }> {
+    const cancelPassword = await this.getSystemSetting("cancel_password");
+    return { is_set: !!cancelPassword };
+  }
+
+  async updateSystemCancelPassword(password: string): Promise<{ is_set: boolean }> {
+    if (!password || password.length < 6) {
+      throw new Error("Cancel password must be at least 6 characters.");
+    }
+    const hashed = await hash(password, 10);
+    await this.setSystemSetting("cancel_password", hashed);
+    return { is_set: true };
+  }
 }

@@ -1,6 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import { EyeIcon } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ResourceManager, type Column } from "@/components/resource-manager";
 import { Payments } from "@/lib/resources";
 import { birr, shortDate } from "@/lib/format";
@@ -42,6 +46,14 @@ export default function PaymentsPage() {
       ]}
       dateFilters={[{ key: "created_at", label: "Date", getDate: (r) => r.created_at }]}
       load={Payments.history}
+      rowActions={(r) => (
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/dashboard/payments/${r.id}`}>
+            <EyeIcon className="size-4" />
+            View
+          </Link>
+        </Button>
+      )}
     />
   );
 }

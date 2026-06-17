@@ -33,7 +33,7 @@ const PRINT_WIDTH = 576; // 80mm @ 203 dpi printable dots
 const PADDING = 16;
 const FONT_FAMILY = "'Noto Sans Ethiopic', 'Nyala', sans-serif";
 
-const FONT_SIZE = 22;
+const FONT_SIZE = 28;
 const TITLE_SIZE = 32;
 const LARGE_SIZE = 28;
 

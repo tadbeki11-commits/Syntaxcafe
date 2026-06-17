@@ -33,6 +33,8 @@ const CreateOrder = () => {
     selectedTable,
     setSelectedTable,
     orderItems,
+    notes,
+    setNotes,
     allTables,
     isMobileSummaryOpen,
     setIsMobileSummaryOpen,
@@ -44,6 +46,7 @@ const CreateOrder = () => {
     addToOrder,
     removeFromOrder,
     updateQuantity,
+    updateItemNote,
     calculateTotal,
     getOrderRoutingInfo,
     handleSubmitOrder,
@@ -154,11 +157,14 @@ const CreateOrder = () => {
             creatingOrder={creatingOrder}
             onUpdateQuantity={updateQuantity}
             onRemoveFromOrder={removeFromOrder}
+            onUpdateItemNote={updateItemNote}
             onSubmitOrder={handleSubmitOrder}
             calculateTotal={calculateTotal}
             getOrderRoutingInfo={getOrderRoutingInfo}
             formatCurrency={formatCurrency}
             forceTableSelection={forceTableSelection}
+            notes={notes}
+            onNotesChange={setNotes}
           />
         </div>
       </div>
@@ -171,11 +177,14 @@ const CreateOrder = () => {
         creatingOrder={creatingOrder}
         onUpdateQuantity={updateQuantity}
         onRemoveFromOrder={removeFromOrder}
+        onUpdateItemNote={updateItemNote}
         onSubmitOrder={handleSubmitOrder}
         calculateTotal={calculateTotal}
         getOrderRoutingInfo={getOrderRoutingInfo}
         formatCurrency={formatCurrency}
         forceTableSelection={forceTableSelection}
+        notes={notes}
+        onNotesChange={setNotes}
       />
     </div>
   );

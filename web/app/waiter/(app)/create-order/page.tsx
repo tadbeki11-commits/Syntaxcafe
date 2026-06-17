@@ -28,6 +28,8 @@ export default function CreateOrderPage() {
     selectedTable,
     setSelectedTable,
     orderItems,
+    notes,
+    setNotes,
     allTables,
     isMobileSummaryOpen,
     setIsMobileSummaryOpen,
@@ -38,6 +40,7 @@ export default function CreateOrderPage() {
     addToOrder,
     removeFromOrder,
     updateQuantity,
+    updateItemNote,
     calculateTotal,
     getOrderRoutingInfo,
     handleSubmitOrder,
@@ -55,7 +58,7 @@ export default function CreateOrderPage() {
   const trimmedSearchQuery = searchQuery.trim();
 
   return (
-    <div className="h-screen overflow-hidden bg-[#fafaf9] font-sans selection:bg-amber-100 selection:text-amber-900 flex flex-col animate-in fade-in duration-300">
+    <div className="h-screen overflow-auto bg-[#fafaf9] font-sans selection:bg-amber-100 selection:text-amber-900 flex flex-col animate-in fade-in duration-300">
       {/* Premium Navigation Header */}
       <WaiterHeader
         onLogout={handleLogout}
@@ -63,8 +66,8 @@ export default function CreateOrderPage() {
         onNavigateToDashboard={() => router.push("/waiter")}
       />
 
-      <div className="flex-1 min-h-0 max-w-full mx-auto px-4 sm:px-6 pb-5 flex flex-col lg:flex-row gap-6 overflow-hidden w-full pt-2">
-        <div className="flex-1 min-h-0 space-y-2 flex flex-col">
+      <div className="flex-1 max-w-full mx-auto px-4 sm:px-6 pb-5 flex flex-col lg:flex-row gap-6 overflow-auto w-full pt-2">
+        <div className="flex-1 space-y-2 flex flex-col">
           <OrderFiltersPanel
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -155,11 +158,14 @@ export default function CreateOrderPage() {
             creatingOrder={creatingOrder}
             onUpdateQuantity={updateQuantity}
             onRemoveFromOrder={removeFromOrder}
+            onUpdateItemNote={updateItemNote}
             onSubmitOrder={handleSubmitOrder}
             calculateTotal={calculateTotal}
             getOrderRoutingInfo={getOrderRoutingInfo}
             formatCurrency={formatCurrency}
             forceTableSelection={forceTableSelection}
+            notes={notes}
+            onNotesChange={setNotes}
           />
         </div>
       </div>
@@ -172,11 +178,14 @@ export default function CreateOrderPage() {
         creatingOrder={creatingOrder}
         onUpdateQuantity={updateQuantity}
         onRemoveFromOrder={removeFromOrder}
+        onUpdateItemNote={updateItemNote}
         onSubmitOrder={handleSubmitOrder}
         calculateTotal={calculateTotal}
         getOrderRoutingInfo={getOrderRoutingInfo}
         formatCurrency={formatCurrency}
         forceTableSelection={forceTableSelection}
+        notes={notes}
+        onNotesChange={setNotes}
       />
     </div>
   );

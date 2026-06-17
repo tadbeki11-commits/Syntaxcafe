@@ -94,6 +94,7 @@ const qs = (params?: Record<string, any>) => {
 export const Orders = {
   list: (params?: Record<string, any>) =>
     apiFetch(`/orders${qs(params)}`).then((d) => d.data.orders ?? []),
+  get: (id: string) => apiFetch(`/orders/${id}`).then((d) => d.data.order),
   forPayment: () =>
     apiFetch("/orders/for-payment").then((d) => d.data.orders ?? []),
   create: (b: any) => apiFetch("/orders", j(b)),
@@ -103,6 +104,7 @@ export const Orders = {
 
 export const Payments = {
   history: () => apiFetch("/payments/history").then((d) => d.data.payments ?? []),
+  get: (id: string) => apiFetch(`/payments/${id}`).then((d) => d.data.payment),
   create: (b: any) => apiFetch("/payments", j(b)).then((d) => d.data.payment),
   confirm: (id: string, processed_by?: string) =>
     apiFetch(`/payments/${id}/confirm`, j({ processed_by })),
@@ -146,6 +148,14 @@ export const Settings = {
   receipt: () => apiFetch("/settings/system/receipt").then((d) => d.data),
   updateReceipt: (b: { enable_cashier_receipt: boolean }) =>
     apiFetch("/settings/system/receipt", put(b)).then((d) => d.data),
+  // Cancel-order override password. The backend never returns the hash, only
+  // whether one is set.
+  cancelPassword: () =>
+    apiFetch("/settings/system/cancel-password").then((d) => d.data),
+  updateCancelPassword: (cancel_password: string) =>
+    apiFetch("/settings/system/cancel-password", put({ cancel_password })).then(
+      (d) => d.data,
+    ),
 };
 
 export const Account = {

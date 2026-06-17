@@ -31,8 +31,43 @@ const DEFAULT_WAITER_NAME = "Waiter";
 const DEFAULT_CATEGORY = "cafe";
 const DEFAULT_ORDER_STATUS = "pending";
 const DEFAULT_PAYMENT_STATUS = "pending";
-const DEFAULT_TABLE_COLUMN_WIDTHS = [20, 6, 11, 11];
-const DEFAULT_TABLE_COLUMN_ALIGNS: ("left" | "right")[] = ["left", "right", "right", "right"];
+const DEFAULT_TABLE_COLUMN_WIDTHS = [12, 36];
+const DEFAULT_TABLE_COLUMN_ALIGNS: ("left" | "right")[] = ["left", "right"];
+
+// Kitchen ticket lines: quantity and item name each centered within their column,
+// matching the centered header/meta lines on the rest of the ticket.
+const ORDER_TICKET_COLUMN_WIDTHS = [8, 40];
+const ORDER_TICKET_COLUMN_ALIGNS: ("left" | "right" | "center")[] = [
+  "center",
+  "center",
+];
+
+/**
+ * Word-wrap free text (e.g. an order note) into lines that fit an 80mm ticket.
+ * The receipt `text` block doesn't wrap — it ellipsis-truncates — so a long note
+ * would otherwise be cut off. ~40 chars/line is conservative for the bold font.
+ */
+const wrapTicketText = (text: string, maxChars = 40): string[] => {
+  const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (candidate.length <= maxChars) {
+      line = candidate;
+      continue;
+    }
+    if (line) lines.push(line);
+    // Hard-break a single token longer than the line width.
+    line = word;
+    while (line.length > maxChars) {
+      lines.push(line.slice(0, maxChars));
+      line = line.slice(maxChars);
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+};
 
 const findOrder = async (id: string) => {
   return findByIdOrRemote(localDbTables.orders, id);
@@ -43,12 +78,16 @@ const findUser = async (id: string) => {
 };
 
 const resolveWaiterName = async (order: any): Promise<string> => {
-  const waiterId = order?.waiter_id ?? order?.employee_id ?? order?.created_by_id;
+  const waiterId =
+    order?.waiter_id ?? order?.employee_id ?? order?.created_by_id;
   if (!waiterId) return DEFAULT_WAITER_NAME;
   const waiterUser = await findUser(String(waiterId));
   if (!waiterUser) return DEFAULT_WAITER_NAME;
   return (
-    [waiterUser.first_name, waiterUser.last_name].filter(Boolean).join(" ").trim() ||
+    [waiterUser.first_name, waiterUser.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
     waiterUser.full_name ||
     waiterUser.name ||
     waiterUser.username ||
@@ -67,15 +106,22 @@ const resolveItemCategory = async (
 ): Promise<string> => {
   const menuItemId = item?.menu_item_id ? String(item.menu_item_id) : "";
   if (menuItemId) {
-    const menuItem = await findByIdOrRemote(localDbTables.menuItems, menuItemId);
+    const menuItem = await findByIdOrRemote(
+      localDbTables.menuItems,
+      menuItemId,
+    );
     const menuMain = extractMenuMainCategory(menuItem);
     if (menuMain) return menuMain;
   }
 
-  const explicitMain = String(item?.main_category || "").trim().toLowerCase();
+  const explicitMain = String(item?.main_category || "")
+    .trim()
+    .toLowerCase();
   if (explicitMain) return explicitMain;
 
-  const legacyType = String(item?.item_type || "").trim().toLowerCase();
+  const legacyType = String(item?.item_type || "")
+    .trim()
+    .toLowerCase();
   if (legacyType) return legacyType;
 
   return fallback;
@@ -91,13 +137,14 @@ const buildResponse = (data: any, status: number = 200) => ({
   config: {} as any,
 });
 
-const buildErrorResponse = (message: string, status: number = 404) => ({
-  data: { status: "error", message },
-  status,
-  statusText: status === 404 ? "Not Found" : "Error",
-  headers: {},
-  config: {} as any,
-}) as any;
+const buildErrorResponse = (message: string, status: number = 404) =>
+  ({
+    data: { status: "error", message },
+    status,
+    statusText: status === 404 ? "Not Found" : "Error",
+    headers: {},
+    config: {} as any,
+  }) as any;
 
 const updateOrderWithChanges = async (id: string, changes: any) => {
   const order = await findOrder(id);
@@ -112,15 +159,44 @@ const updateOrderWithChanges = async (id: string, changes: any) => {
   return buildResponse({});
 };
 
-const selectPrinter = async (printerName?: string): Promise<string> => {
-  const { list_thermal_printers } = await import("tauri-plugin-thermal-printer");
-  if (printerName) return printerName;
-  const printers = (await list_thermal_printers()) as any;
-  if (printers && printers.length > 0) {
-    const first = printers[0];
-    return typeof first === "string" ? first : first.name || first.address || "";
+const printerDisplayName = (p: any): string =>
+  typeof p === "string" ? p : String(p?.name || p?.address || "").trim();
+
+/** Names of the printers CUPS currently knows about (trimmed, non-empty). */
+const listAvailablePrinters = async (): Promise<string[]> => {
+  const { list_thermal_printers } =
+    await import("tauri-plugin-thermal-printer");
+  const printers = ((await list_thermal_printers()) as any[]) || [];
+  return printers.map(printerDisplayName).filter(Boolean);
+};
+
+/**
+ * Resolve a desired printer name to one that actually exists in CUPS.
+ *
+ * `lp -d <name> -o raw` exits non-zero ("The printer or class does not exist")
+ * when handed a name CUPS doesn't have — which the thermal-printer plugin
+ * surfaces as the opaque "lp command failed" error. A stale/typo'd entry in the
+ * department→printer map (read via getActivePrinterName / getPrinterForDepartment)
+ * is the usual cause. Only honor the requested name if it's live; otherwise fall
+ * back to the first available printer so the job still prints.
+ */
+const resolvePrinter = (
+  desired: string | undefined,
+  available: string[],
+): string => {
+  const requested = String(desired || "").trim();
+  if (requested && available.includes(requested)) return requested;
+  if (requested && available.length > 0) {
+    console.warn(
+      `[print] Printer "${requested}" not found in CUPS; falling back to "${available[0]}". Available: ${available.join(", ") || "(none)"}`,
+    );
   }
-  return "";
+  return available[0] || requested;
+};
+
+const selectPrinter = async (printerName?: string): Promise<string> => {
+  const available = await listAvailablePrinters();
+  return resolvePrinter(printerName, available);
 };
 
 const createPrintJob = (imageData: string, printer: string) => ({
@@ -158,7 +234,9 @@ const filterOrdersByParams = (orders: any[], params?: any) => {
   if (employeeId != null && employeeId !== "") {
     const id = String(employeeId);
     result = result.filter(
-      (o) => String(o?.employee_id || "") === id || String(o?.waiter_id || "") === id,
+      (o) =>
+        String(o?.employee_id || "") === id ||
+        String(o?.waiter_id || "") === id,
     );
   }
 
@@ -252,10 +330,10 @@ export const extractPersistedOrderIds = (resp: any): Set<string> | null => {
 export const normalizeOrderPayload = (order: any) => ({
   id: order.id,
   employee_id: order.employee_id,
-  waiter_id: order.waiter_id || '',
+  waiter_id: order.waiter_id || "",
   customer_id: order.customer_id,
-  table_number: order.table_number || '',
-  order_type_label: order.order_type_label || '',
+  table_number: order.table_number || "",
+  order_type_label: order.order_type_label || "",
   type: order.type || "cafe",
   status: order.status,
   payment_status: order.payment_status,
@@ -272,13 +350,17 @@ export const normalizeOrderPayload = (order: any) => ({
       unit_price: item.unit_price,
       subtotal: item.subtotal,
       item_type: item.item_type || "food",
+      main_category: item.main_category,
+      note: item.note || undefined,
     })) || [],
   total_amount: order.total_amount,
 });
 
 const syncUnsyncedOrders = async () => {
   const localOrders = await readRows(localDbTables.orders);
-  const unsyncedOrders = localOrders.filter((o: any) => Number(o?.synced ?? 0) === 0);
+  const unsyncedOrders = localOrders.filter(
+    (o: any) => Number(o?.synced ?? 0) === 0,
+  );
   if (unsyncedOrders.length === 0) return;
 
   const BATCH_SIZE = 50;
@@ -288,7 +370,10 @@ const syncUnsyncedOrders = async () => {
     const orderPayloads = batch.map(normalizeOrderPayload);
 
     try {
-      const resp = await api.post("/orders/sync", { orders: orderPayloads, payments: [] });
+      const resp = await api.post("/orders/sync", {
+        orders: orderPayloads,
+        payments: [],
+      });
       const persisted = extractPersistedOrderIds(resp);
       const confirmed = persisted
         ? batch.filter((o: any) => persisted.has(String(o.id)))
@@ -317,7 +402,9 @@ const syncUnsyncedOrders = async () => {
         } catch (singleError) {
           const singleStatus = Number((singleError as any)?.response?.status);
           if (singleStatus === 409) {
-            console.warn("[Orders Sync] Skipping conflicted order", { orderId: order.id });
+            console.warn("[Orders Sync] Skipping conflicted order", {
+              orderId: order.id,
+            });
             await upsertRow(localDbTables.orders, { ...order, synced: 1 });
             continue;
           }
@@ -327,7 +414,6 @@ const syncUnsyncedOrders = async () => {
     }
   }
 };
-
 
 const normalizeOrderItemsForPrinting = async (items: any[]) => {
   return Promise.all(
@@ -345,7 +431,6 @@ const normalizeOrderItemsForPrinting = async (items: any[]) => {
     }),
   );
 };
-
 
 const ordersAdapterImpl = {
   getAll: async (params?: any) => {
@@ -372,7 +457,6 @@ const ordersAdapterImpl = {
         }
       } catch (err) {
         console.error("[Orders Sync] Failed to fetch from backend:", err);
- 
       }
     }
 
@@ -502,7 +586,7 @@ const ordersAdapterImpl = {
       try {
         const resp = await api.post("/orders/sync", {
           orders: [normalizeOrderPayload(localOrder)],
-          payments: []
+          payments: [],
         });
         // Only mark synced if the backend confirms it actually stored the order;
         // otherwise leave it unsynced so the sync engine retries it later.
@@ -510,7 +594,10 @@ const ordersAdapterImpl = {
         if (!persisted || persisted.has(String(orderId))) {
           localOrder.synced = 1;
         } else {
-          console.warn("[Orders Create] Backend skipped order; keeping it unsynced for retry", orderId);
+          console.warn(
+            "[Orders Create] Backend skipped order; keeping it unsynced for retry",
+            orderId,
+          );
         }
         // Adopt the backend-assigned serial so the cashier sees the official
         // order number immediately instead of waiting for the next pull.
@@ -544,7 +631,12 @@ const ordersAdapterImpl = {
         await api.put(`/orders/${id}/status`, statusData);
         const order = await findOrder(id);
         if (order?.id) {
-          await upsertOrder({ ...order, status: statusData.status, updated_at: getApproximateServerIsoString(), synced: 1 });
+          await upsertOrder({
+            ...order,
+            status: statusData.status,
+            updated_at: getApproximateServerIsoString(),
+            synced: 1,
+          });
         }
         return buildResponse({});
       } catch {
@@ -784,8 +876,10 @@ const ordersAdapterImpl = {
     }
 
     const waiterName = await resolveWaiterName(order);
-    const { print_thermal_printer } = await import("tauri-plugin-thermal-printer");
-    const targetPrinter = await selectPrinter(printerName);
+    const { print_thermal_printer } =
+      await import("tauri-plugin-thermal-printer");
+    const availablePrinters = await listAvailablePrinters();
+    const targetPrinter = resolvePrinter(printerName, availablePrinters);
 
     // Group items by main_category (prefer menu.main_category, then item fields)
     const itemsByDept: Record<string, any[]> = {};
@@ -807,14 +901,9 @@ const ordersAdapterImpl = {
 
     for (const dept of departments) {
       const deptItems = itemsByDept[dept];
-      const deptPrinter = getPrinterForDepartment(dept) || targetPrinter;
-      const rows = deptItems.map((item: any) => [
-        String(item.menu_item_name || "Item"),
-        String(item.quantity),
-        parseFloat(String(item.unit_price)).toFixed(0),
-        parseFloat(String(item.subtotal)).toFixed(0),
-      ]);
-
+      const deptPrinter =
+        resolvePrinter(getPrinterForDepartment(dept), availablePrinters) ||
+        targetPrinter;
       const deptTotal = deptItems.reduce(
         (sum, item) => sum + (parseFloat(item.subtotal) || 0),
         0,
@@ -824,8 +913,8 @@ const ordersAdapterImpl = {
         ? new Date(order.created_at)
         : getApproximateServerDate();
 
-      const colWidths = DEFAULT_TABLE_COLUMN_WIDTHS;
-      const colAligns = DEFAULT_TABLE_COLUMN_ALIGNS;
+      const colWidths = ORDER_TICKET_COLUMN_WIDTHS;
+      const colAligns = ORDER_TICKET_COLUMN_ALIGNS;
 
       const blocks: ReceiptBlock[] = [
         { kind: "title", text: "Syntax services" },
@@ -835,7 +924,6 @@ const ordersAdapterImpl = {
           align: "center",
           bold: true,
         },
-        { kind: "text", text: "OFFLINE ORDER TICKET", align: "center", bold: true },
         {
           kind: "text",
           text: `Order: ${formatOrderNumber(order)}`,
@@ -845,49 +933,76 @@ const ordersAdapterImpl = {
         },
         { kind: "divider" },
         order.table_number
-          ? { kind: "text", text: `Table: #${order.table_number}`, align: "center", bold: true }
-          : { kind: "text", text: "Type: Take Away", align: "center", bold: true },
-        { kind: "text", text: `Waiter: ${waiterName}`, align: "center", bold: true },
-        { kind: "text", text: `Date: ${printedAtDate.toLocaleString()}`, align: "center", bold: true },
+          ? {
+              kind: "text",
+              text: `Table: #${order.table_number}`,
+              align: "center",
+              bold: true,
+            }
+          : {
+              kind: "text",
+              text: "Type: Take Away",
+              align: "center",
+              bold: true,
+            },
+        {
+          kind: "text",
+          text: `Waiter: ${waiterName}`,
+          align: "center",
+          bold: true,
+        },
+        {
+          kind: "text",
+          text: `Date: ${printedAtDate.toLocaleString()}`,
+          align: "center",
+          bold: true,
+        },
         { kind: "divider" },
         {
           kind: "row",
           widths: colWidths,
           align: colAligns,
           bold: true,
-          cells: ["Item", "Qty", "Price", "Sub"],
+          cells: ["Qty", "Item"],
         },
-        ...rows.map(
-          (r: string[]): ReceiptBlock => ({
-            kind: "row",
-            widths: colWidths,
-            align: colAligns,
-            bold: true,
-            cells: r,
-          }),
-        ),
-        { kind: "divider" },
-        {
-          kind: "text",
-          text: `DEPT TOTAL: ${deptTotal.toFixed(2)} Birr`,
-          align: "center",
-          bold: true,
-          large: true,
-        },
+        // Each item: a Qty/Item row, followed by its own note (if any) on the
+        // next line(s). Per-item notes ride with their item, so they only print
+        // on the department ticket that actually makes that item.
+        ...deptItems.flatMap((item: any): ReceiptBlock[] => {
+          const itemBlocks: ReceiptBlock[] = [
+            {
+              kind: "row",
+              widths: colWidths,
+              align: colAligns,
+              bold: true,
+              cells: [`X ${String(item.quantity)}`, String(item.menu_item_name || "Item")],
+            },
+          ];
+          const itemNote = String(item.note || item.notes || "").trim();
+          if (itemNote) {
+            for (const line of wrapTicketText(`- ${itemNote}`)) {
+              itemBlocks.push({ kind: "text", text: line, align: "center" });
+            }
+          }
+          return itemBlocks;
+        }),
       ];
 
-      if (departments.length === 1) {
-        // If only one dept, show the grand total too
-        blocks.push({
-          kind: "text",
-          text: `ORDER TOTAL: ${parseFloat(String(order.total_amount)).toFixed(2)} Birr`,
-          align: "center",
-          bold: true,
-        });
+      const orderNote = String(order.notes || "").trim();
+      if (orderNote) {
+        blocks.push(
+          { kind: "divider" },
+          { kind: "text", text: "NOTE", align: "center", bold: true },
+          ...wrapTicketText(orderNote).map(
+            (line): ReceiptBlock => ({
+              kind: "text",
+              text: line,
+              align: "center",
+              bold: true,
+            }),
+          ),
+        );
       }
-
-      blocks.push({ kind: "gap", height: 8 });
-      blocks.push({ kind: "text", text: "Thank You!", align: "center", bold: true });
 
       const imageData = await renderReceiptImage(blocks);
       const printerKey = String(deptPrinter || "").trim();
@@ -920,7 +1035,8 @@ const ordersAdapterImpl = {
   },
 
   testPrintNative: async (printerName?: string) => {
-    const { print_thermal_printer } = await import("tauri-plugin-thermal-printer");
+    const { print_thermal_printer } =
+      await import("tauri-plugin-thermal-printer");
     const targetPrinter = await selectPrinter(printerName);
 
     const colWidths = DEFAULT_TABLE_COLUMN_WIDTHS;
@@ -929,7 +1045,11 @@ const ordersAdapterImpl = {
     // Rendered as an image so the test confirms Amharic / Ge'ez prints correctly.
     const blocks: ReceiptBlock[] = [
       { kind: "title", text: "DIAGNOSTIC TEST" },
-      { kind: "text", text: "TAURI NATIVE THERMAL PRINTER TEST", align: "center" },
+      {
+        kind: "text",
+        text: "TAURI NATIVE THERMAL PRINTER TEST",
+        align: "center",
+      },
       { kind: "text", text: "የአማርኛ ህትመት ሙከራ", align: "center", bold: true },
       { kind: "divider" },
       { kind: "text", text: "Table: #5 (MOCK)" },

@@ -37,6 +37,8 @@ const CashierCreateOrderAsWaiter = () => {
     selectedTable,
     setSelectedTable,
     orderItems,
+    notes,
+    setNotes,
     allTables,
     isOnline,
     waiterName,
@@ -47,6 +49,7 @@ const CashierCreateOrderAsWaiter = () => {
     addToOrder,
     removeFromOrder,
     updateQuantity,
+    updateItemNote,
     calculateTotal,
     handleSubmitOrder,
     forceTableSelection,
@@ -157,11 +160,14 @@ const CashierCreateOrderAsWaiter = () => {
             creatingOrder={creatingOrder}
             onUpdateQuantity={updateQuantity}
             onRemoveFromOrder={removeFromOrder}
+            onUpdateItemNote={updateItemNote}
             onSubmitOrder={handleSubmitOrder}
             calculateTotal={calculateTotal}
             getOrderRoutingInfo={getOrderRoutingInfo}
             formatCurrency={formatCurrency}
             forceTableSelection={forceTableSelection}
+            notes={notes}
+            onNotesChange={setNotes}
           />
         </div>
       </div>
@@ -174,11 +180,14 @@ const CashierCreateOrderAsWaiter = () => {
         creatingOrder={creatingOrder}
         onUpdateQuantity={updateQuantity}
         onRemoveFromOrder={removeFromOrder}
+        onUpdateItemNote={updateItemNote}
         onSubmitOrder={handleSubmitOrder}
         calculateTotal={calculateTotal}
         getOrderRoutingInfo={getOrderRoutingInfo}
         formatCurrency={formatCurrency}
         forceTableSelection={forceTableSelection}
+        notes={notes}
+        onNotesChange={setNotes}
       />
     </div>
   );

@@ -14,11 +14,14 @@ interface MobileCartDialogProps {
   creatingOrder: boolean;
   onUpdateQuantity: (id: any, change: number) => void;
   onRemoveFromOrder: (id: any) => void;
+  onUpdateItemNote?: (id: any, note: string) => void;
   onSubmitOrder: () => Promise<void>;
   calculateTotal: () => string;
   getOrderRoutingInfo: () => any;
   formatCurrency: (val: any) => string;
   forceTableSelection?: boolean;
+  notes?: string;
+  onNotesChange?: (value: string) => void;
 }
 
 export const MobileCartDialog: React.FC<MobileCartDialogProps> = ({
@@ -29,11 +32,14 @@ export const MobileCartDialog: React.FC<MobileCartDialogProps> = ({
   creatingOrder,
   onUpdateQuantity,
   onRemoveFromOrder,
+  onUpdateItemNote,
   onSubmitOrder,
   calculateTotal,
   getOrderRoutingInfo,
   formatCurrency,
   forceTableSelection = false,
+  notes = "",
+  onNotesChange,
 }) => {
   const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -78,11 +84,14 @@ export const MobileCartDialog: React.FC<MobileCartDialogProps> = ({
             creatingOrder={creatingOrder}
             onUpdateQuantity={onUpdateQuantity}
             onRemoveFromOrder={onRemoveFromOrder}
+            onUpdateItemNote={onUpdateItemNote}
             onSubmitOrder={onSubmitOrder}
             calculateTotal={calculateTotal}
             getOrderRoutingInfo={getOrderRoutingInfo}
             formatCurrency={formatCurrency}
             forceTableSelection={forceTableSelection}
+            notes={notes}
+            onNotesChange={onNotesChange}
             onClose={() => onOpenChange(false)}
           />
         </DialogContent>

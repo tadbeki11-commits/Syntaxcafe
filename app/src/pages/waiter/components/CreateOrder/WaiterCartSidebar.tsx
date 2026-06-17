@@ -18,11 +18,14 @@ interface WaiterCartSidebarProps {
   creatingOrder: boolean;
   onUpdateQuantity: (id: any, change: number) => void;
   onRemoveFromOrder: (id: any) => void;
+  onUpdateItemNote?: (id: any, note: string) => void;
   onSubmitOrder: () => Promise<void>;
   calculateTotal: () => string;
   getOrderRoutingInfo: () => any;
   formatCurrency: (val: any) => string;
   forceTableSelection?: boolean;
+  notes?: string;
+  onNotesChange?: (value: string) => void;
   isMobile?: boolean;
   onClose?: () => void;
 }
@@ -33,10 +36,13 @@ export const WaiterCartSidebar: React.FC<WaiterCartSidebarProps> = ({
   creatingOrder,
   onUpdateQuantity,
   onRemoveFromOrder,
+  onUpdateItemNote,
   onSubmitOrder,
   calculateTotal,
   formatCurrency,
   forceTableSelection = false,
+  notes = '',
+  onNotesChange,
 }) => {
   const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
   const isRealTableSelected =
@@ -95,8 +101,9 @@ export const WaiterCartSidebar: React.FC<WaiterCartSidebarProps> = ({
             {orderItems.map((item) => (
               <div
                 key={item.menu_item_id}
-                className="group flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/15 p-2.5 transition-all duration-200 hover:border-primary/15 hover:bg-muted/25"
-              > 
+                className="group flex flex-col gap-2 rounded-2xl border border-border/50 bg-muted/15 p-2.5 transition-all duration-200 hover:border-primary/15 hover:bg-muted/25"
+              >
+                <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <h4 className="truncate text-foreground">
                     {item.menu_item_name}
@@ -137,6 +144,18 @@ export const WaiterCartSidebar: React.FC<WaiterCartSidebarProps> = ({
                 >
                   <X className="w-3.5 h-3.5" />
                 </Button>
+                </div>
+
+                {onUpdateItemNote && (
+                  <input
+                    type="text"
+                    value={item.note || ''}
+                    onChange={(e) => onUpdateItemNote(item.menu_item_id, e.target.value)}
+                    maxLength={200}
+                    placeholder="Item note (e.g. no ice, well done)…"
+                    className="w-full rounded-xl border border-border/50 bg-background px-2.5 py-1.5 text-[11px] text-foreground outline-none placeholder:text-muted-foreground/55 focus:border-primary/40"
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -146,6 +165,22 @@ export const WaiterCartSidebar: React.FC<WaiterCartSidebarProps> = ({
 
       {/* Total + Submit — pinned to bottom */}
       <div className="shrink-0 px-5 pb-5">
+        {orderItems.length > 0 && onNotesChange && (
+          <div className="mt-4">
+            <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Order note <span className="font-semibold normal-case tracking-normal text-muted-foreground/70">(optional)</span>
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => onNotesChange(e.target.value)}
+              rows={2}
+              maxLength={300}
+              placeholder="e.g. no sugar, extra hot, allergy info…"
+              className="w-full resize-none rounded-2xl border border-border/60 bg-background px-3 py-2 text-xs text-foreground shadow-inner outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/40"
+            />
+          </div>
+        )}
+
         {orderItems.length > 0 && (
           <div className="mt-4 flex items-center justify-between rounded-2xl border border-emerald-500/10 bg-gradient-to-r from-emerald-500/10 via-emerald-500/[0.02] to-transparent p-4 shadow-inner">
             <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-800">

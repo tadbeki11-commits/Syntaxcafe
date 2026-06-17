@@ -17,6 +17,7 @@ export const useWaiterCreateOrder = () => {
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [selectedTable, setSelectedTable] = useState("");
   const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [notes, setNotes] = useState("");
   const [allTables, setAllTables] = useState<any[]>([]);
   const [forceTableSelection, setForceTableSelection] = useState(false);
   const [isMobileSummaryOpen, setIsMobileSummaryOpen] = useState(false);
@@ -385,6 +386,14 @@ export const useWaiterCreateOrder = () => {
     );
   }, []);
 
+  const updateItemNote = useCallback((menuItemId: any, note: string) => {
+    setOrderItems((prev) =>
+      prev.map((item) =>
+        item.menu_item_id === menuItemId ? { ...item, note } : item,
+      ),
+    );
+  }, []);
+
   const calculateTotal = useCallback(() => {
     return orderItems
       .reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0)
@@ -508,9 +517,11 @@ export const useWaiterCreateOrder = () => {
             subtotal: unitPrice * quantity,
             main_category: item.main_category || "barista",
             item_type: isBeverage ? "beverage" : "food",
+            note: item.note?.trim() || undefined,
           };
         }),
         total_amount: parseFloat(calculateTotal()),
+        notes: notes.trim() || undefined,
       };
 
       if (effectiveTable !== "takeaway" && effectiveTable !== "beu") {
@@ -525,6 +536,7 @@ export const useWaiterCreateOrder = () => {
 
       setSelectedTable("");
       setOrderItems([]);
+      setNotes("");
     } finally {
       setCreatingOrder(false);
       submitLockRef.current = false;
@@ -532,6 +544,7 @@ export const useWaiterCreateOrder = () => {
   }, [
     creatingOrder,
     orderItems,
+    notes,
     selectedTable,
     user?.id,
     calculateTotal,
@@ -609,6 +622,8 @@ export const useWaiterCreateOrder = () => {
     selectedTable,
     setSelectedTable,
     orderItems,
+    notes,
+    setNotes,
     allTables,
     isMobileSummaryOpen,
     setIsMobileSummaryOpen,
@@ -620,6 +635,7 @@ export const useWaiterCreateOrder = () => {
     addToOrder,
     removeFromOrder,
     updateQuantity,
+    updateItemNote,
     calculateTotal,
     getOrderRoutingInfo,
     handleSubmitOrder,

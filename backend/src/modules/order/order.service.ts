@@ -47,6 +47,7 @@ export class OrderService {
       subtotal: Number(item.subtotal) || Number(item.unit_price) * Number(item.quantity),
       item_type: item.item_type || "food",
       main_category: item.main_category,
+      note: item.note || null,
     }));
   }
 
@@ -296,6 +297,7 @@ export class OrderService {
           subtotal: Number(item.subtotal) || Number(item.unit_price) * Number(item.quantity),
           item_type: item.item_type || 'food',
           main_category: item.main_category,
+          note: item.note || null,
         };
       });
 
