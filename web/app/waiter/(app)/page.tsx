@@ -89,9 +89,7 @@ export default function WaiterDashboardPage() {
         onNewOrder={() => router.push("/waiter/create-order")}
         onOrderHistory={() => router.push("/waiter/order-history")}
         onViewMenu={() => router.push("/waiter/create-order")}
-        onMyProfile={() =>
-          toast.message("Your profile is managed by your administrator.")
-        }
+        onMyProfile={() => router.push("/waiter/profile")}
       />
 
       <div className="flex justify-center">

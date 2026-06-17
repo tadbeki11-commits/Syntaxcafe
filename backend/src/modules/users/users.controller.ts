@@ -245,4 +245,25 @@ export class UsersController {
       throw new BadRequestException(error.message || "Failed to change password");
     }
   }
+
+  // ─── Change PIN ───────────────────────────────────────────────────────────
+
+  @ApiOperation({ summary: "Change a user's 4-digit login PIN" })
+  @ApiParam({ name: "id" })
+  @Post(":id/change-pin")
+  async changePin(@Param("id") id: string, @Body() body: any) {
+    const { current_pin, new_pin } = body;
+    if (!current_pin || !new_pin) {
+      throw new BadRequestException("current_pin and new_pin are required");
+    }
+    if (!/^\d{4}$/.test(new_pin)) {
+      throw new BadRequestException("new_pin must be exactly 4 digits");
+    }
+    try {
+      await this.usersService.changePin(id, current_pin, new_pin);
+      return { status: "success", message: "PIN updated successfully" };
+    } catch (error: any) {
+      throw new BadRequestException(error.message || "Failed to change PIN");
+    }
+  }
 }

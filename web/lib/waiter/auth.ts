@@ -88,6 +88,13 @@ export function getWaiterUser(): WaiterUser | null {
   }
 }
 
+// Persist an updated waiter user (e.g. after editing their profile) so the
+// cached session reflects the new name/username on the next render.
+export function setWaiterUser(user: WaiterUser): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
 export function isWaiterAuthenticated(): boolean {
   return !!getWaiterToken() && !!getWaiterUser();
 }

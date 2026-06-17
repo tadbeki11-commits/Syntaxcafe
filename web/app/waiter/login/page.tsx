@@ -361,14 +361,6 @@ export default function WaiterLoginPage() {
               ) : null}
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={() => router.push("/waiter/enroll")}
-            className="mt-6 w-full text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-primary transition-colors"
-          >
-            Re-enroll this device
-          </button>
         </div>
 
         <p className="text-center text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mt-8">

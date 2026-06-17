@@ -270,6 +270,43 @@ export class UsersService {
       .where(eq(users.id, id));
   }
 
+  // Floor staff sign in with a 4-digit PIN stored in `pin_hash` (see verifyPin).
+  // Verify the current PIN against the same fallback chain login uses, then
+  // rotate `pin_hash` so the new PIN takes effect everywhere it's synced.
+  async changePin(id: string, currentPin: string, newPin: string) {
+    const [user] = await db
+      .select({
+        id: users.id,
+        pin_hash: users.pin_hash,
+        password_hash: users.password_hash,
+      })
+      .from(users)
+      .where(and(eq(users.id, id), eq(users.branch_id, requireBranchId())))
+      .limit(1);
+
+    if (!user) throw new Error("User not found");
+
+    const existingHash = user.pin_hash || user.password_hash;
+    if (!existingHash) throw new Error("No PIN is set for this account");
+
+    const valid = await compare(currentPin, existingHash);
+    if (!valid) throw new Error("Current PIN is incorrect");
+
+    const newHash = await hash(
+      newPin,
+      parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10),
+    );
+    const [updated] = await db
+      .update(users)
+      .set({ pin_hash: newHash, updated_at: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+
+    if (updated) {
+      await emitUpdated(db, "user", "USER_UPDATED", updated as any);
+    }
+  }
+
   async register(payload: any) {
     const {
       username,

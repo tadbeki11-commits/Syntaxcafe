@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import {
   getWaiterUser,
+  setWaiterUser,
   waiterLogin,
   waiterLogout,
   type WaiterUser,
@@ -21,6 +22,7 @@ interface WaiterAuthContextValue {
   isAuthenticated: boolean;
   login: (name: string, pin: string) => Promise<WaiterUser>;
   logout: () => void;
+  updateUser: (user: WaiterUser) => void;
 }
 
 const WaiterAuthContext = createContext<WaiterAuthContextValue | null>(null);
@@ -49,9 +51,14 @@ export function WaiterAuthProvider({
     setUser(null);
   }, []);
 
+  const updateUser = useCallback((next: WaiterUser) => {
+    setWaiterUser(next);
+    setUser(next);
+  }, []);
+
   return (
     <WaiterAuthContext.Provider
-      value={{ user, loading, isAuthenticated: !!user, login, logout }}
+      value={{ user, loading, isAuthenticated: !!user, login, logout, updateUser }}
     >
       {children}
     </WaiterAuthContext.Provider>

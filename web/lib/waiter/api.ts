@@ -95,6 +95,23 @@ export const waiterServices = {
     getWaiters: () =>
       waiterApi.get("/users/public", { role: "cafe_waiter", is_active: "true" }),
   },
+  account: {
+    // Update the signed-in waiter's name/username. Mirrors the desktop POS:
+    // the backend splits full_name into first/last and returns the refreshed
+    // user under `user`.
+    updateProfile: (
+      userId: string,
+      body: { full_name: string; username: string },
+    ) => waiterApi.put(`/auth/profile/${userId}`, body),
+    // Change the waiter's 4-digit login PIN. PINs live in their own pin_hash
+    // column (see backend users.service), so this hits the dedicated endpoint
+    // rather than change-password (which only touches password_hash).
+    changePin: (userId: string, current_pin: string, new_pin: string) =>
+      waiterApi.post(`/users/${userId}/change-pin`, {
+        current_pin,
+        new_pin,
+      }),
+  },
   settings: {
     getTableSelectionSettings: async (): Promise<{
       force_table_selection: boolean;
