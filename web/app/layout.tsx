@@ -1,4 +1,5 @@
 import React from "react";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "next-themes";
@@ -10,6 +11,24 @@ import { DEFAULT_THEME } from "@/lib/themes";
 import { Toaster } from "@/components/ui/sonner";
 import NextTopLoader from "nextjs-toploader";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PWARegister } from "@/components/pwa-register";
+
+export const metadata: Metadata = {
+  title: "Syntax Cafe System",
+  description: "Cafe management and point-of-sale system.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Syntax Cafe",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
+};
 
 
 export default async function RootLayout({
@@ -46,6 +65,7 @@ export default async function RootLayout({
               disableTransitionOnChange>
               <ActiveThemeProvider initialTheme={themeSettings}>
                 {children}
+                <PWARegister />
                 <Toaster position="top-center" richColors />
                 <NextTopLoader color="var(--primary)" showSpinner={false} height={2} shadow-sm="none" />
               </ActiveThemeProvider>
