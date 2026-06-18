@@ -37,8 +37,14 @@ export async function login(
   const token = data?.token?.access_token;
   if (!token) throw new Error("Login failed: no token returned");
 
-  if (!["super_admin", "owner", "business_admin"].includes(data.user?.role)) {
-    throw new Error("This portal is for platform admins and business owners.");
+  if (
+    !["super_admin", "owner", "business_admin", "fb_manager"].includes(
+      data.user?.role,
+    )
+  ) {
+    throw new Error(
+      "This portal is for platform admins, business owners and F&B managers.",
+    );
   }
 
   setCookie("pa_token", token, SESSION_MAX_AGE);
@@ -70,6 +76,7 @@ const ROLE_LABELS: Record<string, string> = {
   super_admin: "Platform Admin",
   owner: "Owner",
   business_admin: "Business Admin",
+  fb_manager: "F&B Manager",
   admin: "Administrator",
   cashier: "Cashier",
   kitchen_staff: "Kitchen Staff",

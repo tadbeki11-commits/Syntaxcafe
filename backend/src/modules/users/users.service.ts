@@ -168,7 +168,18 @@ export class UsersService {
       .from(users)
       .where(and(eq(users.username, username), isNull(users.branch_id)))
       .limit(1);
-    return crossBranch || null;
+    if (crossBranch) return crossBranch;
+
+    // F&B managers are pinned to a branch (branch_id IS NOT NULL) but sign in
+    // from the platform portal with no branch context, so neither lookup above
+    // finds them. Their username is unique platform-wide (enforced on create and
+    // by users_fb_manager_username_idx), so resolve them by username alone.
+    const [fbManager] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.username, username), eq(users.role, "fb_manager")))
+      .limit(1);
+    return fbManager || null;
   }
 
   async findByName(name: string) {
@@ -341,6 +352,22 @@ export class UsersService {
       .limit(1);
     if (existingUser.length > 0) {
       throw new Error("Username already exists");
+    }
+
+    // F&B managers log in from the platform portal with no branch context, so
+    // login resolves them by username alone — that requires the username to be
+    // unique across the whole platform, not just within the branch.
+    if (role === "fb_manager") {
+      const [clash] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+      if (clash) {
+        throw new Error(
+          "An F&B manager's username must be unique across the platform — that username is already taken.",
+        );
+      }
     }
 
 

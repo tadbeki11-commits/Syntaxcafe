@@ -63,7 +63,12 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
                       <Badge variant={STATUS_VARIANT[p.status] || 'secondary'}>{p.status}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {p.created_at ? new Date(p.created_at).toLocaleString() : '-'}
+                      {(() => {
+                        // Prefer paid_at (real payment time) over created_at,
+                        // which is the sync time for payments made offline.
+                        const when = (p as any).paid_at || p.created_at;
+                        return when ? new Date(when).toLocaleString() : '-';
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end">

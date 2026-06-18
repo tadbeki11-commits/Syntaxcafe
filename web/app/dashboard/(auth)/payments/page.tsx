@@ -14,15 +14,20 @@ type Payment = {
   amount: number | null;
   payment_method: string | null;
   status: string | null;
+  paid_at: string | null;
   created_at: string;
 };
+
+// paid_at is when the payment was actually taken. created_at is the sync time
+// for payments that came from an offline client, so it misrepresents the date.
+const paymentDate = (r: Payment) => r.paid_at || r.created_at;
 
 const columns: Column<Payment>[] = [
   { key: "id", label: "Payment", render: (r) => <span className="font-mono text-xs">{r.id.slice(0, 8)}</span> },
   { key: "amount", label: "Amount", render: (r) => birr(r.amount) },
   { key: "payment_method", label: "Method", render: (r) => <span className="capitalize">{r.payment_method ?? "—"}</span> },
   { key: "status", label: "Status", render: (r) => <Badge variant={r.status === "paid" ? "success" : "muted"} className="capitalize">{r.status ?? "—"}</Badge> },
-  { key: "created_at", label: "Date", render: (r) => shortDate(r.created_at) },
+  { key: "paid_at", label: "Date", render: (r) => shortDate(paymentDate(r)) },
 ];
 
 export default function PaymentsPage() {
@@ -44,7 +49,7 @@ export default function PaymentsPage() {
           ],
         },
       ]}
-      dateFilters={[{ key: "created_at", label: "Date", getDate: (r) => r.created_at }]}
+      dateFilters={[{ key: "paid_at", label: "Date", getDate: (r) => paymentDate(r) }]}
       load={Payments.history}
       rowActions={(r) => (
         <Button asChild variant="outline" size="sm">

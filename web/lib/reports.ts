@@ -194,7 +194,11 @@ export const filterSourceDataByDateRange = (
 
   return {
     orders: orders.filter((order) => withinRange(order?.created_at)),
-    payments: payments.filter((payment) => withinRange(payment?.created_at)),
+    // paid_at is the real payment time; created_at is the sync time for payments
+    // that came from an offline client, so it would misbucket them by date.
+    payments: payments.filter((payment) =>
+      withinRange(payment?.paid_at || payment?.created_at),
+    ),
     menuItems,
   };
 };

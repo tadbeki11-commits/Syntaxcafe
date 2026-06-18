@@ -475,6 +475,25 @@ const ordersAdapterImpl = {
   getById: async (id: string) => {
     let order = await findOrder(id);
 
+    // The local cashier list only pulls active orders, so a completed/paid
+    // order (or one created on another device) may be missing locally, or
+    // present but stripped of its items. When online, fetch the full order
+    // from the backend and cache it so the detail view has its items.
+    const hasItems = Array.isArray(order?.items) && order.items.length > 0;
+    if ((!order || !hasItems) && isOnline()) {
+      try {
+        const resp = await api.get(`/orders/${id}`);
+        const remote =
+          resp.data?.data?.order ?? resp.data?.order ?? null;
+        if (remote?.id) {
+          await persistServerOrders([remote]);
+          order = await findOrder(id);
+        }
+      } catch (err) {
+        console.warn("[Orders getById] Backend fetch failed:", err);
+      }
+    }
+
     if (order) {
       const waiterName = await resolveWaiterName(order);
       order = { ...order, waiter_name: waiterName, employee_name: waiterName };

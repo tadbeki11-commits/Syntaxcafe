@@ -84,7 +84,13 @@ export const usePaymentData = () => {
   const stats = useMemo(() => {
     const today = getApproximateServerDateString();
     const todayRevenueVal = payments
-      .filter(p => p.status === 'paid' && p.created_at?.startsWith(today))
+      .filter(p => {
+        if (p.status !== 'paid') return false;
+        // paid_at is the real payment time; created_at can be the sync time for
+        // payments that originated offline, which would drop them from today.
+        const when = (p as any).paid_at || p.created_at;
+        return when?.startsWith(today);
+      })
       .reduce((s, p) => s + parseFloat(String(p.amount || 0)), 0);
 
     return {

@@ -66,7 +66,9 @@ export class RegisterUserRequestDto {
   @ApiProperty()
   password!: string;
 
-  @ApiPropertyOptional({ enum: ["admin", "cashier", "kitchen_staff", "cafe_waiter"] })
+  @ApiPropertyOptional({
+    enum: ["admin", "fb_manager", "cashier", "kitchen_staff", "cafe_waiter"],
+  })
   role?: string;
 
   @ApiPropertyOptional()

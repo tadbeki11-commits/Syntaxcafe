@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../db/drizzle";
 import { order_items } from "../../db/tables/order-items.table";
 import { orders } from "../../db/tables/orders.table";
@@ -240,6 +240,14 @@ export class PaymentService {
   }
 
   async getPaymentHistory(filters: any) {
+    // Use paid_at (when the money was actually taken) rather than created_at.
+    // For payments synced from an offline client, created_at defaults to the
+    // moment the row reached the server, so an order paid offline yesterday but
+    // synced today would otherwise be bucketed under today. paid_at carries the
+    // real payment time across sync; coalesce to created_at for any legacy rows
+    // that predate paid_at being populated.
+    const paidTimestamp = sql`coalesce(${payments.paid_at}, ${payments.created_at})`;
+
     const conditions = [eq(payments.branch_id, requireBranchId())] as any[];
     if (filters.status) conditions.push(eq(payments.status, filters.status));
     if (filters.payment_method)
@@ -247,9 +255,9 @@ export class PaymentService {
     if (filters.processed_by)
       conditions.push(eq(payments.processed_by, filters.processed_by));
     if (filters.date_from)
-      conditions.push(gte(payments.created_at, new Date(filters.date_from)));
+      conditions.push(gte(paidTimestamp, new Date(filters.date_from)));
     if (filters.date_to)
-      conditions.push(lte(payments.created_at, new Date(filters.date_to)));
+      conditions.push(lte(paidTimestamp, new Date(filters.date_to)));
 
     const rows = await db
       .select({
@@ -261,7 +269,7 @@ export class PaymentService {
       .innerJoin(orders, eq(payments.order_id, orders.id))
       .leftJoin(users, eq(payments.processed_by, users.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(payments.created_at));
+      .orderBy(desc(paidTimestamp));
 
     return rows.map((row: any) => ({
       ...row.payment,

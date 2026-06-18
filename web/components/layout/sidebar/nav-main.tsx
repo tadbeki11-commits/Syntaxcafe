@@ -131,6 +131,22 @@ const ownerNav: NavGroup[] = [
   }
 ];
 
+// The F&B (Food & Beverage) manager runs the food-and-beverage operation of a
+// single branch: menu engineering, item performance and cost control. They get
+// a trimmed, branch-scoped slice of the owner nav (their branch is pinned by the
+// JWT, so there's no branch switcher) plus a dedicated F&B overview.
+const fbManagerNav: NavGroup[] = [
+  {
+    title: "Food & Beverage",
+    items: [
+      { title: "F&B Overview", href: "/dashboard/fb", icon: GaugeIcon },
+      { title: "Menu", href: "/dashboard/menu", icon: UtensilsCrossedIcon },
+      { title: "Items Sold", href: "/dashboard/payments/items", icon: CoffeeIcon },
+      { title: "Reports", href: "/dashboard/reports", icon: BarChart3Icon }
+    ]
+  }
+];
+
 export function NavMain() {
   const pathname = usePathname();
   const { isMobile } = useSidebar();
@@ -138,7 +154,13 @@ export function NavMain() {
 
   useEffect(() => {
     const role = getUser()?.role;
-    setItems(role === "super_admin" ? platformNav : ownerNav);
+    setItems(
+      role === "super_admin"
+        ? platformNav
+        : role === "fb_manager"
+          ? fbManagerNav
+          : ownerNav,
+    );
   }, []);
 
   return (

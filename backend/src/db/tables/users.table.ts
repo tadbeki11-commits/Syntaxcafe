@@ -52,5 +52,11 @@ export const users = pgTable(
     businessUsernameIdx: uniqueIndex("users_business_username_idx")
       .on(table.business_id, table.username)
       .where(sql`${table.branch_id} IS NULL`),
+    // F&B managers are branch-pinned yet sign in from the platform portal with
+    // no branch context, so login resolves them by username alone. That only
+    // works if their username is unique across the entire platform.
+    fbManagerUsernameIdx: uniqueIndex("users_fb_manager_username_idx")
+      .on(table.username)
+      .where(sql`${table.role} = 'fb_manager'`),
   }),
 );

@@ -49,6 +49,7 @@ function StaffAccounts() {
           label: "Role",
           options: [
             { value: "admin", label: "Admin" },
+            { value: "fb_manager", label: "F&B manager" },
             { value: "cashier", label: "Cashier" },
             { value: "kitchen_staff", label: "Kitchen staff" },
             { value: "cafe_waiter", label: "Waiter" },
@@ -76,6 +77,7 @@ function StaffAccounts() {
           createOnly: true,
           options: [
             { value: "admin", label: "Admin" },
+            { value: "fb_manager", label: "F&B manager" },
             { value: "cashier", label: "Cashier" },
             { value: "kitchen_staff", label: "Kitchen staff" },
             { value: "cafe_waiter", label: "Waiter" },

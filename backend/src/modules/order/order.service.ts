@@ -12,9 +12,12 @@ import { users } from "../../db/tables/users.table";
 import { randomUUID } from "crypto";
 import { OrderInventoryService } from "./order-inventory.service";
 import { emitCreated, emitUpdated } from "../sync/sync-emit.util";
-import { requireBranchId, requireBusinessId, tenantInsert } from "../../common/tenant/tenant-context";
+import {
+  requireBranchId,
+  requireBusinessId,
+  tenantInsert,
+} from "../../common/tenant/tenant-context";
 import { OrdersGateway } from "./orders.gateway";
-
 
 @Injectable()
 export class OrderService {
@@ -28,10 +31,16 @@ export class OrderService {
   }
 
   private normalizeOrganizationId(organizationId: any): string | null {
-    return organizationId == null || organizationId === "" ? null : String(organizationId);
+    return organizationId == null || organizationId === ""
+      ? null
+      : String(organizationId);
   }
 
-  private validateUserId(userId: string, validUserIds: Set<string>, fallbackId?: string): string | null {
+  private validateUserId(
+    userId: string,
+    validUserIds: Set<string>,
+    fallbackId?: string,
+  ): string | null {
     if (validUserIds.has(userId)) return userId;
     if (fallbackId && validUserIds.has(fallbackId)) return fallbackId;
     return null;
@@ -44,7 +53,9 @@ export class OrderService {
       menu_item_id: item.menu_item_id,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      subtotal: Number(item.subtotal) || Number(item.unit_price) * Number(item.quantity),
+      subtotal:
+        Number(item.subtotal) ||
+        Number(item.unit_price) * Number(item.quantity),
       item_type: item.item_type || "food",
       main_category: item.main_category,
       note: item.note || null,
@@ -52,7 +63,9 @@ export class OrderService {
   }
 
   private isValidUUID(uuid: string): boolean {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid);
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      uuid,
+    );
   }
 
   /**
@@ -106,14 +119,20 @@ export class OrderService {
       organization_id,
       is_price_override,
     } = orderData;
-    
+
     const safeTableNumber = this.normalizeTableNumber(table_number);
     const safeOrganizationId = this.normalizeOrganizationId(organization_id);
 
     if (type === "cafe" || !type) {
       const requireTableSelection = await this.isTableSelectionRequired();
-      if (requireTableSelection && (safeTableNumber == null || isNaN(parseInt(String(safeTableNumber), 10)))) {
-        throw new BadRequestException("Table selection is required for cafe orders.");
+      if (
+        requireTableSelection &&
+        (safeTableNumber == null ||
+          isNaN(parseInt(String(safeTableNumber), 10)))
+      ) {
+        throw new BadRequestException(
+          "Table selection is required for cafe orders.",
+        );
       }
     }
 
@@ -139,7 +158,9 @@ export class OrderService {
         .returning();
 
       if (items && items.length > 0) {
-        await tx.insert(order_items).values(this.mapOrderItems(items, order.id));
+        await tx
+          .insert(order_items)
+          .values(this.mapOrderItems(items, order.id));
       }
 
       return order;
@@ -161,7 +182,12 @@ export class OrderService {
     return null;
   }
 
-  private async syncOrder(orderData: any, validUserIds: Set<string>, syncUserId: string, tx: any) {
+  private async syncOrder(
+    orderData: any,
+    validUserIds: Set<string>,
+    syncUserId: string,
+    tx: any,
+  ) {
     const {
       id,
       employee_id,
@@ -179,15 +205,25 @@ export class OrderService {
       is_price_override,
     } = orderData;
 
-    const finalEmployeeId = this.validateUserId(employee_id, validUserIds, syncUserId);
+    const finalEmployeeId = this.validateUserId(
+      employee_id,
+      validUserIds,
+      syncUserId,
+    );
 
-    if(!finalEmployeeId){
-      console.warn(`[BulkSync] Skipping order ${id}: employee_id ${employee_id} not found in valid users`);
+    if (!finalEmployeeId) {
+      console.warn(
+        `[BulkSync] Skipping order ${id}: employee_id ${employee_id} not found in valid users`,
+      );
       // Report the skip so the client keeps this order unsynced and retries it
       // later (e.g. once its employee has synced) instead of silently dropping it.
       return { id, skipped: true as const };
     }
-    const finalWaiterId = this.validateUserId(waiter_id, validUserIds, finalEmployeeId);
+    const finalWaiterId = this.validateUserId(
+      waiter_id,
+      validUserIds,
+      finalEmployeeId,
+    );
     const safeTableNumber = this.normalizeTableNumber(table_number);
     const safeOrganizationId = this.normalizeOrganizationId(organization_id);
 
@@ -195,7 +231,9 @@ export class OrderService {
       ? await tx
           .select({ id: orders.id, status: orders.status })
           .from(orders)
-          .where(and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())))
+          .where(
+            and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())),
+          )
           .limit(1)
       : [];
 
@@ -212,19 +250,29 @@ export class OrderService {
         pending: 0,
       };
 
-      const incomingStatus = String(status || '').toLowerCase();
-      const existingStatus = String(existingOrder.status || '').toLowerCase();
+      const incomingStatus = String(status || "").toLowerCase();
+      const existingStatus = String(existingOrder.status || "").toLowerCase();
       const incomingPriority = statusPriority[incomingStatus] ?? -1;
       const existingPriority = statusPriority[existingStatus] ?? -1;
 
       if (incomingPriority > existingPriority) {
         await tx
           .update(orders)
-          .set({ status: incomingStatus, payment_status: payment_status || undefined, updated_at: new Date() })
-          .where(and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())));
-        console.log(`[BulkSync] Updated existing order ${id} status: "${existingStatus}" → "${incomingStatus}"`);
+          .set({
+            status: incomingStatus,
+            payment_status: payment_status || undefined,
+            updated_at: new Date(),
+          })
+          .where(
+            and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())),
+          );
+        console.log(
+          `[BulkSync] Updated existing order ${id} status: "${existingStatus}" → "${incomingStatus}"`,
+        );
       } else if (incomingStatus !== existingStatus) {
-        console.log(`[BulkSync] Skipping status downgrade for order ${id}: "${existingStatus}" (existing) ≥ "${incomingStatus}" (incoming)`);
+        console.log(
+          `[BulkSync] Skipping status downgrade for order ${id}: "${existingStatus}" (existing) ≥ "${incomingStatus}" (incoming)`,
+        );
       }
 
       // Already on the server — report it as persisted so the client can safely
@@ -256,20 +304,22 @@ export class OrderService {
       .returning();
 
     if (items && items.length > 0) {
-
       // First: filter out items with non-UUID menu_item_ids
       const validItems = items.filter((item: any) => {
         const menuItemId = item.menu_item_id;
         if (menuItemId === null || menuItemId === undefined) return true;
-        if (typeof menuItemId === 'string' && this.isValidUUID(menuItemId)) return true;
-        console.warn(`[BulkSync] Skipping item with invalid menu_item_id: ${menuItemId}`);
+        if (typeof menuItemId === "string" && this.isValidUUID(menuItemId))
+          return true;
+        console.warn(
+          `[BulkSync] Skipping item with invalid menu_item_id: ${menuItemId}`,
+        );
         return false;
       });
 
       // Collect all referenced menu_item_ids and check which ones exist in the DB
       const referencedMenuItemIds = validItems
         .map((item: any) => item.menu_item_id)
-        .filter((id: any) => id != null && id !== '');
+        .filter((id: any) => id != null && id !== "");
 
       const existingMenuItemIds = new Set<string>();
       if (referencedMenuItemIds.length > 0) {
@@ -281,11 +331,17 @@ export class OrderService {
       }
 
       const orderItemsToInsert = validItems.map((item: any) => {
-        const menuItemId = item.menu_item_id && item.menu_item_id !== '' ? item.menu_item_id : null;
+        const menuItemId =
+          item.menu_item_id && item.menu_item_id !== ""
+            ? item.menu_item_id
+            : null;
         // If the menu_item_id doesn't exist in DB, set to null to avoid FK violation
-        const safeMenuItemId = menuItemId && existingMenuItemIds.has(menuItemId) ? menuItemId : null;
+        const safeMenuItemId =
+          menuItemId && existingMenuItemIds.has(menuItemId) ? menuItemId : null;
         if (menuItemId && !safeMenuItemId) {
-          console.warn(`[BulkSync] menu_item_id ${menuItemId} not found in DB — setting to null for order item`);
+          console.warn(
+            `[BulkSync] menu_item_id ${menuItemId} not found in DB — setting to null for order item`,
+          );
         }
         return {
           ...tenantInsert(),
@@ -294,8 +350,10 @@ export class OrderService {
           menu_item_id: safeMenuItemId,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          subtotal: Number(item.subtotal) || Number(item.unit_price) * Number(item.quantity),
-          item_type: item.item_type || 'food',
+          subtotal:
+            Number(item.subtotal) ||
+            Number(item.unit_price) * Number(item.quantity),
+          item_type: item.item_type || "food",
           main_category: item.main_category,
           note: item.note || null,
         };
@@ -305,13 +363,20 @@ export class OrderService {
         try {
           await tx.insert(order_items).values(orderItemsToInsert);
         } catch (insertErr) {
-          console.error(`[BulkSync] Failed to insert order_items for order ${createdOrder.id}:`, (insertErr as Error)?.message);
+          console.error(
+            `[BulkSync] Failed to insert order_items for order ${createdOrder.id}:`,
+            (insertErr as Error)?.message,
+          );
         }
       }
     }
 
     if (String(status || "").toLowerCase() === "paid") {
-      const syncedItems = await this.loadOrderItems(createdOrder.id, undefined, tx);
+      const syncedItems = await this.loadOrderItems(
+        createdOrder.id,
+        undefined,
+        tx,
+      );
       try {
         await this.orderInventoryService.reconcileOrderItems({
           tx,
@@ -332,7 +397,12 @@ export class OrderService {
     return { id: createdOrder.id, order_number };
   }
 
-  private async syncPayment(paymentData: any, validUserIds: Set<string>, syncUserId: string, tx: any) {
+  private async syncPayment(
+    paymentData: any,
+    validUserIds: Set<string>,
+    syncUserId: string,
+    tx: any,
+  ) {
     const {
       id,
       order_id,
@@ -341,6 +411,7 @@ export class OrderService {
       status,
       processed_by,
       paid_at,
+      created_at,
       description,
     } = paymentData;
 
@@ -352,13 +423,21 @@ export class OrderService {
     const [verifiedOrder] = await tx
       .select({ id: orders.id })
       .from(orders)
-      .where(and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())));
+      .where(
+        and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())),
+      );
     if (!verifiedOrder) {
-      console.warn(`[BulkSync] Skipping payment ${id}: Order ${order_id} not found in DB.`);
+      console.warn(
+        `[BulkSync] Skipping payment ${id}: Order ${order_id} not found in DB.`,
+      );
       return;
     }
 
-    const finalProcessedBy = this.validateUserId(processed_by, validUserIds, syncUserId);
+    const finalProcessedBy = this.validateUserId(
+      processed_by,
+      validUserIds,
+      syncUserId,
+    );
 
     const resolvedStatus = status || "paid";
     const resolvedPaidAt = paid_at ? new Date(paid_at) : new Date();
@@ -376,6 +455,7 @@ export class OrderService {
         status: resolvedStatus,
         processed_by: finalProcessedBy,
         paid_at: resolvedPaidAt,
+        created_at: resolvedPaidAt,
         description: description || null,
         meta: {},
       })
@@ -400,13 +480,20 @@ export class OrderService {
       const [existingSaleMovement] = await tx
         .select({ id: stockMovements.id })
         .from(stockMovements)
-        .where(and(eq(stockMovements.order_id, order_id), eq(stockMovements.movement_type, "sale")))
+        .where(
+          and(
+            eq(stockMovements.order_id, order_id),
+            eq(stockMovements.movement_type, "sale"),
+          ),
+        )
         .limit(1);
 
       await tx
         .update(orders)
         .set({ status: "paid", payment_status: "paid", updated_at: new Date() })
-        .where(and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())));
+        .where(
+          and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())),
+        );
 
       if (!existingSaleMovement) {
         const paidItems = await this.loadOrderItems(order_id, undefined, tx);
@@ -430,9 +517,15 @@ export class OrderService {
   }
 
   async bulkSync(data: any) {
-    const { orders: syncOrders = [], payments: syncPayments = [], user_id: syncUserId } = data;
+    const {
+      orders: syncOrders = [],
+      payments: syncPayments = [],
+      user_id: syncUserId,
+    } = data;
 
-    console.log(`[OrderService] Starting bulk sync: ${syncOrders.length} orders, ${syncPayments.length} payments`);
+    console.log(
+      `[OrderService] Starting bulk sync: ${syncOrders.length} orders, ${syncPayments.length} payments`,
+    );
 
     const userRows = await db
       .select({ id: users.id })
@@ -450,7 +543,12 @@ export class OrderService {
     const skippedIds: string[] = [];
     await db.transaction(async (tx: any) => {
       for (const orderData of syncOrders) {
-        const result = await this.syncOrder(orderData, validUserIds, syncUserId, tx);
+        const result = await this.syncOrder(
+          orderData,
+          validUserIds,
+          syncUserId,
+          tx,
+        );
         if (!result?.id) continue;
         if ("skipped" in result && result.skipped) {
           skippedIds.push(result.id);
@@ -458,7 +556,10 @@ export class OrderService {
         }
         persistedIds.push(result.id);
         if ("order_number" in result && result.order_number != null) {
-          orderResults.push({ id: result.id, order_number: result.order_number });
+          orderResults.push({
+            id: result.id,
+            order_number: result.order_number,
+          });
         }
       }
 
@@ -468,10 +569,17 @@ export class OrderService {
     });
 
     if (skippedIds.length > 0) {
-      console.warn(`[OrderService] bulk sync skipped ${skippedIds.length} order(s):`, skippedIds);
+      console.warn(
+        `[OrderService] bulk sync skipped ${skippedIds.length} order(s):`,
+        skippedIds,
+      );
     }
 
-    return { orders: orderResults, persisted_ids: persistedIds, skipped_ids: skippedIds };
+    return {
+      orders: orderResults,
+      persisted_ids: persistedIds,
+      skipped_ids: skippedIds,
+    };
   }
 
   async findById(id: string) {
@@ -784,18 +892,32 @@ export class OrderService {
         const [existingItem] = await tx
           .select()
           .from(order_items)
-          .where(and(eq(order_items.order_id, id), eq(order_items.menu_item_id, item.menu_item_id)))
+          .where(
+            and(
+              eq(order_items.order_id, id),
+              eq(order_items.menu_item_id, item.menu_item_id),
+            ),
+          )
           .limit(1);
 
         const itemSubtotal = Number(item.unit_price) * Number(item.quantity);
         additionalTotal += itemSubtotal;
 
         if (existingItem) {
-          const newQuantity = Number(existingItem.quantity) + Number(item.quantity);
+          const newQuantity =
+            Number(existingItem.quantity) + Number(item.quantity);
           await tx
             .update(order_items)
-            .set({ quantity: newQuantity, subtotal: Number(item.unit_price) * newQuantity })
-            .where(and(eq(order_items.order_id, id), eq(order_items.menu_item_id, item.menu_item_id)));
+            .set({
+              quantity: newQuantity,
+              subtotal: Number(item.unit_price) * newQuantity,
+            })
+            .where(
+              and(
+                eq(order_items.order_id, id),
+                eq(order_items.menu_item_id, item.menu_item_id),
+              ),
+            );
         } else {
           await tx.insert(order_items).values({
             ...tenantInsert(),
@@ -812,7 +934,10 @@ export class OrderService {
 
       await tx
         .update(orders)
-        .set({ total_amount: currentTotal + additionalTotal, updated_at: new Date() })
+        .set({
+          total_amount: currentTotal + additionalTotal,
+          updated_at: new Date(),
+        })
         .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)));
 
       if (wasPaid) {
@@ -840,10 +965,7 @@ export class OrderService {
       .from(orders)
       .leftJoin(users, eq(orders.employee_id, users.id))
       .where(
-        and(
-          eq(orders.branch_id, requireBranchId()),
-          eq(orders.type, "cafe"),
-        ),
+        and(eq(orders.branch_id, requireBranchId()), eq(orders.type, "cafe")),
       );
 
     const filtered = rows.filter((row: any) => {
@@ -956,7 +1078,10 @@ export class OrderService {
       ...row.item,
       menu_item_name: row.menu?.name,
       name: row.menu?.name ?? row.item?.name,
-      main_category: row.item?.main_category ?? row.menu?.main_category ?? row.menu?.category,
+      main_category:
+        row.item?.main_category ??
+        row.menu?.main_category ??
+        row.menu?.category,
     }));
   }
 

@@ -45,7 +45,11 @@ export default function LoginPage() {
       const user = await login(username.trim(), password);
       toast.success("Welcome back");
       router.push(
-        user.role === "super_admin" ? "/dashboard/overview" : "/dashboard/home",
+        user.role === "super_admin"
+          ? "/dashboard/overview"
+          : user.role === "fb_manager"
+            ? "/dashboard/fb"
+            : "/dashboard/home",
       );
     } catch (err: any) {
       toast.error(err.message || "Login failed");

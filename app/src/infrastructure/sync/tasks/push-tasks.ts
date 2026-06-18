@@ -120,6 +120,7 @@ const normalizePaymentPayload = (payment: any) => {
     status: payment.status,
     processed_by: payment.processed_by || undefined,
     paid_at: payment.paid_at,
+    created_at: payment.created_at || undefined,
     description: payment.description || undefined,
   };
 };

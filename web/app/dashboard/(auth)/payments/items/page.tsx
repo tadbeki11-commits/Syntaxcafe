@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Coffee, RefreshCw, TrendingUp } from "lucide-react";
+import { Coffee, Coins, RefreshCw, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,13 @@ type AggregatedItemRow = {
 };
 
 const TIME_FILTERS = ["all", "today", "week", "month", "custom"] as const;
-const UNIT_FILTERS = ["all", "cafe", "barista", "restaurant"] as const;
+
+// A business unit counts as "beverages" when its name looks drink-related;
+// everything else is treated as food. Keyed off the menu item's main_category,
+// which is branch-defined (e.g. bar / barista / coffee here, kitchen / cafe
+// elsewhere) — so we classify by keyword instead of hardcoding unit names.
+const BEVERAGE_UNIT_RE = /bar|barista|beverage|drink|juice|coffee|tea|soft/;
+const isBeverageUnit = (unit: string) => BEVERAGE_UNIT_RE.test(unit);
 
 const startOfLocalDay = (d: Date) => {
   const x = new Date(d);
@@ -194,14 +200,31 @@ export default function PaymentsItemsPage() {
   }, [filteredOrders, getItemDepartment, unitFilter]);
 
   const counts = useMemo(() => {
-    const foodQty = itemsRows
-      .filter((r) => r.unit === "cafe" || r.unit === "restaurant")
-      .reduce((sum, r) => sum + (r.qtySold || 0), 0);
-    const softQty = itemsRows
-      .filter((r) => r.unit === "barista")
-      .reduce((sum, r) => sum + (r.qtySold || 0), 0);
-    return { foodQty, softQty };
+    let foodQty = 0;
+    let softQty = 0;
+    let totalRevenue = 0;
+    for (const r of itemsRows) {
+      if (isBeverageUnit(r.unit)) softQty += r.qtySold || 0;
+      else foodQty += r.qtySold || 0;
+      totalRevenue += r.revenue || 0;
+    }
+    return {
+      foodQty,
+      softQty,
+      totalRevenue: Math.round((totalRevenue + Number.EPSILON) * 100) / 100,
+    };
   }, [itemsRows]);
+
+  // Unit-filter pills are driven by the branch's actual menu main categories
+  // rather than a fixed cafe/restaurant/barista list, which varies per tenant.
+  const unitFilters = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of menuItems) {
+      const mc = String(it?.main_category || "").trim().toLowerCase();
+      if (mc) set.add(mc);
+    }
+    return ["all", ...Array.from(set).sort()];
+  }, [menuItems]);
 
   const viewingLabel = useMemo(() => {
     if (timeFilter === "all") return "All";
@@ -303,7 +326,7 @@ export default function PaymentsItemsPage() {
               )}
 
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {UNIT_FILTERS.map((unit) => (
+                {unitFilters.map((unit) => (
                   <Badge
                     key={unit}
                     onClick={() => setUnitFilter(unit)}
@@ -317,7 +340,7 @@ export default function PaymentsItemsPage() {
           </Card>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardContent className="flex items-center justify-between pt-6">
                 <div>
@@ -325,7 +348,7 @@ export default function PaymentsItemsPage() {
                     Total Food Items Sold
                   </p>
                   <p className="text-2xl font-extrabold">{counts.foodQty.toLocaleString()}</p>
-                  <p className="text-muted-foreground text-xs">Cafe & Restaurant aggregations</p>
+                  <p className="text-muted-foreground text-xs">Food category aggregations</p>
                 </div>
                 <Coffee className="text-success size-6" />
               </CardContent>
@@ -337,9 +360,21 @@ export default function PaymentsItemsPage() {
                     Total Beverages Sold
                   </p>
                   <p className="text-2xl font-extrabold">{counts.softQty.toLocaleString()}</p>
-                  <p className="text-muted-foreground text-xs">Barista beverage orders count</p>
+                  <p className="text-muted-foreground text-xs">Drink category aggregations</p>
                 </div>
                 <TrendingUp className="text-primary size-6" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center justify-between pt-6">
+                <div>
+                  <p className="text-muted-foreground text-xs font-bold uppercase tracking-wide">
+                    Total Cost
+                  </p>
+                  <p className="text-2xl font-extrabold">{birr(counts.totalRevenue)}</p>
+                  <p className="text-muted-foreground text-xs">Accumulated value of items sold</p>
+                </div>
+                <Coins className="text-warning size-6" />
               </CardContent>
             </Card>
           </div>

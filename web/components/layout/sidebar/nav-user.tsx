@@ -20,7 +20,7 @@ import {
 import Link from "next/link";
 import { LogOutIcon, UserIcon } from "lucide-react";
 import { DotsVerticalIcon } from "@radix-ui/react-icons";
-import { getUser, logout, type SessionUser } from "@/lib/auth";
+import { getUser, logout, roleLabel, type SessionUser } from "@/lib/auth";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -53,7 +53,7 @@ export function NavUser() {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{name}</span>
                 <span className="text-muted-foreground truncate text-xs">
-                  {user?.role === "super_admin" ? "Platform Admin" : user?.role}
+                  {roleLabel(user?.role)}
                 </span>
               </div>
               <DotsVerticalIcon className="ml-auto size-4" />
