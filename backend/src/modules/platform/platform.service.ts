@@ -33,9 +33,16 @@ interface AuditInput {
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
 
 // Roles a super admin may provision under a business. Branch-scoped roles must
-// be pinned to a branch; business-wide roles (owner/admin) carry no branch.
-const BRANCH_SCOPED_ROLES = ["cashier", "kitchen_staff", "cafe_waiter"] as const;
-const BUSINESS_WIDE_ROLES = ["owner", "business_admin", "admin"] as const;
+// be pinned to a branch; business-wide roles (owner/business_admin) carry no
+// branch. Branch admins are pinned to a single branch (see users.table.ts) and
+// sign in to the web dashboard scoped to that branch alone.
+const BRANCH_SCOPED_ROLES = [
+  "admin",
+  "cashier",
+  "kitchen_staff",
+  "cafe_waiter",
+] as const;
+const BUSINESS_WIDE_ROLES = ["owner", "business_admin"] as const;
 const ASSIGNABLE_ROLES = [
   ...BUSINESS_WIDE_ROLES,
   ...BRANCH_SCOPED_ROLES,

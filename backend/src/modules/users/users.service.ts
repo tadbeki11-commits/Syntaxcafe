@@ -174,6 +174,8 @@ export class UsersService {
     // from the platform portal with no branch context, so neither lookup above
     // finds them. Their username is unique platform-wide (enforced on create and
     // by users_fb_manager_username_idx), so resolve them by username alone.
+    // (Branch admins also branch-pinned, but they enroll a device first — the
+    // x-device-token sets the branch so the scoped lookup above finds them.)
     const [fbManager] = await db
       .select()
       .from(users)
