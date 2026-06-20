@@ -28,6 +28,7 @@ export function middleware(req: NextRequest) {
     wpToken &&
     (pathname === "/" ||
       pathname === "/login" ||
+      pathname === "/branch" ||
       pathname.startsWith("/dashboard"))
   ) {
     return redirectTo("/waiter");
@@ -42,9 +43,16 @@ export function middleware(req: NextRequest) {
     return redirectTo("/dashboard/overview");
   }
 
+  // A signed-in operator who revisits the branch login goes straight to their
+  // dashboard (branch admins land on /home; the page itself sends F&B managers
+  // to /fb on fresh login).
+  if (pathname === "/branch" && paToken) {
+    return redirectTo("/dashboard/home");
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*", "/login"],
+  matcher: ["/", "/dashboard/:path*", "/login", "/branch"],
 };

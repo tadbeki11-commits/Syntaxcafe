@@ -27,9 +27,13 @@ export const useWaiterData = (userId?: string | number) => {
   useEffect(() => {
     if (!userId) return;
 
+    // Only the initial load shows the skeleton; subsequent polls refresh data
+    // silently so the dashboard doesn't flash back to a loading state every 10s.
+    let isFirst = true;
+
     const fetchData = async () => {
       try {
-        setLoading(true);
+        if (isFirst) setLoading(true);
         const [menuResult, myOrdersResult, attendanceResult] =
           (await Promise.allSettled([
             api.menu.getCafeMenu(),
@@ -109,7 +113,10 @@ export const useWaiterData = (userId?: string | number) => {
       } catch (error) {
         console.error("Error fetching waiter dashboard data:", error);
       } finally {
-        setLoading(false);
+        if (isFirst) {
+          setLoading(false);
+          isFirst = false;
+        }
       }
     };
 

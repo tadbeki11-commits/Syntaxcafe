@@ -23,12 +23,29 @@ export function setBranchId(id: string) {
   document.cookie = `pa_branch=${encodeURIComponent(id)}; path=/; max-age=${30 * 24 * 3600}; samesite=lax`;
 }
 
+// The enrolled device token, read straight from localStorage to avoid a circular
+// import with lib/device.ts (which owns enrollment and imports API_BASE here).
+// Keep the storage key in sync with lib/device.ts.
+function getDeviceToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return JSON.parse(localStorage.getItem("pa_device") || "null")?.token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function apiFetch<T = any>(
   path: string,
   opts: RequestInit = {},
 ): Promise<T> {
   const token = getToken();
   const branchId = getBranchId();
+  // Branch admins enroll this device (see lib/device.ts); the device token pins
+  // every request — including the unauthenticated /auth/login — to the enrolled
+  // branch, so login can resolve a branch-scoped admin by username. Owners /
+  // platform admins never enroll, so this header is simply absent for them.
+  const deviceToken = getDeviceToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...opts,
     headers: {
@@ -37,6 +54,7 @@ export async function apiFetch<T = any>(
       "X-App-Client": "tauri-pos-app",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(branchId ? { "X-Branch-Id": branchId } : {}),
+      ...(deviceToken ? { "x-device-token": deviceToken } : {}),
       ...(opts.headers || {}),
     },
   });

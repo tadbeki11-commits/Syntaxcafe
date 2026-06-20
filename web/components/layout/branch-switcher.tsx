@@ -25,10 +25,15 @@ export function BranchSwitcher() {
   useEffect(() => {
     const user = getUser();
     setRole(user?.role);
-    // Only owners switch branches. Super admins use the platform nav, and an
-    // F&B manager is pinned to one branch by their JWT (the backend ignores
-    // x-branch-id for branch scope), so neither needs a switcher.
-    if (!user || user.role === "super_admin" || user.role === "fb_manager")
+    // Only owners switch branches. Super admins use the platform nav, while
+    // F&B managers and branch admins are pinned to one branch by their JWT (the
+    // backend ignores x-branch-id for branch scope), so none need a switcher.
+    if (
+      !user ||
+      user.role === "super_admin" ||
+      user.role === "fb_manager" ||
+      user.role === "admin"
+    )
       return;
 
     apiFetch<Branch[]>("/branches")

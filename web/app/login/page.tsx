@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -47,9 +48,7 @@ export default function LoginPage() {
       router.push(
         user.role === "super_admin"
           ? "/dashboard/overview"
-          : user.role === "fb_manager"
-            ? "/dashboard/fb"
-            : "/dashboard/home",
+          : "/dashboard/home",
       );
     } catch (err: any) {
       toast.error(err.message || "Login failed");
@@ -191,6 +190,16 @@ export default function LoginPage() {
               {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Branch admin or F&amp;B manager?{" "}
+            <Link
+              href="/branch"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Sign in here
+            </Link>
+          </p>
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
             Protected area · Authorized personnel only
