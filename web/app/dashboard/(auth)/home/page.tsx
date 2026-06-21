@@ -45,8 +45,8 @@ export default function HomePage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateFrom, setDateFrom] = useState(() => todayRange().from);
-  const [dateTo, setDateTo] = useState(() => todayRange().to);
+  const [dateFrom, setDateFrom] = useState(() => monthRange().from);
+  const [dateTo, setDateTo] = useState(() => monthRange().to);
 
   useEffect(() => {
     Promise.all([
@@ -84,6 +84,11 @@ export default function HomePage() {
     setDateTo(range.to);
   };
 
+  const today = todayRange();
+  const month = monthRange();
+  const isToday = dateFrom === today.from && dateTo === today.to;
+  const isMonth = dateFrom === month.from && dateTo === month.to;
+
   const todayCards = [
     {
       label: "Revenue",
@@ -120,38 +125,43 @@ export default function HomePage() {
       <PageHeader
         title="Dashboard"
         description="A snapshot of the selected branch."
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPreset(todayRange())}>
-              Today
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPreset(monthRange())}>
-              This month
-            </Button>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className={inputCls}
-              aria-label="From date"
-            />
-            <span className="text-muted-foreground text-sm">to</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className={inputCls}
-              aria-label="To date"
-            />
-          </div>
-        }
       />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
+          <Button
+            variant={isToday ? "default" : "outline"}
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => setPreset(todayRange())}>
+            Today
+          </Button>
+          <Button
+            variant={isMonth ? "default" : "outline"}
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => setPreset(monthRange())}>
+            This month
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className={`${inputCls} w-full sm:w-auto`}
+            aria-label="From date"
+          />
+          <span className="text-muted-foreground text-sm">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className={`${inputCls} w-full sm:w-auto`}
+            aria-label="To date"
+          />
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {todayCards.map((c) => (
