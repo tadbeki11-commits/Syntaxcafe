@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   ChevronRightIcon,
+  DatabaseIcon,
   MonitorSmartphoneIcon,
   ShieldIcon,
   SlidersHorizontalIcon,
@@ -57,6 +58,12 @@ const SECTIONS: SettingLink[] = [
     description: "Devices enrolled to this branch and their status.",
     href: "/dashboard/settings/devices",
     icon: MonitorSmartphoneIcon,
+  },
+  {
+    title: "Data Management",
+    description: "Permanently delete orders and payments for the selected branch.",
+    href: "/dashboard/settings/data-management",
+    icon: DatabaseIcon,
   },
 ];
 

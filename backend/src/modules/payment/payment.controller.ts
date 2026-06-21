@@ -1,15 +1,15 @@
-import { Controller, Post, Body, Get, Param, Put } from "@nestjs/common";
+import { Controller, Post, Body, Get, Param, Put, Query } from "@nestjs/common";
 import {
   ApiBody,
   ApiOperation,
   ApiOkResponse,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
 import { PaymentService } from "./payment.service";
 import {
   PaymentQrResponseDto,
-  PaymentHistoryFiltersDto,
   PaymentRequestDto,
   PaymentResponseDto,
   PaymentStatusUpdateDto,
@@ -43,13 +43,33 @@ export class PaymentController {
     return { status: "success", data: { payments, count: payments.length } };
   }
 
-  @ApiOperation({ summary: "Get payment history" })
-  @ApiBody({ type: PaymentHistoryFiltersDto })
+  @ApiOperation({ summary: "Get payment history (paginated, date-windowed)" })
+  @ApiQuery({ name: "status", required: false })
+  @ApiQuery({ name: "payment_method", required: false })
+  @ApiQuery({ name: "processed_by", required: false })
+  @ApiQuery({ name: "date_from", required: false })
+  @ApiQuery({ name: "date_to", required: false })
+  @ApiQuery({ name: "search", required: false })
+  @ApiQuery({ name: "page", required: false, description: "1-based page number" })
+  @ApiQuery({ name: "limit", required: false, description: "Page size (max 100)" })
   @ApiOkResponse({ type: PaymentsResponseDto })
   @Get("history")
-  async getPaymentHistory(@Body() body: PaymentHistoryFiltersDto) {
-    const payments = await this.paymentService.getPaymentHistory(body || {});
-    return { status: "success", data: { payments, count: payments.length } };
+  async getPaymentHistory(@Query() query: any) {
+    const filters: any = {};
+    [
+      "status",
+      "payment_method",
+      "processed_by",
+      "date_from",
+      "date_to",
+      "search",
+      "page",
+      "limit",
+    ].forEach((k) => {
+      if (query[k]) filters[k] = query[k];
+    });
+    const result = await this.paymentService.getPaymentHistory(filters);
+    return { status: "success", data: result };
   }
 
   @ApiOperation({ summary: "Create a payment and generate a QR code" })

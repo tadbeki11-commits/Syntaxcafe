@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../../db/drizzle";
 import { menuItems } from "../../db/tables/menu-items.table";
 import { order_items } from "../../db/tables/order-items.table";
@@ -626,15 +626,185 @@ export class OrderService {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(orders.created_at));
 
-    const ordersWithItems = [] as any[];
+    // Batch-load every order's items in a single query and group in memory,
+    // instead of one query per order (an N+1 that made this endpoint scale
+    // linearly with the number of orders).
+    const itemsByOrder = await this.loadItemsForOrders(
+      rows.map((r) => r.order.id),
+    );
+
+    return rows.map((row) =>
+      this.toOrderResponse(
+        row.order,
+        row.employee,
+        itemsByOrder.get(row.order.id) ?? [],
+      ),
+    );
+  }
+
+  /**
+   * Load order_items for many orders at once and bucket them by order_id.
+   * Replaces per-order loadOrderItems calls in list endpoints.
+   */
+  private async loadItemsForOrders(
+    orderIds: string[],
+  ): Promise<Map<string, any[]>> {
+    const byOrder = new Map<string, any[]>();
+    if (orderIds.length === 0) return byOrder;
+
+    const rows = await db
+      .select({
+        item: order_items,
+        menu: menuItems,
+      })
+      .from(order_items)
+      .leftJoin(menuItems, eq(order_items.menu_item_id, menuItems.id))
+      .where(inArray(order_items.order_id, orderIds))
+      .orderBy(asc(order_items.id));
+
     for (const row of rows) {
-      const items = await this.loadOrderItems(row.order.id);
-      ordersWithItems.push(
-        this.toOrderResponse(row.order, row.employee, items),
-      );
+      const mapped = {
+        ...row.item,
+        menu_item_name: row.menu?.name,
+        name: row.menu?.name ?? (row.item as any)?.name,
+        main_category:
+          row.item?.main_category ??
+          row.menu?.main_category ??
+          (row.menu as any)?.category,
+      };
+      const list = byOrder.get(row.item.order_id);
+      if (list) list.push(mapped);
+      else byOrder.set(row.item.order_id, [mapped]);
     }
 
-    return ordersWithItems;
+    return byOrder;
+  }
+
+  /**
+   * Expand a filter value into a Date. A bare yyyy-mm-dd is treated as a local
+   * day boundary (start or end) so a single-day "to" still includes that day.
+   */
+  private parseDateBound(value: string, end: boolean): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(`${value}T${end ? "23:59:59.999" : "00:00:00.000"}`);
+    }
+    return new Date(value);
+  }
+
+  /**
+   * Paginated, date-windowed order list for the dashboard. Returns the page of
+   * rows plus the total matching count and summary stats computed server-side
+   * over the *whole* window (not just the page) so the stat cards stay correct.
+   *
+   * Pagination and the default date window are opt-in: a caller that passes
+   * neither `page`/`limit` nor an explicit date range gets the full unwindowed
+   * history (the behaviour the heavier aggregation pages still rely on).
+   */
+  async findAllPaged(filters: any) {
+    const branchId = requireBranchId();
+    const paginate = filters.page != null || filters.limit != null;
+    const hasExplicitDates = filters.date_from != null || filters.date_to != null;
+
+    const conditions = [eq(orders.branch_id, branchId)] as any[];
+
+    // Default to a 30-day window only when paginating without explicit dates,
+    // so the dashboard list never scans the whole history on first paint.
+    let from: Date | null = null;
+    let to: Date | null = null;
+    if (hasExplicitDates || paginate) {
+      to = filters.date_to ? this.parseDateBound(filters.date_to, true) : new Date();
+      from = filters.date_from
+        ? this.parseDateBound(filters.date_from, false)
+        : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+      conditions.push(gte(orders.created_at, from));
+      conditions.push(lte(orders.created_at, to));
+    }
+
+    if (filters.status) conditions.push(eq(orders.status, filters.status));
+    if (filters.type) conditions.push(eq(orders.type, filters.type));
+    if (filters.employee_id)
+      conditions.push(eq(orders.employee_id, filters.employee_id));
+    if (filters.table_number)
+      conditions.push(eq(orders.table_number, filters.table_number));
+    if (filters.paid === "paid")
+      conditions.push(
+        sql`(${orders.payment_status} = 'paid' or ${orders.status} = 'paid')`,
+      );
+    else if (filters.paid === "unpaid")
+      conditions.push(
+        sql`not (${orders.payment_status} = 'paid' or ${orders.status} = 'paid')`,
+      );
+
+    const search = String(filters.search ?? "").trim().toLowerCase();
+    if (search) {
+      const like = `%${search}%`;
+      conditions.push(sql`(
+        lower(coalesce(${orders.status}, '')) like ${like}
+        or lower(coalesce(${orders.type}, '')) like ${like}
+        or lower(coalesce(${orders.payment_status}, '')) like ${like}
+        or cast(${orders.order_number} as text) like ${like}
+        or lower(
+          coalesce(${users.first_name}, '') || ' ' || coalesce(${users.last_name}, '')
+        ) like ${like}
+      )`);
+    }
+
+    const where = and(...conditions);
+    const paid = sql`(${orders.payment_status} = 'paid' or ${orders.status} = 'paid')`;
+    const notVoided = sql`${orders.status} not in ('cancelled', 'voided', 'refunded')`;
+
+    const [agg] = await db
+      .select({
+        total: count(),
+        collected: sql<number>`coalesce(sum(case when ${notVoided} and ${paid} then coalesce(${orders.total_amount}, 0) else 0 end), 0)`,
+        outstanding: sql<number>`coalesce(sum(case when ${notVoided} and not ${paid} then coalesce(${orders.total_amount}, 0) else 0 end), 0)`,
+        pending: sql<number>`count(*) filter (where ${orders.status} = 'pending')`,
+      })
+      .from(orders)
+      .leftJoin(users, eq(orders.employee_id, users.id))
+      .where(where);
+
+    const limit = Math.min(Math.max(Number(filters.limit) || 25, 1), 100);
+    const page = Math.max(Number(filters.page) || 1, 1);
+
+    const baseQuery = db
+      .select({ order: orders, employee: users })
+      .from(orders)
+      .leftJoin(users, eq(orders.employee_id, users.id))
+      .where(where)
+      .orderBy(desc(orders.created_at));
+
+    const rows = paginate
+      ? await baseQuery.limit(limit).offset((page - 1) * limit)
+      : await baseQuery;
+
+    const itemsByOrder = await this.loadItemsForOrders(
+      rows.map((r) => r.order.id),
+    );
+    const list = rows.map((row) =>
+      this.toOrderResponse(
+        row.order,
+        row.employee,
+        itemsByOrder.get(row.order.id) ?? [],
+      ),
+    );
+
+    return {
+      orders: list,
+      count: Number(agg?.total ?? 0),
+      page: paginate ? page : 1,
+      limit: paginate ? limit : Number(agg?.total ?? 0),
+      window:
+        from && to
+          ? { from: from.toISOString(), to: to.toISOString() }
+          : null,
+      stats: {
+        total_orders: Number(agg?.total ?? 0),
+        collected: Number(agg?.collected ?? 0),
+        outstanding: Number(agg?.outstanding ?? 0),
+        pending: Number(agg?.pending ?? 0),
+      },
+    };
   }
 
   async updateStatus(id: string, status: string, updatedBy?: any) {
@@ -722,14 +892,16 @@ export class OrderService {
       .where(and(...conditions))
       .orderBy(asc(orders.created_at));
 
-    const ordersWithItems = [] as any[];
-    for (const row of rows) {
-      const items = await this.loadOrderItems(row.order.id);
-      ordersWithItems.push(
-        this.toOrderResponse(row.order, row.employee, items),
-      );
-    }
-    return ordersWithItems;
+    const itemsByOrder = await this.loadItemsForOrders(
+      rows.map((r) => r.order.id),
+    );
+    return rows.map((row) =>
+      this.toOrderResponse(
+        row.order,
+        row.employee,
+        itemsByOrder.get(row.order.id) ?? [],
+      ),
+    );
   }
 
   async getReadyOrders(type?: string) {
@@ -749,14 +921,16 @@ export class OrderService {
       .where(and(...conditions))
       .orderBy(asc(orders.updated_at));
 
-    const ordersWithItems = [] as any[];
-    for (const row of rows) {
-      const items = await this.loadOrderItems(row.order.id);
-      ordersWithItems.push(
-        this.toOrderResponse(row.order, row.employee, items),
-      );
-    }
-    return ordersWithItems;
+    const itemsByOrder = await this.loadItemsForOrders(
+      rows.map((r) => r.order.id),
+    );
+    return rows.map((row) =>
+      this.toOrderResponse(
+        row.order,
+        row.employee,
+        itemsByOrder.get(row.order.id) ?? [],
+      ),
+    );
   }
 
   async createCafeOrder(data: any) {

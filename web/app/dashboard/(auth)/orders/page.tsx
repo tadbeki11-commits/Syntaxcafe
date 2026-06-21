@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { EyeIcon, PlusIcon } from "lucide-react";
+import {
+  EyeIcon,
+  PlusIcon,
+  ReceiptTextIcon,
+  TrendingUpIcon,
+  ClockIcon,
+  HourglassIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { StatCards, type StatCard } from "@/components/stat-cards";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -49,8 +57,12 @@ type Order = {
   items?: OrderItem[];
 };
 
+const PAGE_SIZE = 25;
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [count, setCount] = useState(0);
+  const [serverStats, setServerStats] = useState<Record<string, number>>({});
   const [methods, setMethods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState<Order | null>(null);
@@ -59,19 +71,52 @@ export default function OrdersPage() {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
 
-  function reload() {
+  // Server-driven query state.
+  const [page, setPage] = useState(0); // 0-based
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [paid, setPaid] = useState("");
+  const [dateFrom, setDateFrom] = useState<string | undefined>();
+  const [dateTo, setDateTo] = useState<string | undefined>();
+
+  // Debounce the search box so we don't refetch on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const reload = useCallback(() => {
     setLoading(true);
-    return Promise.all([Orders.list(), Settings.paymentMethods().catch(() => [])])
-      .then(([o, m]) => {
-        setOrders(o);
+    const params: Record<string, any> = {
+      page: page + 1,
+      limit: PAGE_SIZE,
+    };
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (status) params.status = status;
+    if (paid) params.paid = paid;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    return Promise.all([
+      Orders.page<Order>(params),
+      Settings.paymentMethods().catch(() => []),
+    ])
+      .then(([res, m]) => {
+        setOrders(res.rows);
+        setCount(res.count);
+        setServerStats(res.stats);
         setMethods(m);
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
-  }
+  }, [page, debouncedSearch, status, paid, dateFrom, dateTo]);
+
   useEffect(() => {
     reload();
-  }, []);
+  }, [reload]);
 
   function openPay(o: Order) {
     setPaying(o);
@@ -102,6 +147,39 @@ export default function OrdersPage() {
   }
 
   const isPaid = (o: Order) => o.payment_status === "paid" || o.status === "paid";
+
+  // Stats are computed server-side over the whole filtered window, not just the
+  // current page, so they stay correct under pagination.
+  const statCards: StatCard[] = useMemo(
+    () => [
+      {
+        label: "Total orders",
+        value: serverStats.total_orders ?? 0,
+        icon: ReceiptTextIcon,
+      },
+      {
+        label: "Revenue collected",
+        value: birr(serverStats.collected ?? 0),
+        hint: "Paid orders",
+        icon: TrendingUpIcon,
+        valueClass: "text-emerald-600 dark:text-emerald-500",
+      },
+      {
+        label: "Outstanding",
+        value: birr(serverStats.outstanding ?? 0),
+        hint: "Unpaid orders",
+        icon: ClockIcon,
+        valueClass: "text-amber-600 dark:text-amber-500",
+      },
+      {
+        label: "Pending",
+        value: serverStats.pending ?? 0,
+        hint: "Awaiting completion",
+        icon: HourglassIcon,
+      },
+    ],
+    [serverStats],
+  );
 
   const columns: Column<Order>[] = [
     {
@@ -177,13 +255,31 @@ export default function OrdersPage() {
         }
       />
 
+      <StatCards cards={statCards} loading={loading} />
+
       <DataTable<Order>
         columns={columns}
         rows={orders}
         loading={loading}
-        searchKeys={["id", "type", "status", "payment_status", "employee_name"]}
         searchPlaceholder="Search orders…"
         emptyMessage="No orders yet. Create your first order."
+        server={{
+          total: count,
+          page,
+          pageSize: PAGE_SIZE,
+          onPageChange: setPage,
+          onSearchChange: setSearch,
+          onFilterChange: (key, value) => {
+            setPage(0);
+            if (key === "status") setStatus(value);
+            else if (key === "payment") setPaid(value);
+          },
+          onRangeChange: (_key, range) => {
+            setPage(0);
+            setDateFrom(range.from);
+            setDateTo(range.to);
+          },
+        }}
         filters={[
           {
             key: "status",

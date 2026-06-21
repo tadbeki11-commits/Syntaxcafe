@@ -347,13 +347,13 @@ export class UsersService {
       .from(users)
       .where(
         and(
-          eq(users.branch_id, requireBranchId()),
+          eq(users.business_id, requireBusinessId()),
           eq(users.username, username),
         ),
       )
       .limit(1);
     if (existingUser.length > 0) {
-      throw new Error("Username already exists");
+      throw new Error("Username already exists in this business");
     }
 
     // F&B managers log in from the platform portal with no branch context, so

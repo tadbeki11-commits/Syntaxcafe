@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../db/drizzle";
 import { order_items } from "../../db/tables/order-items.table";
 import { orders } from "../../db/tables/orders.table";
@@ -239,6 +239,18 @@ export class PaymentService {
     }));
   }
 
+  private parseDateBound(value: string, end: boolean): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(`${value}T${end ? "23:59:59.999" : "00:00:00.000"}`);
+    }
+    return new Date(value);
+  }
+
+  /**
+   * Paginated, date-windowed payment history for the dashboard. Returns the page
+   * of rows plus the total count and summary stats computed server-side over the
+   * whole window so the stat cards stay correct without loading every payment.
+   */
   async getPaymentHistory(filters: any) {
     // Use paid_at (when the money was actually taken) rather than created_at.
     // For payments synced from an offline client, created_at defaults to the
@@ -248,18 +260,61 @@ export class PaymentService {
     // that predate paid_at being populated.
     const paidTimestamp = sql`coalesce(${payments.paid_at}, ${payments.created_at})`;
 
+    // Pagination and the default 30-day window are opt-in: a caller that passes
+    // neither page/limit nor an explicit date range gets the full history (which
+    // the dashboard summary / reports pages still aggregate client-side).
+    const paginate = filters.page != null || filters.limit != null;
+    const hasExplicitDates =
+      filters.date_from != null || filters.date_to != null;
+
     const conditions = [eq(payments.branch_id, requireBranchId())] as any[];
+
+    let from: Date | null = null;
+    let to: Date | null = null;
+    if (hasExplicitDates || paginate) {
+      to = filters.date_to
+        ? this.parseDateBound(filters.date_to, true)
+        : new Date();
+      from = filters.date_from
+        ? this.parseDateBound(filters.date_from, false)
+        : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+      conditions.push(gte(paidTimestamp, from));
+      conditions.push(lte(paidTimestamp, to));
+    }
+
     if (filters.status) conditions.push(eq(payments.status, filters.status));
     if (filters.payment_method)
       conditions.push(eq(payments.payment_method, filters.payment_method));
     if (filters.processed_by)
       conditions.push(eq(payments.processed_by, filters.processed_by));
-    if (filters.date_from)
-      conditions.push(gte(paidTimestamp, new Date(filters.date_from)));
-    if (filters.date_to)
-      conditions.push(lte(paidTimestamp, new Date(filters.date_to)));
 
-    const rows = await db
+    const search = String(filters.search ?? "").trim().toLowerCase();
+    if (search) {
+      const like = `%${search}%`;
+      conditions.push(sql`(
+        lower(coalesce(${payments.payment_method}, '')) like ${like}
+        or lower(coalesce(${payments.status}, '')) like ${like}
+        or cast(${payments.id} as text) like ${like}
+      )`);
+    }
+
+    const where = and(...conditions);
+    const isPaid = sql`lower(coalesce(${payments.status}, '')) = 'paid'`;
+
+    const [agg] = await db
+      .select({
+        total: count(),
+        collected: sql<number>`coalesce(sum(case when ${isPaid} then coalesce(${payments.amount}, 0) else 0 end), 0)`,
+        paid_count: sql<number>`count(*) filter (where ${isPaid})`,
+        pending: sql<number>`count(*) filter (where lower(coalesce(${payments.status}, '')) = 'pending')`,
+      })
+      .from(payments)
+      .where(where);
+
+    const limit = Math.min(Math.max(Number(filters.limit) || 25, 1), 100);
+    const page = Math.max(Number(filters.page) || 1, 1);
+
+    const baseQuery = db
       .select({
         payment: payments,
         order: orders,
@@ -268,16 +323,41 @@ export class PaymentService {
       .from(payments)
       .innerJoin(orders, eq(payments.order_id, orders.id))
       .leftJoin(users, eq(payments.processed_by, users.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(where)
       .orderBy(desc(paidTimestamp));
 
-    return rows.map((row: any) => ({
+    const rows = paginate
+      ? await baseQuery.limit(limit).offset((page - 1) * limit)
+      : await baseQuery;
+
+    const list = rows.map((row: any) => ({
       ...row.payment,
       customer_id: row.order.customer_id,
       order_type: row.order.type,
       table_number: row.order.table_number,
       processed_by_name: this.formatEmployeeName(row.user),
     }));
+
+    const collected = Number(agg?.collected ?? 0);
+    const paidCount = Number(agg?.paid_count ?? 0);
+
+    return {
+      payments: list,
+      count: Number(agg?.total ?? 0),
+      page: paginate ? page : 1,
+      limit: paginate ? limit : Number(agg?.total ?? 0),
+      window:
+        from && to
+          ? { from: from.toISOString(), to: to.toISOString() }
+          : null,
+      stats: {
+        total_payments: Number(agg?.total ?? 0),
+        collected,
+        paid_count: paidCount,
+        pending: Number(agg?.pending ?? 0),
+        avg: paidCount > 0 ? collected / paidCount : 0,
+      },
+    };
   }
 
   async createWithQR(body: any) {

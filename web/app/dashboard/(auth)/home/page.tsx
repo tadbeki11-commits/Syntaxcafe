@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   UtensilsCrossedIcon,
   BoxesIcon,
@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,15 +27,26 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Menu, Inventory, Tables, Orders, Payments } from "@/lib/resources";
 import { birr, shortDate } from "@/lib/format";
-import { salesSplit, todayRange, rangeBounds, type SalesSplit } from "@/lib/profit";
+import { salesSplit, todayRange, monthRange, rangeBounds } from "@/lib/profit";
 
-const EMPTY_SALES: SalesSplit = { paid: 0, unpaid: 0, total: 0 };
+const inputCls = "border-input bg-background h-9 rounded-md border px-3 text-sm";
+
+const withinRange = (value: any, fromDt: Date | null, toDt: Date | null) => {
+  if (!fromDt && !toDt) return true;
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return false;
+  if (fromDt && dt < fromDt) return false;
+  if (toDt && dt > toDt) return false;
+  return true;
+};
 
 export default function HomePage() {
   const [stats, setStats] = useState({ menu: 0, inventory: 0, tables: 0, orders: 0 });
-  const [today, setToday] = useState<SalesSplit>(EMPTY_SALES);
-  const [recent, setRecent] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState(() => todayRange().from);
+  const [dateTo, setDateTo] = useState(() => todayRange().to);
 
   useEffect(() => {
     Promise.all([
@@ -44,40 +56,52 @@ export default function HomePage() {
       Orders.list().catch(() => []),
       Payments.history().catch(() => []),
     ])
-      .then(([menu, inv, tables, orders, payments]) => {
+      .then(([menu, inv, tables, ords, pays]) => {
         setStats({
           menu: menu.length,
           inventory: inv.length,
           tables: tables.length,
-          orders: orders.length,
+          orders: ords.length,
         });
-        const { from, to } = todayRange();
-        const { fromDt, toDt } = rangeBounds(from, to);
-        setToday(salesSplit(orders, payments, fromDt, toDt));
-        setRecent(orders.slice(0, 8));
+        setOrders(Array.isArray(ords) ? ords : []);
+        setPayments(Array.isArray(pays) ? pays : []);
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
   }, []);
 
+  const { sales, recent } = useMemo(() => {
+    const { fromDt, toDt } = rangeBounds(dateFrom, dateTo);
+    const inRange = orders.filter((o) => withinRange(o?.created_at, fromDt, toDt));
+    return {
+      sales: salesSplit(orders, payments, fromDt, toDt),
+      recent: inRange.slice(0, 8),
+    };
+  }, [orders, payments, dateFrom, dateTo]);
+
+  const setPreset = (range: { from: string; to: string }) => {
+    setDateFrom(range.from);
+    setDateTo(range.to);
+  };
+
   const todayCards = [
     {
-      label: "Today's revenue",
-      value: today.paid,
+      label: "Revenue",
+      value: sales.paid,
       hint: "Collected",
       icon: TrendingUpIcon,
       valueClass: "text-emerald-600 dark:text-emerald-500",
     },
     {
       label: "Unpaid sales",
-      value: today.unpaid,
+      value: sales.unpaid,
       hint: "Outstanding",
       icon: ClockIcon,
       valueClass: "text-amber-600 dark:text-amber-500",
     },
     {
       label: "Total sales",
-      value: today.total,
+      value: sales.total,
       hint: "Paid + unpaid",
       icon: WalletIcon,
       valueClass: "",
@@ -93,7 +117,41 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" description="A snapshot of the selected branch." />
+      <PageHeader
+        title="Dashboard"
+        description="A snapshot of the selected branch."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPreset(todayRange())}>
+              Today
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPreset(monthRange())}>
+              This month
+            </Button>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={inputCls}
+              aria-label="From date"
+            />
+            <span className="text-muted-foreground text-sm">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className={inputCls}
+              aria-label="To date"
+            />
+          </div>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {todayCards.map((c) => (
@@ -159,7 +217,7 @@ export default function HomePage() {
               {recent.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
-                    No orders yet.
+                    No orders in this range.
                   </TableCell>
                 </TableRow>
               ) : (

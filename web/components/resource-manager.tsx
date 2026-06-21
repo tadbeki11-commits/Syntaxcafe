@@ -53,6 +53,7 @@ export function ResourceManager<T extends { id: string }>({
   filters,
   dateFilters,
   pageSize,
+  stats,
 }: {
   title: string;
   description?: string;
@@ -70,6 +71,8 @@ export function ResourceManager<T extends { id: string }>({
   filters?: DataTableFilter<T>[];
   dateFilters?: DateRangeFilter<T>[];
   pageSize?: number;
+  /** Optional summary cards rendered between the header and the table. */
+  stats?: (rows: T[], loading: boolean) => React.ReactNode;
 }) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,6 +163,8 @@ export function ResourceManager<T extends { id: string }>({
           ) : undefined
         }
       />
+
+      {stats?.(rows, loading)}
 
       <DataTable<T>
         columns={columns}

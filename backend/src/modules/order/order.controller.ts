@@ -66,13 +66,16 @@ export class OrderController {
     };
   }
 
-  @ApiOperation({ summary: "List orders with optional filters" })
+  @ApiOperation({ summary: "List orders (paginated, date-windowed)" })
   @ApiQuery({ name: "status", required: false })
   @ApiQuery({ name: "type", required: false })
   @ApiQuery({ name: "employee_id", required: false })
   @ApiQuery({ name: "table_number", required: false })
   @ApiQuery({ name: "date_from", required: false })
   @ApiQuery({ name: "date_to", required: false })
+  @ApiQuery({ name: "search", required: false })
+  @ApiQuery({ name: "page", required: false, description: "1-based page number" })
+  @ApiQuery({ name: "limit", required: false, description: "Page size (max 100)" })
   @ApiOkResponse({ type: OrdersResponseDto })
   @Get()
   async getAllOrders(@Query() query: any) {
@@ -82,13 +85,17 @@ export class OrderController {
       "type",
       "employee_id",
       "table_number",
+      "paid",
       "date_from",
       "date_to",
+      "search",
+      "page",
+      "limit",
     ].forEach((k) => {
       if (query[k]) filters[k] = query[k];
     });
-    const orders = await this.orderService.findAll(filters);
-    return { status: "success", data: { orders, count: orders.length } };
+    const result = await this.orderService.findAllPaged(filters);
+    return { status: "success", data: result };
   }
 
   @ApiOperation({ summary: "Stream new order events" })

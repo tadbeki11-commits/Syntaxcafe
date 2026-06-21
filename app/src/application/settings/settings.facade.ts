@@ -15,7 +15,6 @@ export class SettingsFacade {
   updateCancelPassword = (password: string) =>
     this.adapter.updateCancelPassword(password);
   updatePrintCopies = (copies: number) => this.adapter.updatePrintCopies(copies);
-  cleanupData = () => this.adapter.cleanupData();
 
   createPaymentMethod = async (data: any) => {
     return this.adapter.createPaymentMethod(data as any);

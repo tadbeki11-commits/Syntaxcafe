@@ -40,6 +40,23 @@ export type DateRangeFilter<T> = {
   getDate: (row: T) => string | Date | null | undefined;
 };
 
+/**
+ * When provided, the table stops filtering/paginating in the browser and instead
+ * reports query/filter/range/page changes back to the parent, which is expected
+ * to refetch the matching page from the server. `rows` then holds only the
+ * current page and `total` the full server-side count.
+ */
+export type ServerMode = {
+  total: number;
+  /** 0-based current page. */
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onSearchChange?: (query: string) => void;
+  onFilterChange?: (key: string, value: string) => void;
+  onRangeChange?: (key: string, range: { from?: string; to?: string }) => void;
+};
+
 function textOf<T>(row: T, col: Column<T> | undefined, key: string): string {
   if (col?.searchValue) return col.searchValue(row);
   return String((row as Record<string, unknown>)[key] ?? "");
@@ -108,6 +125,7 @@ export function DataTable<T>({
   emptyMessage = "Nothing here yet.",
   rowActions,
   toolbar,
+  server,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -123,6 +141,8 @@ export function DataTable<T>({
   rowActions?: (row: T) => React.ReactNode;
   /** Extra controls rendered on the right side of the toolbar. */
   toolbar?: React.ReactNode;
+  /** Opt into server-driven search / filtering / pagination. */
+  server?: ServerMode;
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<Record<string, string>>({});
@@ -131,6 +151,8 @@ export function DataTable<T>({
   const [page, setPage] = useState(0);
 
   const filtered = useMemo(() => {
+    // In server mode the parent already returns the matching page; don't filter.
+    if (server) return rows;
     const q = query.trim().toLowerCase();
     return rows.filter((row) => {
       for (const f of filters ?? []) {
@@ -158,30 +180,45 @@ export function DataTable<T>({
         return textOf(row, col, k).toLowerCase().includes(q);
       });
     });
-  }, [rows, query, active, ranges, filters, dateFilters, searchKeys, columns]);
+  }, [server, rows, query, active, ranges, filters, dateFilters, searchKeys, columns]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const current = Math.min(page, pageCount - 1);
-  const paged = filtered.slice(current * pageSize, current * pageSize + pageSize);
+  const effPageSize = server ? server.pageSize : pageSize;
+  const totalCount = server ? server.total : filtered.length;
+  const pageCount = Math.max(1, Math.ceil(totalCount / effPageSize));
+  const current = server ? server.page : Math.min(page, pageCount - 1);
+  // Server mode already hands us just the current page; client mode slices.
+  const paged = server
+    ? filtered
+    : filtered.slice(current * pageSize, current * pageSize + pageSize);
   const colSpan = columns.length + (rowActions ? 1 : 0);
 
+  function goToPage(p: number) {
+    if (server) server.onPageChange(p);
+    else setPage(p);
+  }
   function onQuery(v: string) {
     setQuery(v);
     setPage(0);
+    server?.onSearchChange?.(v);
   }
   function onFilter(key: string, v: string) {
     setActive((prev) => ({ ...prev, [key]: v }));
     setPage(0);
+    server?.onFilterChange?.(key, v);
   }
   function onRange(key: string, bound: "from" | "to", v: string) {
-    setRanges((prev) => ({ ...prev, [key]: { ...prev[key], [bound]: v || undefined } }));
+    const next = { ...ranges[key], [bound]: v || undefined };
+    setRanges((prev) => ({ ...prev, [key]: next }));
     setPresets((prev) => ({ ...prev, [key]: "custom" }));
     setPage(0);
+    server?.onRangeChange?.(key, next);
   }
   function onPreset(key: string, preset: string) {
     setPresets((prev) => ({ ...prev, [key]: preset }));
-    setRanges((prev) => ({ ...prev, [key]: presetRange(preset) }));
+    const range = presetRange(preset);
+    setRanges((prev) => ({ ...prev, [key]: range }));
     setPage(0);
+    server?.onRangeChange?.(key, range);
   }
 
   return (
@@ -219,7 +256,11 @@ export function DataTable<T>({
                 className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
                 value={presets[f.key] ?? ""}
                 onChange={(e) => onPreset(f.key, e.target.value)}>
-                <option value="">{f.label}: All time</option>
+                {/* In server mode the empty default is the backend's rolling
+                    30-day window, not the entire history. */}
+                <option value="">
+                  {server ? `${f.label}: Last 30 days` : `${f.label}: All time`}
+                </option>
                 {DATE_PRESETS.map((p) => (
                   <option key={p.value} value={p.value}>
                     {p.label}
@@ -300,11 +341,12 @@ export function DataTable<T>({
         </Table>
       </CardContent>
 
-      {!loading && filtered.length > 0 && (
+      {!loading && totalCount > 0 && (
         <div className="text-muted-foreground flex items-center justify-between gap-3 border-t p-3 text-sm">
           <span>
-            Showing {current * pageSize + 1}–
-            {Math.min(filtered.length, (current + 1) * pageSize)} of {filtered.length}
+            Showing {current * effPageSize + 1}–
+            {Math.min(totalCount, current * effPageSize + paged.length)} of{" "}
+            {totalCount}
           </span>
           <div className="flex items-center gap-2">
             <span>
@@ -315,7 +357,7 @@ export function DataTable<T>({
               size="icon"
               className="size-8"
               disabled={current === 0}
-              onClick={() => setPage(current - 1)}>
+              onClick={() => goToPage(current - 1)}>
               <ChevronLeftIcon className="size-4" />
             </Button>
             <Button
@@ -323,7 +365,7 @@ export function DataTable<T>({
               size="icon"
               className="size-8"
               disabled={current >= pageCount - 1}
-              onClick={() => setPage(current + 1)}>
+              onClick={() => goToPage(current + 1)}>
               <ChevronRightIcon className="size-4" />
             </Button>
           </div>

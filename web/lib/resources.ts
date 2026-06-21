@@ -91,9 +91,29 @@ const qs = (params?: Record<string, any>) => {
   return "?" + entries.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 };
 
+export type Page<T> = {
+  rows: T[];
+  count: number;
+  page: number;
+  limit: number;
+  window: { from: string; to: string } | null;
+  stats: Record<string, number>;
+};
+
 export const Orders = {
   list: (params?: Record<string, any>) =>
     apiFetch(`/orders${qs(params)}`).then((d) => d.data.orders ?? []),
+  // Paginated + date-windowed list with server-computed stats. Pass page/limit
+  // (and optionally date_from/date_to/search) to opt into pagination.
+  page: <T = any>(params?: Record<string, any>): Promise<Page<T>> =>
+    apiFetch(`/orders${qs(params)}`).then((d) => ({
+      rows: d.data.orders ?? [],
+      count: d.data.count ?? 0,
+      page: d.data.page ?? 1,
+      limit: d.data.limit ?? 0,
+      window: d.data.window ?? null,
+      stats: d.data.stats ?? {},
+    })),
   get: (id: string) => apiFetch(`/orders/${id}`).then((d) => d.data.order),
   forPayment: () =>
     apiFetch("/orders/for-payment").then((d) => d.data.orders ?? []),
@@ -104,6 +124,16 @@ export const Orders = {
 
 export const Payments = {
   history: () => apiFetch("/payments/history").then((d) => d.data.payments ?? []),
+  // Paginated + date-windowed history with server-computed stats.
+  page: <T = any>(params?: Record<string, any>): Promise<Page<T>> =>
+    apiFetch(`/payments/history${qs(params)}`).then((d) => ({
+      rows: d.data.payments ?? [],
+      count: d.data.count ?? 0,
+      page: d.data.page ?? 1,
+      limit: d.data.limit ?? 0,
+      window: d.data.window ?? null,
+      stats: d.data.stats ?? {},
+    })),
   get: (id: string) => apiFetch(`/payments/${id}`).then((d) => d.data.payment),
   create: (b: any) => apiFetch("/payments", j(b)).then((d) => d.data.payment),
   confirm: (id: string, processed_by?: string) =>
@@ -156,6 +186,9 @@ export const Settings = {
     apiFetch("/settings/system/cancel-password", put({ cancel_password })).then(
       (d) => d.data,
     ),
+  // Permanently delete every order and payment for the selected branch
+  // (scoped server-side via x-branch-id). Irreversible.
+  cleanupData: () => apiFetch("/settings/cleanup-data", j({})),
 };
 
 export const Account = {

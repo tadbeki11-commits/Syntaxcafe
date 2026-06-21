@@ -7,12 +7,15 @@ import {
   timestamp,
   json,
   boolean,
+  index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.table";
 import { organizations } from "./organizations.table";
 import { tenantColumns } from "./_tenant";
 
-export const orders = pgTable("orders", {
+export const orders = pgTable(
+  "orders",
+  {
   id: uuid("id").primaryKey().defaultRandom(),
   ...tenantColumns(),
   // Human-friendly, ever-increasing serial scoped to the branch. Assigned on
@@ -43,4 +46,9 @@ export const orders = pgTable("orders", {
   meta: json("meta"),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
-});
+  },
+  (t) => [
+    index("orders_branch_id_idx").on(t.branch_id),
+    index("orders_branch_created_idx").on(t.branch_id, t.created_at),
+  ],
+);

@@ -469,11 +469,6 @@ export const settingsAdapter = {
     } as any;
   },
 
-  /** Cleanup all orders and payments (Admin only) */
-  cleanupData: async () => {
-    return api.post("/settings/cleanup-data");
-  },
-
   // ── System / Inventory Settings ─────────────────────────────────────────────
 
   /**

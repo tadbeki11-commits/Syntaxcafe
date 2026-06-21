@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, AlertTriangle, Database, Package, MapPin, Receipt, MonitorSmartphone } from 'lucide-react';
+import { AlertTriangle, Package, MapPin, Receipt, MonitorSmartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import PageHeader from '@/components/layout/PageHeader';
@@ -13,8 +13,6 @@ import { getDeviceEnrollment, clearDeviceEnrollment } from '@/shared/utils/devic
 import { clearSessionUser } from '@/shared/utils/sessionUser';
 
 const DataManagement = () => {
-    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
     const [allowLowStock, setAllowLowStock] = useState(false);
     const [savingInventorySettings, setSavingInventorySettings] = useState(false);
     const [forceTableSelection, setForceTableSelection] = useState(false);
@@ -88,31 +86,6 @@ const DataManagement = () => {
             toast.error('Failed to update receipt settings. Please try again.');
         } finally {
             setSavingReceiptSettings(false);
-        }
-    };
-
-    const handleCleanup = async () => {
-        setLoading(true);
-        try {
-            // 1. Cleanup backend data
-            await apiService.settings.cleanupData();
-
-            // 2. Cleanup frontend local data
-            const db = await getLocalDb();
-            const orders = await db.delete(localDbTables.orders);
-            const payments = await db.delete(localDbTables.payments);
-
-            // console.log("orders", orders);
-            // console.log("payments", payments);
-
-            toast.success('Data cleanup successful (Cloud & Local)');
-            setIsConfirmOpen(false);
-        } catch (error: any) {
-            console.error('Cleanup failed:', error);
-            const errorMsg = error.response?.data?.message || 'Cleanup failed. Please try again.';
-            toast.error(errorMsg);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -327,63 +300,7 @@ const DataManagement = () => {
                         </div>
                     </CardContent>
                 </Card>
-
-                {/* Danger Zone */}
-                <Card className="border-destructive/20 bg-destructive/5">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-destructive">
-                            <AlertTriangle className="h-5 w-5" />
-                            Danger Zone
-                        </CardTitle>
-                        <CardDescription>
-                            These actions are irreversible. Please proceed with extreme caution.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-destructive/20 rounded-lg bg-background gap-4">
-                            <div className="space-y-1">
-                                <h4 className="font-medium text-sm flex items-center gap-2">
-                                    <Database className="h-4 w-4" />
-                                    Cleanup Orders & Payments
-                                </h4>
-                                <p className="text-xs text-muted-foreground">
-                                    This will permanently delete ALL orders, order items, and payment records from the system.
-                                </p>
-                            </div>
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => setIsConfirmOpen(true)}
-                                disabled={!online}
-                                className="w-full sm:w-auto"
-                            >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Cleanup
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
             </div>
-
-            <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Are you absolutely sure?</DialogTitle>
-                        <DialogDescription>
-                            This action will permanently delete all orders and payment history.
-                            This cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={loading}>
-                            Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={handleCleanup} disabled={loading}>
-                            {loading ? 'Cleaning up...' : 'Yes, Delete Everything'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
             <Dialog open={isResetDeviceOpen} onOpenChange={setIsResetDeviceOpen}>
                 <DialogContent>
