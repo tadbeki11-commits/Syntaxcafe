@@ -174,31 +174,31 @@ export default function ReportsPage() {
             to={dateTo}
           />
 
-          <Tabs defaultValue="overview" className="space-y-5">
-            <TabsList className="flex w-full flex-wrap">
+          <Tabs defaultValue="overview" className="space-y-5 overflow-auto">
+            <TabsList className="flex h-auto w-full flex-wrap justify-between gap-1 p-1">
               <TabsTrigger value="overview" className="gap-2">
                 <TrendingUp className="size-4" />
-                Overview
+                <span className="hidden sm:inline">Overview</span>
               </TabsTrigger>
               <TabsTrigger value="product-mix" className="gap-2">
                 <PackageSearch className="size-4" />
-                Product Mix
+                <span className="hidden sm:inline">Product Mix</span>
               </TabsTrigger>
               <TabsTrigger value="sales-breakdown" className="gap-2">
                 <PieChart className="size-4" />
-                Sales Breakdown
+                <span className="hidden sm:inline">Sales Breakdown</span>
               </TabsTrigger>
               <TabsTrigger value="operations" className="gap-2">
                 <BarChart2 className="size-4" />
-                Operations
+                <span className="hidden sm:inline">Operations</span>
               </TabsTrigger>
               <TabsTrigger value="orders" className="gap-2">
                 <ListOrdered className="size-4" />
-                Orders
+                <span className="hidden sm:inline">Orders</span>
               </TabsTrigger>
               <TabsTrigger value="z-report" className="gap-2">
                 <FileText className="size-4" />
-                Z-Report
+                <span className="hidden sm:inline">Z-Report</span>
               </TabsTrigger>
             </TabsList>
 
