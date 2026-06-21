@@ -335,7 +335,7 @@ export const useCashierCreateOrder = () => {
 
       toast.success("Added to order", {
         id: "cashier-add-to-order",
-        duration: 1000,
+        duration: 2000,
       });
     },
     [orderItems],

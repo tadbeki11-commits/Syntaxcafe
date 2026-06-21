@@ -110,6 +110,9 @@ export class OrderService {
   async create(orderData: any) {
     const {
       employee_id,
+      waiter_id,
+      created_by_id,
+      cashier_id,
       customer_id,
       table_number,
       type,
@@ -119,6 +122,14 @@ export class OrderService {
       organization_id,
       is_price_override,
     } = orderData;
+
+    // The waiter the order belongs to (defaults to the employee on the order).
+    const finalWaiterId = waiter_id || employee_id;
+    // An order is "placed by a cashier" when whoever created it differs from the
+    // waiter it's attributed to. Waiters placing their own orders leave this null.
+    const finalCashierId =
+      cashier_id ||
+      (created_by_id && created_by_id !== finalWaiterId ? created_by_id : null);
 
     const safeTableNumber = this.normalizeTableNumber(table_number);
     const safeOrganizationId = this.normalizeOrganizationId(organization_id);
@@ -146,6 +157,8 @@ export class OrderService {
           order_number,
           customer_id: customer_id || randomUUID(),
           employee_id,
+          waiter_id: finalWaiterId,
+          cashier_id: finalCashierId,
           table_number: safeTableNumber,
           organization_id: safeOrganizationId,
           is_price_override: Boolean(is_price_override),
@@ -192,6 +205,8 @@ export class OrderService {
       id,
       employee_id,
       waiter_id,
+      created_by_id,
+      cashier_id,
       customer_id,
       table_number,
       type,
@@ -224,6 +239,14 @@ export class OrderService {
       validUserIds,
       finalEmployeeId,
     );
+    // Cashier-placed orders carry a creator distinct from the waiter; keep it
+    // only when it's a known user and actually differs from the waiter.
+    const incomingCashierId =
+      cashier_id ||
+      (created_by_id && created_by_id !== finalWaiterId ? created_by_id : null);
+    const finalCashierId = incomingCashierId
+      ? this.validateUserId(incomingCashierId, validUserIds)
+      : null;
     const safeTableNumber = this.normalizeTableNumber(table_number);
     const safeOrganizationId = this.normalizeOrganizationId(organization_id);
 
@@ -290,6 +313,7 @@ export class OrderService {
         customer_id: customer_id || randomUUID(),
         employee_id: finalEmployeeId,
         waiter_id: finalWaiterId,
+        cashier_id: finalCashierId,
         table_number: safeTableNumber,
         organization_id: safeOrganizationId,
         is_price_override: Boolean(is_price_override),
@@ -1260,8 +1284,16 @@ export class OrderService {
   }
 
   private toOrderResponse(order: any, employee: any, items: any[]) {
+    // Surface who placed the order so clients can show "Cashier" vs "Waiter".
+    // cashier_id is only set when a cashier rang up an order on a waiter's behalf.
+    const orderSource = order?.cashier_id ? "cashier" : "waiter";
     return {
       ...order,
+      // Mirror cashier_id into created_by_id so existing clients (which key off
+      // created_by_id !== waiter_id) keep working for server-fetched orders.
+      created_by_id:
+        order?.created_by_id ?? order?.cashier_id ?? order?.waiter_id ?? null,
+      order_source: orderSource,
       employee_name: this.formatEmployeeName(employee),
       employee_role: employee?.role ?? null,
       items,

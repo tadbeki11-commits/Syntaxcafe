@@ -359,7 +359,7 @@ export const useWaiterCreateOrder = () => {
 
       toast.success("Added to Cart", {
         id: "waiter-add-to-order",
-        duration: 1000,
+        duration: 2000,
         icon: "🛒",
       });
     },

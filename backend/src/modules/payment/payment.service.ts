@@ -5,7 +5,6 @@ import { order_items } from "../../db/tables/order-items.table";
 import { orders } from "../../db/tables/orders.table";
 import { payments } from "../../db/tables/payments.table";
 import { stockMovements } from "../../db/tables/stock-movements.table";
-import { systemSettings } from "../../db/tables/system-settings.table";
 import { users } from "../../db/tables/users.table";
 import { OrderInventoryService } from "../order/order-inventory.service";
 import { emitCreated, emitUpdated } from "../sync/sync-emit.util";
@@ -134,17 +133,6 @@ export class PaymentService {
 
   async confirmPayment(id: string, processedBy?: any) {
     const branchId = requireBranchId();
-    const [settingRow] = await db
-      .select({ value: systemSettings.value })
-      .from(systemSettings)
-      .where(
-        and(
-          eq(systemSettings.key, "allow_low_stock_orders"),
-          eq(systemSettings.branch_id, branchId),
-        ),
-      )
-      .limit(1);
-    const allowLowStock = settingRow?.value === "true";
 
     return db.transaction(async (tx: any) => {
       const [payment] = await tx
@@ -199,14 +187,24 @@ export class PaymentService {
         return payment;
       }
 
-      await this.orderInventoryService.reconcileOrderItems({
-        tx,
-        orderId: payment.order_id,
-        previousItems: [],
-        nextItems: orderLines,
-        createdBy: processedBy || null,
-        allowLowStock,
-      });
+      // Deduct stock as a side effect of payment, but never block the payment on
+      // it — the order has already been served, so a shortfall just lets stock go
+      // negative (a warning to restock), mirroring the offline-sync create path.
+      try {
+        await this.orderInventoryService.reconcileOrderItems({
+          tx,
+          orderId: payment.order_id,
+          previousItems: [],
+          nextItems: orderLines,
+          createdBy: processedBy || null,
+          allowLowStock: true,
+        });
+      } catch (error) {
+        console.warn(
+          `[confirmPayment] Inventory reconciliation failed for order ${payment.order_id}; payment is still recorded.`,
+          (error as Error)?.message,
+        );
+      }
 
       return payment;
     });

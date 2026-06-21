@@ -155,19 +155,19 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ initialFilterStatus =
             >
               Previous
             </Button>
-            <div className="flex items-center gap-1">
+            {/* <div className="flex items-center gap-1 ">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                 <Button
                   key={page}
                   variant={currentPage === page ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setCurrentPage(page)}
+                  onClick={() => setCurrentPagcleare(page)}
                   className={`h-8 w-8 p-0 ${currentPage === page ? 'bg-primary text-primary-foreground' : ''}`}
                 >
                   {page}
                 </Button>
               ))}
-            </div>
+            </div> */}
             <Button
               variant="outline"
               size="sm"

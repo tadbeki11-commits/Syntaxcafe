@@ -1,4 +1,4 @@
-import { uuidToDisplayId, formatOrderNumber } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber, getOrderSource } from "@/lib/utils";
 import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             <TableHead className="font-bold">Order ID</TableHead>
             <TableHead className="font-bold">Table</TableHead>
             <TableHead className="font-bold">Waiter</TableHead>
+            <TableHead className="font-bold">Placed By</TableHead>
             <TableHead className="font-bold">Date & Time</TableHead>
             <TableHead className="font-bold">Items</TableHead>
             <TableHead className="font-bold">Total</TableHead>
@@ -84,6 +85,17 @@ export const OrdersList: React.FC<OrdersListProps> = ({
                   )}
                 </TableCell>
                 <TableCell className="font-medium text-sm">{waiterName}</TableCell>
+                <TableCell>
+                  {getOrderSource(order) === 'cashier' ? (
+                    <Badge className="bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-50 text-[10px] font-bold">
+                      Cashier
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-50 text-[10px] font-bold">
+                      Waiter
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />

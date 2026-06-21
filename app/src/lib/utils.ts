@@ -40,3 +40,23 @@ export function formatOrderNumber(
   if (serial != null && Number(serial) > 0) return `#${serial}`;
   return `#${order?.id}`;
 }
+
+export type OrderSource = "cashier" | "waiter";
+
+/**
+ * Determines whether an order was rung up by a cashier on a waiter's behalf or
+ * placed directly by the waiter. Prefers the backend-provided `order_source`;
+ * otherwise infers it from the creator differing from the attributed waiter
+ * (cashier flows send a distinct `created_by_id`/`cashier_id`).
+ */
+export function getOrderSource(order: any): OrderSource {
+  if (order?.order_source === "cashier" || order?.order_source === "waiter") {
+    return order.order_source;
+  }
+  const waiterId = order?.waiter_id || order?.employee_id;
+  const creatorId = order?.cashier_id || order?.created_by_id;
+  if (creatorId && waiterId && String(creatorId) !== String(waiterId)) {
+    return "cashier";
+  }
+  return "waiter";
+}

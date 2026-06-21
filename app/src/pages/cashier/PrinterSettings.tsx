@@ -170,9 +170,9 @@ const PrinterSettings: React.FC = () => {
     });
 
     if (checked) {
-      toast.success(`🖨️ ${printerName} now prints ${departmentLabel} receipts`, { duration: 3000 });
+      toast.success(`🖨️ ${printerName} now prints ${departmentLabel} receipts`, { duration: 2000 });
     } else {
-      toast.success(`🖨️ ${printerName} no longer prints ${departmentLabel} receipts`, { duration: 3000 });
+      toast.success(`🖨️ ${printerName} no longer prints ${departmentLabel} receipts`, { duration: 2000 });
     }
   };
 
@@ -215,10 +215,10 @@ const PrinterSettings: React.FC = () => {
         sections,
       } as any);
 
-      toast.success(`Test print sent to "${printerName}" ✓`, { duration: 3000 });
+      toast.success(`Test print sent to "${printerName}" ✓`, { duration: 2000 });
     } catch (err: any) {
       const msg = typeof err === 'string' ? err : (err?.message || String(err));
-      toast.error(`Test print failed: ${msg}`, { duration: 5000 });
+      toast.error(`Test print failed: ${msg}`, { duration: 2000 });
     } finally {
       setTestingPrinter(null);
     }

@@ -27,7 +27,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Toaster
           position="bottom-center"
           toastOptions={{
-            duration: 3000,
+            duration: 2000,
             className: '!bg-popover !text-popover-foreground !border !border-border !shadow-md !rounded-full !text-[13px] !font-semibold !px-4 !py-2',
             success: {
               iconTheme: { primary: 'hsl(var(--success))', secondary: 'hsl(var(--success-foreground))' },

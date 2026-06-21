@@ -94,7 +94,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
           ? String(err.message)
           : String(err || "Unknown native printing error");
     console.error("Tauri Thermal Printer Error Details:", err);
-    toast.error(`Thermal printer printing failed: ${msg}`, { duration: 6000 });
+    toast.error(`Thermal printer printing failed: ${msg}`, { duration: 2000 });
     setQzStatus({ connected: false, error: msg });
   }, []);
 
@@ -136,7 +136,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
             : "";
           toast.success(
             `🖨️ Order # ${tablePart} printed successfully (${copies} copy${copies > 1 ? "ies" : ""})`,
-            { duration: 1000 },
+            { duration: 2000 },
           );
           printed = true;
         } catch (err) {
@@ -194,7 +194,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
         setQzStatus({ connected: true, error: null });
         toast.success(
           `🖨️ Order printed successfully (${copies} copy${copies > 1 ? "ies" : ""})`,
-          { duration: 1000 },
+          { duration: 2000 },
         );
       } catch (err: any) {
         console.error(
@@ -273,7 +273,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
       console.error("[Tauri Print Test] Error:", err);
       toast.error(`Test print failed: ${err.message || err}`, {
         id: "tauri-test",
-        duration: 5000,
+        duration: 2000,
       });
       setQzStatus({ connected: false, error: err.message || String(err) });
     }

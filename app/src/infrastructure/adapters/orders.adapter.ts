@@ -275,6 +275,7 @@ const mapServerOrderToLocal = (remote: any, cached?: any) => ({
   employee_id: remote.employee_id,
   waiter_id: remote.waiter_id,
   created_by_id: remote.created_by_id,
+  order_source: remote.order_source,
   organization_id: remote.organization_id,
   type: remote.type,
   status: remote.status,
@@ -331,6 +332,9 @@ export const normalizeOrderPayload = (order: any) => ({
   id: order.id,
   employee_id: order.employee_id,
   waiter_id: order.waiter_id || "",
+  // Carries who actually placed the order. When it differs from waiter_id the
+  // backend records it as the cashier so the order is marked "placed by cashier".
+  created_by_id: order.created_by_id || "",
   customer_id: order.customer_id,
   table_number: order.table_number || "",
   order_type_label: order.order_type_label || "",
