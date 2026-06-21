@@ -8,7 +8,7 @@ import {
   Put,
   Query,
 } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { InventoryService } from "./inventory.service";
 
 @ApiTags("inventory")
@@ -46,6 +46,19 @@ export class InventoryController {
       status: "success",
       message: "Inventory item created",
       data: { item },
+    };
+  }
+
+  @ApiOperation({ summary: "Bulk sync inventory items" })
+  @Post("sync")
+  async bulkSync(@Body() body: any) {
+    const data = await this.inventoryService.syncBulk(
+      body.inventoryItems || body.items || [],
+    );
+    return {
+      status: "success",
+      message: "Inventory items bulk sync successful",
+      data,
     };
   }
 

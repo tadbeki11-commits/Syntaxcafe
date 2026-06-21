@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { UploadIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -113,6 +115,14 @@ export default function StaffPage() {
       <PageHeader
         title="Staff"
         description="Manage POS logins and review each employee's order activity."
+        action={
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/staff/bulk-import">
+              <UploadIcon className="size-4" />
+              Bulk import
+            </Link>
+          </Button>
+        }
       />
       <Tabs defaultValue="accounts" className="space-y-5">
         <TabsList>

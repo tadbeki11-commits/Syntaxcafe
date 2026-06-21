@@ -3,8 +3,31 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { WifiOff, RefreshCw, MonitorSmartphone, Loader2 } from "lucide-react";
+import {
+  WifiOff,
+  RefreshCw,
+  MonitorSmartphone,
+  Loader2,
+  QrCode,
+  X,
+} from "lucide-react";
+import { Scanner, type IDetectedBarcode } from "@yudiel/react-qr-scanner";
 import { enrollDevice, isDeviceEnrolled } from "@/lib/waiter/device";
+
+/**
+ * Enrollment QR codes encode the branch's plain enrollment code. Tolerate a
+ * JSON wrapper ({ "code": "..." }) too, in case the admin format evolves.
+ */
+function extractCode(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed.code === "string") return parsed.code.trim();
+  } catch {
+    /* not JSON — treat as a bare code */
+  }
+  return trimmed;
+}
 
 /**
  * First-run screen for the waiter portal. The operator pastes the reusable
@@ -18,6 +41,7 @@ export default function EnrollPage() {
   const [deviceName, setDeviceName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   const [isOnline, setIsOnline] = useState(true);
   const [checkingConn, setCheckingConn] = useState(false);
@@ -45,29 +69,49 @@ export default function EnrollPage() {
     };
   }, [checkConnection, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submitCode = useCallback(
+    async (rawCode: string) => {
+      if (submitting) return;
+      const trimmed = rawCode.trim();
+      if (!trimmed) {
+        setError("Please enter the enrollment code.");
+        return;
+      }
+
+      setSubmitting(true);
+      setError(null);
+      try {
+        await enrollDevice(trimmed, deviceName);
+        router.replace("/waiter/login");
+      } catch (err: any) {
+        const message =
+          err?.message || "Enrollment failed. Check the code and try again.";
+        setError(Array.isArray(message) ? message.join(", ") : message);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [submitting, deviceName, router],
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting) return;
-
-    const trimmed = code.trim();
-    if (!trimmed) {
-      setError("Please enter the enrollment code.");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-    try {
-      await enrollDevice(trimmed, deviceName);
-      router.replace("/waiter/login");
-    } catch (err: any) {
-      const message =
-        err?.message || "Enrollment failed. Check the code and try again.";
-      setError(Array.isArray(message) ? message.join(", ") : message);
-    } finally {
-      setSubmitting(false);
-    }
+    submitCode(code);
   };
+
+  // A successful scan fills the code and immediately redeems it — the operator
+  // just points the camera at the QR shown in the admin dashboard.
+  const handleScan = useCallback(
+    (results: IDetectedBarcode[]) => {
+      const raw = results?.[0]?.rawValue;
+      if (!raw) return;
+      const scanned = extractCode(raw).toUpperCase();
+      setScanning(false);
+      setCode(scanned);
+      submitCode(scanned);
+    },
+    [submitCode],
+  );
 
   return (
     <div className="min-h-screen bg-linear-to-br from-amber-50 to-slate-100 flex flex-col justify-center items-center p-4 overflow-hidden relative">
@@ -113,10 +157,57 @@ export default function EnrollPage() {
               Set up this device
             </h1>
             <p className="text-sm text-muted-foreground mt-1.5">
-              Enter the enrollment code from your administrator to link this
-              device to its branch.
+              Scan the QR code from your administrator — or enter the enrollment
+              code manually — to link this device to its branch.
             </p>
           </div>
+
+          {scanning ? (
+            <div className="mb-4 space-y-3">
+              <div className="overflow-hidden rounded-xl border border-border bg-black">
+                <Scanner
+                  onScan={handleScan}
+                  onError={() =>
+                    setError(
+                      "Couldn't access the camera. Allow camera access or enter the code manually.",
+                    )
+                  }
+                  formats={["qr_code"]}
+                  components={{ finder: true }}
+                  styles={{ container: { width: "100%" } }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setScanning(false)}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted">
+                <X className="h-4 w-4" />
+                Cancel scan
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setScanning(true);
+              }}
+              disabled={submitting}
+              className="mb-4 w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-50">
+              <QrCode className="h-4 w-4" />
+              Scan QR code
+            </button>
+          )}
+
+          {!scanning && (
+            <div className="mb-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                or enter manually
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -172,7 +263,7 @@ export default function EnrollPage() {
             <button
               type="submit"
               disabled={submitting || !code.trim()}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm font-bold text-foreground shadow-sm transition hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (
                 <>

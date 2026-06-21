@@ -26,6 +26,10 @@ export const Menu = {
 export const Inventory = {
   list: () => apiFetch("/inventory?limit=200").then((d) => d.data.items ?? []),
   create: (b: any) => apiFetch("/inventory", j(b)),
+  // Bulk create/update. The backend upserts each item (and seeds/reconciles
+  // stock) and emits sync events, scoped to the branch from x-branch-id.
+  bulkSync: (inventoryItems: any[]) =>
+    apiFetch("/inventory/sync", j({ inventoryItems })),
   remove: (id: string) => apiFetch(`/inventory/${id}`, del),
   setQuantity: (id: string, b: any) => apiFetch(`/inventory/${id}/quantity`, put(b)),
   transfers: () => apiFetch("/inventory/transfers").then((d) => d.data.transfers ?? []),
@@ -48,6 +52,9 @@ export const Tables = {
 export const Users = {
   list: () => apiFetch("/users").then((d) => d.data.users ?? d.data ?? []),
   create: (b: any) => apiFetch("/users", j(b)),
+  // Bulk create/update staff. The backend upserts by id, scopes tenancy from
+  // the device/owner token, and hashes a default password for new accounts.
+  bulkSync: (users: any[]) => apiFetch("/users/sync", j({ users })),
   update: (id: string, b: any) => apiFetch(`/users/${id}`, put(b)),
   toggle: (id: string) => apiFetch(`/users/${id}/toggle-status`, patch({})),
 };
@@ -209,4 +216,11 @@ export const Devices = {
     apiFetch(`/devices/enrollment-codes?branch_id=${encodeURIComponent(branch_id)}`),
   rotateEnrollmentCode: (branch_id: string) =>
     apiFetch("/devices/enrollment-codes", j({ branch_id })),
+  // Kick out (permanently remove) an enrolled device. The device's token stops
+  // working immediately and it falls back to the enrollment screen.
+  remove: (id: string, branch_id: string) =>
+    apiFetch(
+      `/devices/${id}?branch_id=${encodeURIComponent(branch_id)}`,
+      del,
+    ),
 };

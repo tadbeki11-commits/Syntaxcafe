@@ -39,11 +39,19 @@ export class UsersService {
           if (item.phone) updates.phone = item.phone;
           if (item.role) updates.role = item.role;
           if (item.username) updates.username = item.username;
+          if (item.password) updates.password_hash = await hash(item.password, saltRounds);
+          if (item.pin) updates.pin_hash = await hash(String(item.pin), saltRounds);
 
           await tx.update(users).set(updates).where(eq(users.id, item.id));
           updatedIds.push(item.id);
         } else {
-          const hashed = await hash(item.password || "123456", saltRounds);
+          // PIN-only staff are valid; only fall back to a default password when
+          // neither credential was supplied.
+          const pin_hash = item.pin ? await hash(String(item.pin), saltRounds) : null;
+          const password_hash =
+            item.password || !pin_hash
+              ? await hash(item.password || "123456", saltRounds)
+              : null;
           const [created] = await tx
             .insert(users)
             .values({
@@ -52,7 +60,8 @@ export class UsersService {
               branch_id: branchId,
               username: item.username || `user_${Date.now()}`,
               name: item.name || item.full_name || item.username || "Staff",
-              password_hash: hashed,
+              password_hash,
+              pin_hash,
               role: item.role || "employee",
               first_name: item.first_name || null,
               last_name: item.last_name || null,

@@ -15,6 +15,7 @@ import {
   PackageIcon,
   PlusIcon,
   RefreshCwIcon,
+  UploadIcon,
   WarehouseIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -104,6 +105,142 @@ const locationIcon = (loc: Pick<Loc, "name" | "slug">) => {
     return <ChefHatIcon className="size-5 text-emerald-500" />;
   return <MapPinIcon className="size-5 text-blue-500" />;
 };
+
+// ── measurement units ──────────────────────────────────────────────────────
+// Common units grouped by dimension. Units that share a physical dimension
+// (weight/volume) carry a `factor` so the conversion between any two of them
+// can be derived automatically. Container-style count units (box, carton…)
+// have no fixed size, so the user supplies the ratio themselves.
+
+type UnitDef = {
+  value: string;
+  label: string;
+  dim?: "weight" | "volume";
+  factor?: number;
+};
+
+const UNIT_GROUPS: { group: string; units: UnitDef[] }[] = [
+  {
+    group: "Count",
+    units: [
+      { value: "piece", label: "Piece" },
+      { value: "dozen", label: "Dozen (12 pieces)" },
+      { value: "pack", label: "Pack" },
+      { value: "box", label: "Box" },
+      { value: "carton", label: "Carton" },
+      { value: "case", label: "Case" },
+      { value: "crate", label: "Crate" },
+      { value: "bag", label: "Bag" },
+      { value: "sack", label: "Sack" },
+      { value: "bottle", label: "Bottle" },
+      { value: "can", label: "Can" },
+      { value: "sachet", label: "Sachet" },
+      { value: "roll", label: "Roll" },
+    ],
+  },
+  {
+    group: "Weight",
+    units: [
+      { value: "g", label: "Gram (g)", dim: "weight", factor: 1 },
+      { value: "kg", label: "Kilogram (kg)", dim: "weight", factor: 1000 },
+      { value: "oz", label: "Ounce (oz)", dim: "weight", factor: 28.3495 },
+      { value: "lb", label: "Pound (lb)", dim: "weight", factor: 453.592 },
+    ],
+  },
+  {
+    group: "Volume",
+    units: [
+      { value: "ml", label: "Millilitre (ml)", dim: "volume", factor: 1 },
+      { value: "l", label: "Litre (L)", dim: "volume", factor: 1000 },
+      { value: "gal", label: "Gallon", dim: "volume", factor: 3785.41 },
+    ],
+  },
+];
+
+const UNIT_DEFS: Record<string, UnitDef> = Object.fromEntries(
+  UNIT_GROUPS.flatMap((g) => g.units).map((u) => [u.value, u]),
+);
+
+// Count units with a known number of pieces.
+const COUNT_FACTORS: Record<string, number> = { piece: 1, dozen: 12 };
+
+/** Best-guess number of `base` units in one `purchase` unit, or null if unknown. */
+function suggestPiecesPerUnit(purchase: string, base: string): number | null {
+  if (!purchase || !base) return null;
+  if (purchase === base) return 1;
+  const p = UNIT_DEFS[purchase];
+  const b = UNIT_DEFS[base];
+  // Same physical dimension → ratio of their factors (e.g. kg→g = 1000).
+  if (p?.dim && b?.dim && p.dim === b.dim && p.factor && b.factor) {
+    return p.factor / b.factor;
+  }
+  // Count units with a fixed piece size (e.g. dozen→piece = 12).
+  const pc = COUNT_FACTORS[purchase];
+  const bc = COUNT_FACTORS[base];
+  if (pc && bc) return pc / bc;
+  return null;
+}
+
+/**
+ * Dropdown of common measurement units with a "Custom…" escape hatch for
+ * anything not in the list. Keeps existing custom values editable when reopened.
+ */
+function UnitSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [customMode, setCustomMode] = useState(value !== "" && !(value in UNIT_DEFS));
+
+  if (customMode) {
+    return (
+      <div className="flex gap-2">
+        <Input
+          value={value}
+          placeholder="Custom unit"
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setCustomMode(false);
+            onChange("piece");
+          }}>
+          List
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => {
+        if (e.target.value === "__custom__") {
+          setCustomMode(true);
+          onChange("");
+        } else {
+          onChange(e.target.value);
+        }
+      }}
+      className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
+      {UNIT_GROUPS.map((g) => (
+        <optgroup key={g.group} label={g.group}>
+          {g.units.map((u) => (
+            <option key={u.value} value={u.value}>
+              {u.label}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+      <option value="__custom__">Custom…</option>
+    </select>
+  );
+}
 
 // ── location card ────────────────────────────────────────────────────────
 
@@ -195,11 +332,22 @@ export default function InventoryPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    unit: "piece",
+    unit: "box",
     base_unit: "piece",
+    pieces_per_unit: "1",
     min_quantity: "0",
     quantity: "0",
   });
+
+  // Apply a unit change and, when the pairing is known, auto-fill the ratio.
+  function setUnits(patch: { unit?: string; base_unit?: string }) {
+    setForm((f) => {
+      const merged = { ...f, ...patch };
+      const suggested = suggestPiecesPerUnit(merged.unit, merged.base_unit);
+      if (suggested != null) merged.pieces_per_unit = String(suggested);
+      return merged;
+    });
+  }
 
   async function reload() {
     setLoading(true);
@@ -313,6 +461,7 @@ export default function InventoryPage() {
         name: form.name.trim(),
         unit: form.unit,
         base_unit: form.base_unit,
+        pieces_per_unit: Math.max(1, Number(form.pieces_per_unit) || 1),
         min_quantity: Number(form.min_quantity) || 0,
         stock_by_location: [
           { location_id: selectedLoc.id, quantity: Number(form.quantity) || 0 },
@@ -320,7 +469,14 @@ export default function InventoryPage() {
       });
       toast.success("Item created");
       setCreateOpen(false);
-      setForm({ name: "", unit: "piece", base_unit: "piece", min_quantity: "0", quantity: "0" });
+      setForm({
+        name: "",
+        unit: "box",
+        base_unit: "piece",
+        pieces_per_unit: "1",
+        min_quantity: "0",
+        quantity: "0",
+      });
       await reload();
     } catch (e: any) {
       toast.error(e.message);
@@ -383,12 +539,20 @@ export default function InventoryPage() {
         title="Inventory"
         description="Stock held across this branch's locations."
         action={
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/inventory/transfers">
-              <ArrowLeftRightIcon className="size-4" />
-              Transfer stock
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/inventory/bulk-import">
+                <UploadIcon className="size-4" />
+                Bulk import
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/inventory/transfers">
+                <ArrowLeftRightIcon className="size-4" />
+                Transfer stock
+              </Link>
+            </Button>
+          </div>
         }
       />
 
@@ -691,21 +855,56 @@ export default function InventoryPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Unit</Label>
-                <Input
-                  value={form.unit}
-                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label>Base unit</Label>
-                <Input
+                <UnitSelect
                   value={form.base_unit}
-                  onChange={(e) => setForm({ ...form, base_unit: e.target.value })}
+                  onChange={(v) => setUnits({ base_unit: v })}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Smallest unit you track &amp; consume in.
+                </p>
               </div>
               <div className="space-y-2">
-                <Label>Min quantity</Label>
+                <Label>Purchase unit</Label>
+                <UnitSelect
+                  value={form.unit}
+                  onChange={(v) => setUnits({ unit: v })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The unit you buy stock in.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                {form.base_unit && form.unit
+                  ? `How many ${form.base_unit} in 1 ${form.unit}?`
+                  : "Base units per purchase unit"}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                step="any"
+                value={form.pieces_per_unit}
+                onChange={(e) =>
+                  setForm({ ...form, pieces_per_unit: e.target.value })
+                }
+              />
+              {Number(form.pieces_per_unit) > 0 &&
+                form.unit !== form.base_unit && (
+                  <div className="rounded bg-muted/50 p-2 text-xs text-muted-foreground">
+                    1 {form.unit} ={" "}
+                    <strong>
+                      {Number(form.pieces_per_unit)} {form.base_unit}
+                    </strong>
+                  </div>
+                )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Min quantity ({form.base_unit})</Label>
                 <Input
                   type="number"
                   min={0}
@@ -714,7 +913,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Opening quantity</Label>
+                <Label>Opening quantity ({form.base_unit})</Label>
                 <Input
                   type="number"
                   min={0}

@@ -146,6 +146,37 @@ export class DevicesService {
     };
   }
 
+  /**
+   * Kicks out (deletes) an enrolled device. Owner/platform only, scoped to the
+   * branch. The device's token stops resolving immediately: the row is removed
+   * and the in-memory token cache is busted, so the next sync/API call from that
+   * device 401s and it falls back to the enrollment screen.
+   */
+  async removeDevice(deviceId: string, branchId: string) {
+    if (!deviceId) throw new BadRequestException("Device id is required");
+    const branch = await this.getManageableBranch(branchId);
+
+    const [device] = await db
+      .select()
+      .from(branchDevices)
+      .where(
+        and(
+          eq(branchDevices.id, deviceId),
+          eq(branchDevices.branch_id, branch.id),
+        ),
+      )
+      .limit(1);
+    if (!device) throw new NotFoundException("Device not found");
+
+    await db.delete(branchDevices).where(eq(branchDevices.id, device.id));
+
+    // We cache by raw token (not its hash), so we can't evict a single entry —
+    // clear the whole map. It re-populates lazily on the next request.
+    this.tokenCache.clear();
+
+    return { id: device.id, removed: true };
+  }
+
   /** Resolves a device token to its tenant, or null if unknown/revoked. */
   async resolveToken(token: string): Promise<DeviceTenant | null> {
     if (!token) return null;

@@ -11,10 +11,13 @@ import {
   EyeOffIcon,
   LockIcon,
   MonitorSmartphoneIcon,
+  QrCodeIcon,
   ShieldCheckIcon,
   StoreIcon,
   UserIcon,
+  XIcon,
 } from "lucide-react";
+import { Scanner, type IDetectedBarcode } from "@yudiel/react-qr-scanner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +29,21 @@ import {
   getDeviceEnrollment,
   type DeviceEnrollment,
 } from "@/lib/device";
+
+/**
+ * Enrollment QR codes encode the branch's plain enrollment code. Tolerate a
+ * JSON wrapper ({ "code": "..." }) too, in case the admin format evolves.
+ */
+function extractCode(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed.code === "string") return parsed.code.trim();
+  } catch {
+    /* not JSON — treat as a bare code */
+  }
+  return trimmed;
+}
 
 const HIGHLIGHTS = [
   {
@@ -49,6 +67,7 @@ export default function BranchLoginPage() {
   const [code, setCode] = useState("");
   const [deviceName, setDeviceName] = useState("");
   const [enrolling, setEnrolling] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -59,11 +78,12 @@ export default function BranchLoginPage() {
     setEnrollment(getDeviceEnrollment());
   }, []);
 
-  async function onEnroll(e: React.FormEvent) {
-    e.preventDefault();
+  async function enroll(rawCode: string) {
+    const trimmed = rawCode.trim();
+    if (!trimmed || enrolling) return;
     setEnrolling(true);
     try {
-      const result = await enrollDevice(code.trim(), deviceName);
+      const result = await enrollDevice(trimmed, deviceName);
       setEnrollment(result);
       setCode("");
       setDeviceName("");
@@ -73,6 +93,22 @@ export default function BranchLoginPage() {
     } finally {
       setEnrolling(false);
     }
+  }
+
+  function onEnroll(e: React.FormEvent) {
+    e.preventDefault();
+    enroll(code);
+  }
+
+  // A successful scan fills the code and immediately redeems it — point the
+  // camera at the QR shown in the admin dashboard's Devices page.
+  function onScan(results: IDetectedBarcode[]) {
+    const raw = results?.[0]?.rawValue;
+    if (!raw) return;
+    const scanned = extractCode(raw).toUpperCase();
+    setScanning(false);
+    setCode(scanned);
+    enroll(scanned);
   }
 
   function onChangeDevice() {
@@ -259,10 +295,55 @@ export default function BranchLoginPage() {
                   Set up this device
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Enter the enrollment code from your owner or admin to link this
-                  device to its branch.
+                  Scan the QR code from your owner or admin — or enter the
+                  enrollment code manually — to link this device to its branch.
                 </p>
               </div>
+
+              {scanning ? (
+                <div className="mb-5 space-y-3">
+                  <div className="overflow-hidden rounded-lg border bg-black">
+                    <Scanner
+                      onScan={onScan}
+                      onError={() =>
+                        toast.error(
+                          "Couldn't access the camera. Allow camera access or enter the code manually.",
+                        )
+                      }
+                      formats={["qr_code"]}
+                      components={{ finder: true }}
+                      styles={{ container: { width: "100%" } }}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setScanning(false)}>
+                    <XIcon className="size-4" />
+                    Cancel scan
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  className="mb-5 w-full"
+                  disabled={enrolling}
+                  onClick={() => setScanning(true)}>
+                  <QrCodeIcon className="size-4" />
+                  Scan QR code
+                </Button>
+              )}
+
+              {!scanning && (
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    or enter manually
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+              )}
 
               <form onSubmit={onEnroll} className="space-y-5">
                 <div className="space-y-2">
@@ -294,6 +375,7 @@ export default function BranchLoginPage() {
                 </div>
                 <Button
                   type="submit"
+                  variant="outline"
                   className="w-full"
                   disabled={enrolling || !code.trim()}
                 >

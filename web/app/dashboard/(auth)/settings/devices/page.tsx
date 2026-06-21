@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { MonitorSmartphoneIcon, CopyIcon, RefreshCwIcon } from "lucide-react";
+import {
+  MonitorSmartphoneIcon,
+  CopyIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+  Loader2Icon,
+} from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +20,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { Devices } from "@/lib/resources";
 import { getBranchId } from "@/lib/api";
@@ -43,6 +59,9 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState<EnrolledDevice[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [devicesLoading, setDevicesLoading] = useState(true);
+  // The device the operator is about to kick out (drives the confirm dialog).
+  const [toKick, setToKick] = useState<EnrolledDevice | null>(null);
+  const [kicking, setKicking] = useState(false);
 
   const load = useCallback(async () => {
     const branchId = getBranchId();
@@ -93,6 +112,28 @@ export default function DevicesPage() {
     }
   }
 
+  async function kick() {
+    const branchId = getBranchId();
+    if (!toKick || !branchId) return;
+    setKicking(true);
+    try {
+      await Devices.remove(toKick.id, branchId);
+      setDevices((prev) => {
+        const next = prev.filter((d) => d.id !== toKick.id);
+        setOnlineCount(next.filter((d) => d.online).length);
+        return next;
+      });
+      toast.success(
+        `${toKick.name ?? "Device"} kicked out. It will return to the enrollment screen.`,
+      );
+      setToKick(null);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setKicking(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -132,6 +173,19 @@ export default function DevicesPage() {
               </Button>
             )}
           </div>
+
+          {code && (
+            <div className="flex flex-col items-center gap-2 rounded-md border p-4">
+              <div className="rounded-md bg-white p-3">
+                <QRCodeSVG value={code} size={176} marginSize={0} level="M" />
+              </div>
+              <p className="text-muted-foreground text-center text-xs">
+                On a new device, open the waiter app and tap{" "}
+                <span className="font-medium">Scan QR</span> to enroll without
+                typing the code.
+              </p>
+            </div>
+          )}
 
           <Button onClick={rotate} disabled={rotating || loading}>
             <RefreshCwIcon className="size-4" />
@@ -185,15 +239,60 @@ export default function DevicesPage() {
                       </div>
                     </div>
                   </div>
-                  <Badge variant="muted" className="capitalize">
-                    {d.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="muted" className="capitalize">
+                      {d.status}
+                    </Badge>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      title="Kick out this device"
+                      onClick={() => setToKick(d)}>
+                      <Trash2Icon className="size-4" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!toKick}
+        onOpenChange={(open) => !open && !kicking && setToKick(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Kick out this device?</DialogTitle>
+            <DialogDescription>
+              {toKick?.name ?? "This device"} will be removed and signed out
+              immediately. It will return to the enrollment screen and needs the
+              enrollment code (or a QR scan) to reconnect. This can&apos;t be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={kicking}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={kick} disabled={kicking}>
+              {kicking ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" />
+                  Kicking out…
+                </>
+              ) : (
+                <>
+                  <Trash2Icon className="size-4" />
+                  Kick out
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

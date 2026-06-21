@@ -348,6 +348,234 @@ export class InventoryService {
     });
   }
 
+  async syncBulk(items: any[]) {
+    if (!items || items.length === 0) return {};
+
+    const branchId = requireBranchId();
+    const updatedIds: string[] = [];
+    const createdIds: string[] = [];
+
+    await db.transaction(async (tx) => {
+      for (const payload of items) {
+        const [existing] = payload.id
+          ? await tx
+              .select({ id: inventoryItems.id })
+              .from(inventoryItems)
+              .where(
+                and(
+                  eq(inventoryItems.id, payload.id),
+                  eq(inventoryItems.branch_id, branchId),
+                ),
+              )
+              .limit(1)
+          : [];
+
+        if (existing) {
+          const updates: Record<string, any> = { updated_at: new Date() };
+          [
+            "name",
+            "unit",
+            "base_unit",
+            "pieces_per_unit",
+            "min_quantity",
+            "min_quantity_mode",
+            "notes",
+          ].forEach((key) => {
+            if (payload[key] !== undefined) {
+              updates[key] =
+                key === "pieces_per_unit" || key === "min_quantity"
+                  ? numberOrZero(payload[key])
+                  : payload[key];
+            }
+          });
+          if (updates.pieces_per_unit !== undefined) {
+            updates.pieces_per_unit = Math.max(1, updates.pieces_per_unit);
+          }
+
+          await tx
+            .update(inventoryItems)
+            .set(updates)
+            .where(
+              and(
+                eq(inventoryItems.id, payload.id),
+                eq(inventoryItems.branch_id, branchId),
+              ),
+            );
+          await this.reconcileStock(tx, payload.id, payload);
+          updatedIds.push(payload.id);
+        } else {
+          const [created] = await tx
+            .insert(inventoryItems)
+            .values({
+              ...tenantInsert(),
+              ...(payload.id ? { id: payload.id } : {}),
+              name: payload.name,
+              unit: payload.unit ?? "piece",
+              base_unit: payload.base_unit ?? "piece",
+              pieces_per_unit: Math.max(
+                1,
+                numberOrZero(payload.pieces_per_unit ?? 1),
+              ),
+              min_quantity: numberOrZero(payload.min_quantity),
+              min_quantity_mode: payload.min_quantity_mode ?? "global",
+              notes: payload.notes ?? null,
+              meta: {},
+            })
+            .returning();
+          await this.applyInitialStock(tx, created.id, payload);
+          createdIds.push(created.id);
+        }
+      }
+    });
+
+    for (const id of updatedIds) {
+      const item = await this.findOne(id);
+      await emitUpdated(db, "inventory_item", "INVENTORY_ITEM_UPDATED", item as any);
+    }
+    for (const id of createdIds) {
+      const item = await this.findOne(id);
+      await emitCreated(db, "inventory_item", "INVENTORY_ITEM_CREATED", item as any);
+    }
+
+    return {};
+  }
+
+  // Seed stock for a newly-created item from `stock_by_location` (or a single
+  // generic `quantity` placed at the default location). Mirrors `create`.
+  private async applyInitialStock(tx: any, itemId: string, payload: any) {
+    if (Array.isArray(payload.stock_by_location)) {
+      for (const stock of payload.stock_by_location) {
+        const locId = String(stock.location_id);
+        const qty = numberOrZero(stock.quantity);
+        const minQty =
+          payload.min_quantity_mode === "per_location"
+            ? numberOrZero(stock.min_quantity)
+            : 0;
+        if (locId && (qty >= 0 || minQty >= 0)) {
+          await tx.insert(inventoryStock).values({
+            ...tenantInsert(),
+            inventory_item_id: itemId,
+            location_id: locId,
+            quantity: qty,
+            min_quantity: minQty,
+          });
+          if (qty > 0) {
+            await tx.insert(stockMovements).values({
+              ...tenantInsert(),
+              inventory_item_id: itemId,
+              movement_type: "initial",
+              location_id: locId,
+              quantity_delta: qty,
+              quantity_after: qty,
+              created_by: payload.user_id || null,
+            });
+          }
+        }
+      }
+    } else {
+      const qty = numberOrZero(payload.quantity ?? payload.store_quantity);
+      if (qty > 0) {
+        const [defaultLoc] = await tx
+          .select()
+          .from(stockLocations)
+          .where(
+            and(
+              eq(stockLocations.is_default, true),
+              eq(stockLocations.branch_id, requireBranchId()),
+            ),
+          )
+          .limit(1);
+        if (defaultLoc) {
+          await tx.insert(inventoryStock).values({
+            ...tenantInsert(),
+            inventory_item_id: itemId,
+            location_id: defaultLoc.id,
+            quantity: qty,
+            min_quantity: 0,
+          });
+          await tx.insert(stockMovements).values({
+            ...tenantInsert(),
+            inventory_item_id: itemId,
+            movement_type: "initial",
+            location_id: defaultLoc.id,
+            quantity_delta: qty,
+            quantity_after: qty,
+            created_by: payload.user_id || null,
+          });
+        }
+      }
+    }
+  }
+
+  // Reconcile stock for an existing item against `stock_by_location`, logging
+  // an adjustment/initial movement for any delta. Mirrors `update`.
+  private async reconcileStock(tx: any, itemId: string, payload: any) {
+    if (!Array.isArray(payload.stock_by_location)) return;
+    for (const stock of payload.stock_by_location) {
+      const locId = String(stock.location_id);
+      const qty = numberOrZero(stock.quantity);
+      const minQty = numberOrZero(stock.min_quantity);
+      if (!locId) continue;
+
+      const [existingStock] = await tx
+        .select()
+        .from(inventoryStock)
+        .where(
+          and(
+            eq(inventoryStock.inventory_item_id, itemId),
+            eq(inventoryStock.location_id, locId),
+          ),
+        )
+        .limit(1);
+
+      const finalMinQty =
+        payload.min_quantity_mode === "per_location" ? minQty : 0;
+
+      if (existingStock) {
+        const delta = qty - existingStock.quantity;
+        if (delta !== 0) {
+          await tx
+            .update(inventoryStock)
+            .set({ quantity: qty, min_quantity: finalMinQty })
+            .where(eq(inventoryStock.id, existingStock.id));
+          await tx.insert(stockMovements).values({
+            ...tenantInsert(),
+            inventory_item_id: itemId,
+            movement_type: "adjustment",
+            location_id: locId,
+            quantity_delta: delta,
+            quantity_after: qty,
+            created_by: payload.user_id || null,
+          });
+        } else if (finalMinQty !== existingStock.min_quantity) {
+          await tx
+            .update(inventoryStock)
+            .set({ min_quantity: finalMinQty })
+            .where(eq(inventoryStock.id, existingStock.id));
+        }
+      } else {
+        await tx.insert(inventoryStock).values({
+          ...tenantInsert(),
+          inventory_item_id: itemId,
+          location_id: locId,
+          quantity: qty,
+          min_quantity: finalMinQty,
+        });
+        if (qty > 0) {
+          await tx.insert(stockMovements).values({
+            ...tenantInsert(),
+            inventory_item_id: itemId,
+            movement_type: "initial",
+            location_id: locId,
+            quantity_delta: qty,
+            quantity_after: qty,
+            created_by: payload.user_id || null,
+          });
+        }
+      }
+    }
+  }
+
   async update(id: string, payload: any) {
     const updates: Record<string, any> = {
       updated_at: new Date(),

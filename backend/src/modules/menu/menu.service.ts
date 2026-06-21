@@ -83,6 +83,19 @@ export class MenuService {
     const createdIds: string[] = [];
 
     await db.transaction(async (tx) => {
+      // Ensure every referenced main category exists for this branch before
+      // wiring items to it (deduped so we only touch each slug once).
+      const mainCategoryValues = Array.from(
+        new Set(
+          items
+            .map((item) => String(item?.main_category ?? "").trim())
+            .filter(Boolean),
+        ),
+      );
+      for (const value of mainCategoryValues) {
+        await this.ensureMainCategory(tx, value);
+      }
+
       for (const item of items) {
         const categoryInputs = asCategoryInputs(item);
         const [existing] = item.id
@@ -391,6 +404,33 @@ export class MenuService {
       .returning();
 
     return category;
+  }
+
+  // Insert a main_categories row for this branch when one doesn't exist yet.
+  // Keyed on (branch_id, slug); existing rows are left untouched so we never
+  // clobber a manually-curated name/order.
+  private async ensureMainCategory(tx: any, value: any) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return;
+    const slug = slugify(raw);
+    if (!slug) return;
+
+    const name = raw
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+    await tx
+      .insert(mainCategories)
+      .values({
+        ...tenantInsert(),
+        name,
+        slug,
+        display_order: 0,
+        is_active: true,
+      })
+      .onConflictDoNothing({
+        target: [mainCategories.branch_id, mainCategories.slug],
+      });
   }
 
   private hydrateMenuItems(rows: Array<{ item: any; category: any }>) {

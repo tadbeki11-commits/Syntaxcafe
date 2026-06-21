@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { DevicesService } from "./devices.service";
 
@@ -37,5 +37,13 @@ export class DevicesController {
   @Post("enroll")
   enroll(@Body() body: { code: string; device_name?: string }) {
     return this.devicesService.enroll(body?.code, body?.device_name);
+  }
+
+  @ApiOperation({
+    summary: "Kick out (remove) an enrolled device (owner/platform)",
+  })
+  @Delete(":id")
+  remove(@Param("id") id: string, @Query("branch_id") branchId: string) {
+    return this.devicesService.removeDevice(id, branchId);
   }
 }
