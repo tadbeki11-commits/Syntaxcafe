@@ -347,6 +347,33 @@ export class SettingsController {
     return { status: "success", data };
   }
 
+  @ApiOperation({ summary: "Get printer department routing settings" })
+  @Get("system/printer-routing")
+  async getPrinterRoutingSettings(@Headers("x-app-client") appClient: string) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    const data = await this.settingsService.getPrinterRoutingSettings();
+    return { status: "success", data };
+  }
+
+  @ApiOperation({
+    summary: "Update printer department routing settings (admin)",
+  })
+  @Put("system/printer-routing")
+  async updatePrinterRoutingSettings(
+    @Headers("x-app-client") appClient: string,
+    @Body() body: { printer_department_routing: Record<string, unknown> },
+  ) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    const data = await this.settingsService.updatePrinterRoutingSettings({
+      printer_department_routing: body?.printer_department_routing ?? {},
+    });
+    return { status: "success", data };
+  }
+
   @ApiOperation({ summary: "Get receipt system settings" })
   @Get("system/receipt")
   async getReceiptSettings(@Headers("x-app-client") appClient: string) {

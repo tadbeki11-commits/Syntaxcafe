@@ -58,6 +58,12 @@ export class SettingsFacade {
     allow_cashier_manage_org_orders: boolean;
   }) => this.adapter.updateOrganizationSettings(data);
 
+  getPrinterRoutingSettings = () => this.adapter.getPrinterRoutingSettings();
+  getLocalPrinterRoutingSettings = () =>
+    this.adapter.getLocalPrinterRoutingSettings();
+  updatePrinterRoutingSettings = (map: Record<string, any>) =>
+    this.adapter.updatePrinterRoutingSettings(map);
+
   getReceiptSettings = () => this.adapter.getReceiptSettings();
   getLocalReceiptSettings = () => this.adapter.getLocalReceiptSettings();
   updateReceiptSettings = (data: { enable_cashier_receipt: boolean }) =>

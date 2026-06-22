@@ -712,6 +712,76 @@ export const settingsAdapter = {
     return settingsAdapter.getLocalReceiptSettings();
   },
 
+  // ── Printer Department Routing ────────────────────────────────────────────────
+
+  /** Read the cached printer routing map from the local system-settings KV. */
+  getLocalPrinterRoutingSettings: async (): Promise<Record<string, any>> => {
+    try {
+      const db = await getLocalDb();
+      const rows = await db.select().from(localDbTables.systemSettings as any);
+      const row = rows.find((r: any) => r.key === "printer_department_routing");
+      const parsed = parseRawJson(row?.value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed
+        : {};
+    } catch {
+      return {};
+    }
+  },
+
+  /** Fetch the branch printer routing map (online) and cache it locally. */
+  getPrinterRoutingSettings: async (): Promise<Record<string, any>> => {
+    if (isOnline()) {
+      try {
+        const response = await api.get("/settings/system/printer-routing");
+        const data =
+          (response as any)?.data?.data ?? (response as any)?.data ?? {};
+        const map = data?.printer_department_routing ?? {};
+        const safeMap =
+          map && typeof map === "object" && !Array.isArray(map) ? map : {};
+        await upsertSystemSetting(
+          "printer_department_routing",
+          JSON.stringify(safeMap),
+        );
+        return safeMap;
+      } catch (err) {
+        console.warn(
+          "[settingsApi] Failed to fetch printer routing, using local cache:",
+          err,
+        );
+      }
+    }
+    return settingsAdapter.getLocalPrinterRoutingSettings();
+  },
+
+  /**
+   * Persist the branch printer routing map. Caches locally first so the config
+   * survives offline, then pushes to the backend best-effort when online.
+   */
+  updatePrinterRoutingSettings: async (
+    map: Record<string, any>,
+  ): Promise<Record<string, any>> => {
+    const safeMap =
+      map && typeof map === "object" && !Array.isArray(map) ? map : {};
+    await upsertSystemSetting(
+      "printer_department_routing",
+      JSON.stringify(safeMap),
+    );
+    if (isOnline()) {
+      try {
+        await api.put("/settings/system/printer-routing", {
+          printer_department_routing: safeMap,
+        });
+      } catch (err) {
+        console.warn(
+          "[settingsApi] Failed to push printer routing to backend:",
+          err,
+        );
+      }
+    }
+    return safeMap;
+  },
+
   /** Update receipt settings (admin) */
   updateReceiptSettings: async (data: { enable_cashier_receipt: boolean }) => {
     if (!isOnline()) {

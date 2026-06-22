@@ -8,7 +8,10 @@ import { CreditCard, DollarSign, Clipboard } from 'lucide-react';
 // Hooks
 import { useCashierData } from './hooks/useCashierData';
 import { useCashierStats } from './hooks/useCashierStats';
-import { useCashierPrinting } from './hooks/useCashierPrinting';
+import {
+  useCashierPrintingContext,
+  CASHIER_REFRESH_EVENT,
+} from '@/context/CashierPrintingContext';
 
 // Components
 import { HeaderBanner } from './components/HeaderBanner';
@@ -22,7 +25,10 @@ import { ModalSection } from './components/ModalSection';
 const CashierDashboard = () => {
   const { user } = useAuth() as any;
 
-  // Printing system
+  // Printing system — the auto-print engine itself lives in
+  // CashierPrintingProvider (mounted in DashboardLayout) so it keeps receiving
+  // and printing orders even while the cashier is on another page. Here we just
+  // consume that single shared instance.
   const {
     qzStatus,
     testQzPrint,
@@ -30,11 +36,7 @@ const CashierDashboard = () => {
     pollUnprintedOrders,
     stuckPrintOrders,
     retryStuckPrint,
-  } = useCashierPrinting({
-    refreshDashboardData: async () => {
-      await refreshDashboardData();
-    }
-  });
+  } = useCashierPrintingContext();
 
   // Data fetching
   const {
@@ -82,6 +84,19 @@ const CashierDashboard = () => {
     printOrderImmediately,
     pollUnprintedOrders
   });
+  // The background print engine (in CashierPrintingProvider) dispatches this
+  // event after each print pass. While the dashboard is open, refresh its lists
+  // so a newly arrived/printed order shows up without waiting for a poll.
+  useEffect(() => {
+    const onRefresh = () => {
+      refreshDashboardData();
+    };
+    window.addEventListener(CASHIER_REFRESH_EVENT, onRefresh);
+    return () => {
+      window.removeEventListener(CASHIER_REFRESH_EVENT, onRefresh);
+    };
+  }, [refreshDashboardData]);
+
   const [mainCategories, setMainCategories] = useState<Array<{ name: string; slug: string }>>([]);
 
   useEffect(() => {

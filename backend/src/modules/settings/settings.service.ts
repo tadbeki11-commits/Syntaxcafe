@@ -369,6 +369,40 @@ export class SettingsService {
     return { force_table_selection: data.force_table_selection };
   }
 
+  // Per-branch printer department routing (which printers/stations a department
+  // fans its tickets out to). Stored as a JSON blob under a single key so the
+  // POS can mirror the whole map into its local config in one shot.
+  async getPrinterRoutingSettings(): Promise<{
+    printer_department_routing: Record<string, unknown>;
+  }> {
+    const raw = await this.getSystemSetting("printer_department_routing");
+    let parsed: Record<string, unknown> = {};
+    if (raw) {
+      try {
+        const value = JSON.parse(raw);
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          parsed = value;
+        }
+      } catch {
+        // Corrupt/legacy value — treat as empty rather than failing the request.
+      }
+    }
+    return { printer_department_routing: parsed };
+  }
+
+  async updatePrinterRoutingSettings(data: {
+    printer_department_routing: Record<string, unknown>;
+  }): Promise<{ printer_department_routing: Record<string, unknown> }> {
+    const map =
+      data?.printer_department_routing &&
+      typeof data.printer_department_routing === "object" &&
+      !Array.isArray(data.printer_department_routing)
+        ? data.printer_department_routing
+        : {};
+    await this.setSystemSetting("printer_department_routing", JSON.stringify(map));
+    return { printer_department_routing: map };
+  }
+
   async getReceiptSettings(): Promise<{ enable_cashier_receipt: boolean }> {
     const raw = await this.getSystemSetting("enable_cashier_receipt");
     return { enable_cashier_receipt: raw === "true" };

@@ -8,6 +8,11 @@ import { persistServerOrders } from "@/infrastructure/adapters/orders.adapter";
 
 interface PrintingProps {
   refreshDashboardData: () => Promise<void>;
+  // When false, the background engine (socket subscription, polling loop and
+  // print-leadership renewal) stays dormant. The interactive helpers
+  // (printOrderImmediately, testQzPrint) remain callable. Used so only the
+  // cashier role runs the auto-print engine.
+  enabled?: boolean;
 }
 
 export interface StuckPrintOrder {
@@ -22,7 +27,7 @@ export interface StuckPrintOrder {
 // truly offline / out of paper) rather than silently looping forever.
 const FAILURE_BANNER_THRESHOLD = 3;
 
-export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
+export const useCashierPrinting = ({ refreshDashboardData, enabled = true }: PrintingProps) => {
   const [qzStatus, setQzStatus] = useState<any>({
     connected: true,
     error: null,
@@ -110,6 +115,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
 
   // Print Leadership Management
   useEffect(() => {
+    if (!enabled) return;
     if (typeof window === "undefined") return;
     const renew = () => {
       tryAcquirePrintLeadership();
@@ -135,7 +141,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
       clearInterval(t);
       window.removeEventListener("beforeunload", onUnload);
     };
-  }, [tryAcquirePrintLeadership]);
+  }, [tryAcquirePrintLeadership, enabled]);
 
   const maybeToastError = useCallback((err: any) => {
     const now = getApproximateServerNow();
@@ -282,6 +288,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
 
   // Background Polling Effect
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     const tick = async () => {
@@ -301,12 +308,13 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
       cancelled = true;
       if (pollIntervalRef.current) clearTimeout(pollIntervalRef.current);
     };
-  }, [pollUnprintedOrders]);
+  }, [pollUnprintedOrders, enabled]);
 
   // Real-time order stream (WebSocket). While online, the device keeps an
   // active branch-scoped socket to the backend; an order created by a waiter
   // arrives instantly and triggers an immediate refresh + auto-print pass.
   useEffect(() => {
+    if (!enabled) return;
     const unsubscribe = orderSocket.subscribeNewOrder(async (order) => {
       try {
         // The socket payload carries the full order. The cashier list reads
@@ -326,7 +334,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
     return () => {
       unsubscribe();
     };
-  }, [pollUnprintedOrders, refreshDashboardData]);
+  }, [pollUnprintedOrders, refreshDashboardData, enabled]);
 
   // Diagnostic Printer testing utility
   const testQzPrint = async () => {

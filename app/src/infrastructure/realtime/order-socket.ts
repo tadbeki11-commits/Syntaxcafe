@@ -12,7 +12,8 @@
 
 import { io, type Socket } from "socket.io-client";
 import { API_BASE_URL } from "@/infrastructure/api/http-client";
-import { getDeviceToken } from "@/shared/utils/deviceToken";
+import { getDeviceToken, getDeviceEnrollment } from "@/shared/utils/deviceToken";
+import { getSessionUser } from "@/shared/utils/sessionUser";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
 
 type NewOrderHandler = (order: any) => void;
@@ -43,13 +44,34 @@ class OrderSocketManager {
     });
   }
 
-  private connect() {
+  /**
+   * Auth payload for the gateway. A device-enrolled POS authenticates with its
+   * token (the backend resolves it to the device's branch). For clients the
+   * token alone can't scope — owner/business accounts have no single branch
+   * (branch_id is null) — we also send an explicit branchId fallback: the branch
+   * the device is enrolled to, or the user's own pinned branch. The gateway
+   * prefers the token and only uses branchId when the token doesn't resolve.
+   */
+  private buildAuth(): { deviceToken?: string; branchId?: string } | null {
     const token = getDeviceToken();
-    // Without a device token the backend can't scope us to a branch.
-    if (!token) return;
+    const branchId =
+      getDeviceEnrollment()?.branchId ||
+      (getSessionUser()?.branch_id as string | undefined) ||
+      undefined;
+    if (!token && !branchId) return null;
+    return {
+      ...(token ? { deviceToken: token } : {}),
+      ...(branchId ? { branchId } : {}),
+    };
+  }
+
+  private connect() {
+    const auth = this.buildAuth();
+    // Without a device token or a branch the backend can't scope us to a branch.
+    if (!auth) return;
 
     if (this.socket) {
-      (this.socket.auth as any) = { deviceToken: token };
+      (this.socket.auth as any) = auth;
       if (!this.socket.connected) this.socket.connect();
       return;
     }
@@ -58,7 +80,7 @@ class OrderSocketManager {
     if (!origin) return;
 
     const socket = io(`${origin}/orders`, {
-      auth: { deviceToken: token },
+      auth,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,

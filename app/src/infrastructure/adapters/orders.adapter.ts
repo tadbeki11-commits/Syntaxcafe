@@ -10,7 +10,10 @@ import {
   isOnline,
   generateEscPosBase64,
 } from "@/infrastructure/api/http-client";
-import { getPrinterForDepartment } from "@/infrastructure/printing/printer-config";
+import {
+  getPrinterForDepartment,
+  getDepartmentStations,
+} from "@/infrastructure/printing/printer-config";
 import { eq } from "drizzle-orm";
 import {
   findById,
@@ -922,28 +925,31 @@ const ordersAdapterImpl = {
 
     const jobsByPrinter: Record<string, any> = {};
 
-    for (const dept of departments) {
-      const deptItems = itemsByDept[dept];
-      const deptPrinter =
-        resolvePrinter(getPrinterForDepartment(dept), availablePrinters) ||
-        targetPrinter;
-      const deptTotal = deptItems.reduce(
-        (sum, item) => sum + (parseFloat(item.subtotal) || 0),
-        0,
-      );
+    const printedAtDate = order.created_at
+      ? new Date(order.created_at)
+      : getApproximateServerDate();
+    const orderNote = String(order.notes || "").trim();
 
-      const printedAtDate = order.created_at
-        ? new Date(order.created_at)
-        : getApproximateServerDate();
-
-      const colWidths = ORDER_TICKET_COLUMN_WIDTHS;
-      const colAligns = ORDER_TICKET_COLUMN_ALIGNS;
+    // Build one department/station ticket. `headerLabel` is the bold line under
+    // the title (e.g. "DEPT: BUTCHERY", "BUTCHER", "CUSTOMER COPY"). When
+    // `showPrices` is set the ticket carries per-line subtotals and a total —
+    // used for the customer's copy; prep tickets (butcher/kitchen) stay
+    // price-free so the line cooks don't get distracted by money.
+    const buildTicketBlocks = (
+      deptItems: any[],
+      headerLabel: string,
+      showPrices: boolean,
+    ): ReceiptBlock[] => {
+      const colWidths = showPrices ? [6, 26, 16] : ORDER_TICKET_COLUMN_WIDTHS;
+      const colAligns: ("left" | "right" | "center")[] = showPrices
+        ? ["center", "left", "right"]
+        : ORDER_TICKET_COLUMN_ALIGNS;
 
       const blocks: ReceiptBlock[] = [
         { kind: "title", text: "Syntax services" },
         {
           kind: "text",
-          text: `DEPT: ${dept.toUpperCase()}`,
+          text: headerLabel,
           align: "center",
           bold: true,
         },
@@ -986,19 +992,26 @@ const ordersAdapterImpl = {
           widths: colWidths,
           align: colAligns,
           bold: true,
-          cells: ["Qty", "Item"],
+          cells: showPrices ? ["Qty", "Item", "Subtotal"] : ["Qty", "Item"],
         },
-        // Each item: a Qty/Item row, followed by its own note (if any) on the
-        // next line(s). Per-item notes ride with their item, so they only print
-        // on the department ticket that actually makes that item.
+        // Each item: a row, followed by its own note (if any) on the next
+        // line(s). Per-item notes ride with their item, so they only print on
+        // the ticket that actually makes that item.
         ...deptItems.flatMap((item: any): ReceiptBlock[] => {
+          const name = String(item.menu_item_name || "Item");
           const itemBlocks: ReceiptBlock[] = [
             {
               kind: "row",
               widths: colWidths,
               align: colAligns,
               bold: true,
-              cells: [`X ${String(item.quantity)}`, String(item.menu_item_name || "Item")],
+              cells: showPrices
+                ? [
+                    `X ${String(item.quantity)}`,
+                    name,
+                    (parseFloat(item.subtotal) || 0).toFixed(2),
+                  ]
+                : [`X ${String(item.quantity)}`, name],
             },
           ];
           const itemNote = String(item.note || item.notes || "").trim();
@@ -1011,7 +1024,23 @@ const ordersAdapterImpl = {
         }),
       ];
 
-      const orderNote = String(order.notes || "").trim();
+      if (showPrices) {
+        const deptTotal = deptItems.reduce(
+          (sum, item) => sum + (parseFloat(item.subtotal) || 0),
+          0,
+        );
+        blocks.push(
+          { kind: "divider" },
+          {
+            kind: "text",
+            text: `TOTAL: ${deptTotal.toFixed(2)}`,
+            align: "center",
+            bold: true,
+            large: true,
+          },
+        );
+      }
+
       if (orderNote) {
         blocks.push(
           { kind: "divider" },
@@ -1027,24 +1056,66 @@ const ordersAdapterImpl = {
         );
       }
 
+      return blocks;
+    };
+
+    // Render `blocks` and queue it onto `printerName`'s job `copies` times.
+    // Tickets bound for the same printer are concatenated into one job (each
+    // with its own cut) so a printer fires once per order.
+    const queueTicket = async (
+      blocks: ReceiptBlock[],
+      printerName: string,
+      copies: number,
+    ) => {
+      const deptPrinter =
+        resolvePrinter(printerName, availablePrinters) || targetPrinter;
       const imageData = await renderReceiptImage(blocks);
       const printerKey = String(deptPrinter || "").trim();
-      if (!jobsByPrinter[printerKey]) {
-        jobsByPrinter[printerKey] = createPrintJob(imageData, deptPrinter);
-      } else {
-        jobsByPrinter[printerKey].sections.push(
-          {
-            Image: {
-              data: imageData,
-              max_width: 0,
-              align: "center",
-              dithering: false,
-              size: "normal",
+      for (let copy = 0; copy < Math.max(1, copies); copy += 1) {
+        if (!jobsByPrinter[printerKey]) {
+          jobsByPrinter[printerKey] = createPrintJob(imageData, deptPrinter);
+        } else {
+          jobsByPrinter[printerKey].sections.push(
+            {
+              Image: {
+                data: imageData,
+                max_width: 0,
+                align: "center",
+                dithering: false,
+                size: "normal",
+              },
             },
-          },
-          { Feed: { feed_type: "lines", value: 3 } },
-          { Cut: { mode: "partial", feed: 0 } },
+            { Feed: { feed_type: "lines", value: 3 } },
+            { Cut: { mode: "partial", feed: 0 } },
+          );
+        }
+      }
+    };
+
+    for (const dept of departments) {
+      const deptItems = itemsByDept[dept];
+      const stations = getDepartmentStations(dept);
+
+      if (stations.length > 0) {
+        // Advanced routing (e.g. butchery): fan the same items out to each
+        // station's printer with that station's label, copies and price flag.
+        for (const station of stations) {
+          const headerLabel = station.label || `DEPT: ${dept.toUpperCase()}`;
+          const blocks = buildTicketBlocks(
+            deptItems,
+            headerLabel,
+            station.showPrices,
+          );
+          await queueTicket(blocks, station.printer, station.copies);
+        }
+      } else {
+        // Default: a single prep ticket to the department's printer.
+        const blocks = buildTicketBlocks(
+          deptItems,
+          `DEPT: ${dept.toUpperCase()}`,
+          false,
         );
+        await queueTicket(blocks, getPrinterForDepartment(dept), 1);
       }
     }
 

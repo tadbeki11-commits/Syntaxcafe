@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '@/application';
@@ -11,7 +11,12 @@ import {
   Circle,
   Settings2,
   AlertTriangle,
-  Wifi
+  Wifi,
+  Plus,
+  Trash2,
+  ChevronDown,
+  Layers,
+  GripVertical
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,6 +37,12 @@ import {
   getActivePrinterName,
   getPrinterForDepartment,
   getPrintCopies,
+  getDepartmentConfigMap,
+  setDepartmentConfig,
+  replaceDepartmentConfigMap,
+  createStationId,
+  type DepartmentStation,
+  type DepartmentPrintConfig,
 } from '@/infrastructure/printing/printer-config';
 import { getApproximateServerDate } from '@/shared/utils/serverTime';
 
@@ -99,6 +110,24 @@ const PrinterSettings: React.FC = () => {
   const [testingPrinter, setTestingPrinter] = useState<string | null>(null);
   const [printerAssignments, setPrinterAssignments] = useState<Record<string, string>>(getPrinterDepartmentMap());
   const [printCopies, setPrintCopies] = useState<number>(getPrintCopies());
+  const [departmentConfigs, setDepartmentConfigs] = useState<Record<string, DepartmentPrintConfig>>(getDepartmentConfigMap());
+  const [expandedDept, setExpandedDept] = useState<string | null>(null);
+
+  // Debounced push of the whole routing map to the branch backend. Local
+  // storage is always written synchronously by the change handlers; this just
+  // mirrors the result up so it persists across reinstalls and devices.
+  const routingSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pushRoutingToBackend = useCallback(() => {
+    if (routingSyncTimer.current) clearTimeout(routingSyncTimer.current);
+    routingSyncTimer.current = setTimeout(() => {
+      api.settings.updatePrinterRoutingSettings(getDepartmentConfigMap()).catch(() => {
+        /* best-effort — config is already saved locally */
+      });
+    }, 800);
+  }, []);
+  useEffect(() => () => {
+    if (routingSyncTimer.current) clearTimeout(routingSyncTimer.current);
+  }, []);
 
   // ── Load printers ──────────────────────────────────────────────────────────
   const loadPrinters = useCallback(async () => {
@@ -144,36 +173,108 @@ const PrinterSettings: React.FC = () => {
     }
   }, []);
 
+  // Pull the branch routing config from the backend. If the backend already has
+  // a map, it wins and we mirror it into local storage. If it's empty (nothing
+  // saved yet), we seed it from whatever this device has locally rather than
+  // wiping a device that was configured before this synced to the backend.
+  const loadRouting = useCallback(async () => {
+    try {
+      const map = await api.settings.getPrinterRoutingSettings();
+      if (map && typeof map === 'object' && Object.keys(map).length > 0) {
+        replaceDepartmentConfigMap(map);
+        setDepartmentConfigs(getDepartmentConfigMap());
+        setPrinterAssignments(getPrinterDepartmentMap());
+      } else {
+        const local = getDepartmentConfigMap();
+        if (Object.keys(local).length > 0) {
+          api.settings.updatePrinterRoutingSettings(local).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.warn('[PrinterSettings] Failed to load routing from backend:', err);
+    }
+  }, []);
+
   useEffect(() => {
     loadPrinters();
     loadDepartments();
-  }, [loadDepartments, loadPrinters]);
+    loadRouting();
+  }, [loadDepartments, loadPrinters, loadRouting]);
 
   // ── Save selection ─────────────────────────────────────────────────────────
-  // One printer can serve multiple departments; each department maps to a single printer.
+  // One printer can serve multiple departments; each department maps to a single
+  // printer. Writes go through setPrinterDepartment so the department's advanced
+  // station routing (if any) is preserved.
   const handleToggleDepartment = (printerName: string, departmentSlug: string, checked: boolean) => {
     const departmentLabel =
       availableDepartments.find((entry) => entry.slug === departmentSlug)?.name || departmentSlug;
 
-    setPrinterAssignments((current) => {
-      const next: Record<string, string> = { ...current };
+    const current = printerAssignments[departmentSlug];
+    setPrinterDepartment(departmentSlug, checked ? printerName : current === printerName ? '' : current || '');
 
-      if (checked) {
-        // Assign this department to this printer (reassigns it from any other printer).
-        next[departmentSlug] = printerName;
-      } else if (next[departmentSlug] === printerName) {
-        delete next[departmentSlug];
-      }
-
-      localStorage.setItem(PRINTER_DEPARTMENT_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
+    setPrinterAssignments(getPrinterDepartmentMap());
+    setDepartmentConfigs(getDepartmentConfigMap());
+    pushRoutingToBackend();
 
     if (checked) {
       toast.success(`🖨️ ${printerName} now prints ${departmentLabel} receipts`, { duration: 2000 });
     } else {
       toast.success(`🖨️ ${printerName} no longer prints ${departmentLabel} receipts`, { duration: 2000 });
     }
+  };
+
+  // ── Advanced station routing ─────────────────────────────────────────────────
+  // A department can fan one order out to several stations (e.g. an Ethiopian
+  // butchery: Butcher → Kitchen → Customer copy). Each station is its own ticket
+  // to its own printer, all sharing the order number.
+  const persistDepartmentConfig = (slug: string, config: DepartmentPrintConfig) => {
+    setDepartmentConfig(slug, config);
+    setDepartmentConfigs(getDepartmentConfigMap());
+    setPrinterAssignments(getPrinterDepartmentMap());
+    pushRoutingToBackend();
+  };
+
+  const getConfigFor = (slug: string): DepartmentPrintConfig =>
+    departmentConfigs[slug] || { printer: '', stations: [] };
+
+  const handleAddStation = (slug: string) => {
+    const config = getConfigFor(slug);
+    const station: DepartmentStation = {
+      id: createStationId(),
+      label: '',
+      printer: printers[0]?.name || config.printer || '',
+      copies: 1,
+      showPrices: false,
+    };
+    persistDepartmentConfig(slug, { ...config, stations: [...config.stations, station] });
+  };
+
+  const handleUpdateStation = (slug: string, stationId: string, patch: Partial<DepartmentStation>) => {
+    const config = getConfigFor(slug);
+    persistDepartmentConfig(slug, {
+      ...config,
+      stations: config.stations.map((s) => (s.id === stationId ? { ...s, ...patch } : s)),
+    });
+  };
+
+  const handleRemoveStation = (slug: string, stationId: string) => {
+    const config = getConfigFor(slug);
+    persistDepartmentConfig(slug, {
+      ...config,
+      stations: config.stations.filter((s) => s.id !== stationId),
+    });
+  };
+
+  const handleApplyButcheryPreset = (slug: string) => {
+    const config = getConfigFor(slug);
+    const defaultPrinter = config.printer || printers[0]?.name || '';
+    const stations: DepartmentStation[] = [
+      { id: createStationId(), label: 'BUTCHER', printer: defaultPrinter, copies: 1, showPrices: false },
+      { id: createStationId(), label: 'KITCHEN', printer: defaultPrinter, copies: 1, showPrices: false },
+      { id: createStationId(), label: 'CUSTOMER COPY', printer: defaultPrinter, copies: 1, showPrices: true },
+    ];
+    persistDepartmentConfig(slug, { ...config, stations });
+    toast.success('Butchery routing added — set a printer for each station', { duration: 2500 });
   };
 
   const assignedDepartments = Object.entries(printerAssignments);
@@ -497,6 +598,174 @@ const PrinterSettings: React.FC = () => {
             Assign a printer to a department, then orders with that department will print only on that printer.
             If a department is unassigned, the system falls back to the configured active printer, then the <code className="bg-muted px-1 rounded">VITE_PRINTER_NAME</code> environment variable.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* ── Advanced Department Routing ── */}
+      <Card className="shadow-sm border-border/60">
+        <CardHeader className="pb-3 pt-5 px-5">
+          <CardTitle className="text-base font-bold flex items-center gap-2">
+            <Layers className="w-4 h-4 text-primary" />
+            Advanced Department Routing
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Optional. Fan a department's order out to several stations — each its own ticket and printer,
+            all sharing the order number. Built for butchery flows (Butcher → Kitchen → Customer copy).
+            Leave a department untouched to keep its single-ticket behavior above.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="px-5 pb-5 space-y-2">
+          {availableDepartments.length === 0 && (
+            <p className="text-xs text-muted-foreground py-4 text-center">
+              No departments found in the database.
+            </p>
+          )}
+
+          {availableDepartments.map((dept) => {
+            const config = departmentConfigs[dept.slug] || { printer: '', stations: [] };
+            const stations = config.stations;
+            const expanded = expandedDept === dept.slug;
+
+            return (
+              <div key={dept.slug} className="rounded-xl border-2 border-border/50 overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
+                  onClick={() => setExpandedDept(expanded ? null : dept.slug)}
+                >
+                  <span className="font-bold text-sm text-foreground flex-1 truncate">{dept.name}</span>
+                  {stations.length > 0 ? (
+                    <Badge className="bg-primary/15 text-primary border-none text-[10px] font-bold">
+                      {stations.length} station{stations.length !== 1 ? 's' : ''}
+                    </Badge>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">
+                      {config.printer ? 'Single ticket' : 'Not routed'}
+                    </span>
+                  )}
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                </button>
+
+                {expanded && (
+                  <div className="border-t border-border/50 px-4 py-3 space-y-3 bg-muted/10">
+                    {stations.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        This department prints one ticket to its assigned printer. Add stations to split it.
+                      </p>
+                    )}
+
+                    {stations.map((station, idx) => (
+                      <div
+                        key={station.id}
+                        className="rounded-lg border border-border/60 bg-background p-3 space-y-2.5"
+                      >
+                        <div className="flex items-center gap-2">
+                          <GripVertical className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                            Station {idx + 1}
+                          </span>
+                          <div className="flex-1" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleRemoveStation(dept.slug, station.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div>
+                            <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                              Ticket label
+                            </Label>
+                            <Input
+                              value={station.label}
+                              placeholder="e.g. BUTCHER"
+                              onChange={(e) => handleUpdateStation(dept.slug, station.id, { label: e.target.value })}
+                              className="mt-1 h-9 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                              Printer
+                            </Label>
+                            <select
+                              value={station.printer}
+                              onChange={(e) => handleUpdateStation(dept.slug, station.id, { printer: e.target.value })}
+                              className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
+                            >
+                              <option value="">Select printer…</option>
+                              {printers.map((p) => (
+                                <option key={p.name} value={p.name}>{p.name}</option>
+                              ))}
+                              {station.printer && !printers.some((p) => p.name === station.printer) && (
+                                <option value={station.printer}>{station.printer} (offline)</option>
+                              )}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                              Copies
+                            </Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={station.copies}
+                              onChange={(e) =>
+                                handleUpdateStation(dept.slug, station.id, {
+                                  copies: Math.max(1, Math.min(10, parseInt(e.target.value || '1', 10))),
+                                })
+                              }
+                              className="h-8 w-16 text-xs"
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                            <Checkbox
+                              checked={station.showPrices}
+                              onCheckedChange={(value) =>
+                                handleUpdateStation(dept.slug, station.id, { showPrices: value === true })
+                              }
+                            />
+                            Show prices (customer copy)
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs font-bold"
+                        onClick={() => handleAddStation(dept.slug)}
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Add station
+                      </Button>
+                      {stations.length === 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs font-bold text-primary"
+                          onClick={() => handleApplyButcheryPreset(dept.slug)}
+                        >
+                          <Layers className="w-3.5 h-3.5 mr-1" />
+                          Use butchery preset
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 

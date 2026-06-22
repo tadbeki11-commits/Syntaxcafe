@@ -18,6 +18,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import BranchBadge from '@/components/common/BranchBadge';
+import { replaceDepartmentConfigMap } from '@/infrastructure/printing/printer-config';
+import { CashierPrintingProvider } from '@/context/CashierPrintingContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -75,6 +77,26 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
   const [cashierCanManageOrgs, setCashierCanManageOrgs] = useState(false);
   const [enableCashierReceipt, setEnableCashierReceipt] = useState(false);
+
+  // Mirror the branch printer routing into this device's local config so the
+  // auto-print queue honors it even on a station that never opened Printer
+  // Settings (e.g. a fresh install). Only overwrites when the backend actually
+  // has a saved map, so a locally-configured-but-not-yet-synced device is safe.
+  useEffect(() => {
+    if (!user?.role) return;
+    let active = true;
+    api.settings
+      .getPrinterRoutingSettings()
+      .then((map: Record<string, unknown>) => {
+        if (active && map && typeof map === 'object' && Object.keys(map).length > 0) {
+          replaceDepartmentConfigMap(map);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [user?.role]);
 
   useEffect(() => {
     let active = true;
@@ -271,6 +293,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   );
 
   return (
+    <CashierPrintingProvider>
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className={cn(
@@ -325,6 +348,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         </main>
       </div>
     </div>
+    </CashierPrintingProvider>
   );
 };
 
