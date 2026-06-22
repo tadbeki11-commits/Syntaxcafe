@@ -28,28 +28,36 @@ type Item = {
   id: string;
   name: string;
   price: string | null;
+  // The actual menu category (e.g. "Hot Drinks", "Pastries").
   category: string | null;
+  // The printing/kitchen department this item routes to (e.g. "barista").
   main_category: string | null;
   type: string | null;
   is_available: boolean;
 };
+// A "main category" row — i.e. a printing/kitchen department.
+type Department = { id: string; name: string; slug: string };
+// A real menu category — used to filter the menu in the waiter/cashier screens.
 type Category = { id: string; name: string; slug: string };
 
 export default function MenuPage() {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Item | null>(null);
   const [open, setOpen] = useState(false);
   const [recipeItem, setRecipeItem] = useState<Item | null>(null);
+  const [deptName, setDeptName] = useState("");
   const [catName, setCatName] = useState("");
 
   function load() {
     setLoading(true);
-    return Promise.all([Menu.items(), Menu.categories()])
-      .then(([i, c]) => {
+    return Promise.all([Menu.items(), Menu.departments(), Menu.categories()])
+      .then(([i, d, c]) => {
         setItems(i);
+        setDepartments(d);
         setCategories(c);
       })
       .catch((e) => toast.error(e.message))
@@ -65,7 +73,7 @@ export default function MenuPage() {
       name: "",
       price: "",
       category: "",
-      main_category: "",
+      main_category: departments[0]?.slug ?? "",
       type: "cafe",
       is_available: true,
     });
@@ -77,7 +85,8 @@ export default function MenuPage() {
     const body = {
       name: editing.name,
       price: editing.price ? Number(editing.price) : null,
-      category: editing.category || editing.main_category || null,
+      // Real menu category and printing department are kept distinct.
+      category: editing.category?.trim() || null,
       main_category: editing.main_category || null,
       type: editing.type || "cafe",
       is_available: editing.is_available,
@@ -113,6 +122,18 @@ export default function MenuPage() {
     }
   }
 
+  async function addDepartment() {
+    if (!deptName.trim()) return;
+    try {
+      await Menu.createDepartment({ name: deptName.trim() });
+      setDeptName("");
+      toast.success("Department added");
+      await load();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
+
   async function addCategory() {
     if (!catName.trim()) return;
     try {
@@ -125,14 +146,35 @@ export default function MenuPage() {
     }
   }
 
+  async function removeCategory(id: string) {
+    if (!confirm("Delete this category? Items keep their existing category text.")) return;
+    try {
+      await Menu.removeCategory(id);
+      toast.success("Category deleted");
+      await load();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
+
+  const deptLabel = (slug: string | null) =>
+    departments.find((d) => d.slug === slug)?.name || slug || "—";
+
   const itemColumns: Column<Item>[] = [
     { key: "name", label: "Name", className: "font-medium" },
     {
       key: "category",
       label: "Category",
       className: "text-muted-foreground",
-      searchValue: (it) => it.main_category || it.category || "",
-      render: (it) => it.main_category || it.category || "—",
+      searchValue: (it) => it.category || "",
+      render: (it) => it.category || "—",
+    },
+    {
+      key: "main_category",
+      label: "Department",
+      className: "text-muted-foreground",
+      searchValue: (it) => deptLabel(it.main_category),
+      render: (it) => deptLabel(it.main_category),
     },
     { key: "price", label: "Price", render: (it) => birr(it.price) },
     {
@@ -144,6 +186,11 @@ export default function MenuPage() {
     },
   ];
 
+  const departmentColumns: Column<Department>[] = [
+    { key: "name", label: "Name", className: "font-medium" },
+    { key: "slug", label: "Slug", className: "text-muted-foreground" },
+  ];
+
   const categoryColumns: Column<Category>[] = [
     { key: "name", label: "Name", className: "font-medium" },
     { key: "slug", label: "Slug", className: "text-muted-foreground" },
@@ -153,7 +200,7 @@ export default function MenuPage() {
     <div className="space-y-6">
       <PageHeader
         title="Menu"
-        description="Items and categories for this branch."
+        description="Items, categories, and printing departments for this branch."
         action={
           <div className="flex items-center gap-2">
             <Button
@@ -174,6 +221,7 @@ export default function MenuPage() {
         <TabsList>
           <TabsTrigger value="items">Items</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="departments">Departments</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items">
@@ -186,10 +234,16 @@ export default function MenuPage() {
             emptyMessage="No menu items. Add your first item."
             filters={[
               {
-                key: "main_category",
+                key: "category",
                 label: "Category",
-                options: categories.map((c) => ({ value: c.slug, label: c.name })),
-                match: (it, v) => it.main_category === v || it.category === v,
+                options: categories.map((c) => ({ value: c.name, label: c.name })),
+                match: (it, v) => it.category === v,
+              },
+              {
+                key: "main_category",
+                label: "Department",
+                options: departments.map((d) => ({ value: d.slug, label: d.name })),
+                match: (it, v) => it.main_category === v,
               },
               {
                 key: "is_available",
@@ -230,7 +284,11 @@ export default function MenuPage() {
 
         <TabsContent value="categories" className="space-y-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Categories group items on the menu (e.g. Hot Drinks, Pastries) and
+                are used as filters in the waiter and cashier order screens.
+              </p>
               <div className="flex gap-2">
                 <Input
                   placeholder="New category name"
@@ -251,6 +309,41 @@ export default function MenuPage() {
             searchKeys={["name", "slug"]}
             searchPlaceholder="Search categories…"
             emptyMessage="No categories yet."
+            rowActions={(c) => (
+              <Button variant="ghost" size="icon" onClick={() => removeCategory(c.id)}>
+                <Trash2Icon className="size-4 text-destructive" />
+              </Button>
+            )}
+          />
+        </TabsContent>
+
+        <TabsContent value="departments" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Departments route items to the right kitchen/bar printer (e.g.
+                Barista, Kitchen). Each item is assigned a department on its form.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="New department name"
+                  value={deptName}
+                  onChange={(e) => setDeptName(e.target.value)}
+                />
+                <Button onClick={addDepartment}>
+                  <PlusIcon className="size-4" />
+                  Add
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          <DataTable<Department>
+            columns={departmentColumns}
+            rows={departments}
+            loading={loading}
+            searchKeys={["name", "slug"]}
+            searchPlaceholder="Search departments…"
+            emptyMessage="No departments yet."
           />
         </TabsContent>
       </Tabs>
@@ -279,17 +372,45 @@ export default function MenuPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Category</Label>
+                  <Label>Department (printing)</Label>
                   <select
                     className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm"
                     value={editing.main_category ?? ""}
-                    onChange={(e) => setEditing({ ...editing, main_category: e.target.value })}>
+                    onChange={(e) =>
+                      setEditing({ ...editing, main_category: e.target.value })
+                    }>
                     <option value="">—</option>
-                    {categories.map((c) => (
-                      <option key={c.slug} value={c.slug}>{c.name}</option>
+                    {departments.map((d) => (
+                      <option key={d.slug} value={d.slug}>
+                        {d.name}
+                      </option>
                     ))}
                   </select>
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <select
+                  className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                  value={editing.category ?? ""}
+                  onChange={(e) =>
+                    setEditing({ ...editing, category: e.target.value })
+                  }>
+                  <option value="">—</option>
+                  {/* Existing category that isn't in the managed list yet. */}
+                  {editing.category &&
+                    !categories.some((c) => c.name === editing.category) && (
+                      <option value={editing.category}>{editing.category}</option>
+                    )}
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Manage the list in the Categories tab.
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <Switch

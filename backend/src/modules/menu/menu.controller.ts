@@ -102,6 +102,25 @@ export class MenuController {
     };
   }
 
+  @ApiOperation({ summary: "Create a menu category" })
+  @Post("categories")
+  async createCategory(@Body() body: any) {
+    const category = await this.menuService.createCategory(body);
+    return {
+      status: "success",
+      message: "Category created successfully",
+      data: { categories: [category], count: 1 },
+    };
+  }
+
+  @ApiOperation({ summary: "Delete a menu category" })
+  @ApiParam({ name: "id", required: true })
+  @Delete("categories/:id")
+  async deleteCategory(@Param("id") id: string) {
+    await this.menuService.deleteCategory(id);
+    return { status: "success", message: "Category deleted successfully" };
+  }
+
   @ApiOperation({ summary: "List main categories" })
   @ApiQuery({ name: "is_active", required: false, type: Boolean })
   @ApiQuery({ name: "search", required: false })

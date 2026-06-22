@@ -9,10 +9,18 @@ const del = { method: "DELETE" };
 
 export const Menu = {
   items: () => apiFetch("/menu").then((d) => d.data.menuItems ?? []),
-  // Categories shown/managed here are "main categories" — the same table the
-  // create call writes to, and the source for a menu item's `main_category`.
-  categories: () =>
+  // "Main categories" are the printing/kitchen departments — the table that
+  // feeds a menu item's `main_category` and drives department→printer routing.
+  // Exposed here as `departments` so the UI stops conflating them with the
+  // item's real `category`.
+  departments: () =>
     apiFetch("/menu/main-categories").then((d) => d.data.mainCategories ?? []),
+  // The real menu categories — the list waiters/cashiers filter the menu by,
+  // and the source for a menu item's `category`.
+  categories: () =>
+    apiFetch("/menu/categories").then((d) => d.data.categories ?? []),
+  createCategory: (b: any) => apiFetch("/menu/categories", j(b)),
+  removeCategory: (id: string) => apiFetch(`/menu/categories/${id}`, del),
   create: (b: any) => apiFetch("/menu", j(b)),
   // Bulk create/update. The backend upserts each item and emits sync events,
   // scoped to the branch from the X-Branch-Id header.
@@ -20,7 +28,7 @@ export const Menu = {
   update: (id: string, b: any) => apiFetch(`/menu/${id}`, put(b)),
   remove: (id: string) => apiFetch(`/menu/${id}`, del),
   toggle: (id: string) => apiFetch(`/menu/${id}/toggle-availability`, { method: "POST" }),
-  createCategory: (b: any) => apiFetch("/menu/main-categories", j(b)),
+  createDepartment: (b: any) => apiFetch("/menu/main-categories", j(b)),
 };
 
 export const Inventory = {

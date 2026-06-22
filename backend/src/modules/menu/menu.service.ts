@@ -323,6 +323,50 @@ export class MenuService {
       .orderBy(asc(categories.type), asc(categories.display_order), asc(categories.name));
   }
 
+  // Create (or rename) a real menu category — the list waiters and cashiers
+  // filter the menu by. Stored in the `categories` table, keyed on
+  // (branch_id, slug) so re-adding an existing name just refreshes it.
+  async createCategory(payload: any) {
+    const name = String(payload?.name || "").trim();
+    if (!name) {
+      throw new Error("Category name is required");
+    }
+
+    const slug = slugify(payload?.slug || name) || `category-${Date.now()}`;
+
+    const [category] = await db
+      .insert(categories)
+      .values({
+        ...tenantInsert(),
+        name,
+        slug,
+        icon: payload?.icon ?? null,
+        display_order: payload?.display_order ?? 0,
+        type: payload?.type ?? "main",
+        is_active: payload?.is_active ?? true,
+      })
+      .onConflictDoUpdate({
+        target: [categories.branch_id, categories.slug],
+        set: {
+          name,
+          display_order: payload?.display_order ?? 0,
+          is_active: payload?.is_active ?? true,
+          updated_at: new Date(),
+        },
+      })
+      .returning();
+
+    return category;
+  }
+
+  async deleteCategory(id: string) {
+    const [deleted] = await db
+      .delete(categories)
+      .where(and(eq(categories.id, id), eq(categories.branch_id, requireBranchId())))
+      .returning({ id: categories.id });
+    return deleted;
+  }
+
   async findMainCategories(filters: any = {}) {
     const conditions = [eq(mainCategories.branch_id, requireBranchId())] as any[];
 

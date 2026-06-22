@@ -16,12 +16,21 @@ import { Menu, Tables, Orders, Organizations } from "@/lib/resources";
 import { getUser } from "@/lib/auth";
 import { birr } from "@/lib/format";
 
-type Item = { id: string; name: string; price: string | null; main_category: string | null };
+type Item = {
+  id: string;
+  name: string;
+  price: string | null;
+  category: string | null;
+  main_category: string | null;
+};
+type Category = { id: string; name: string; slug: string };
 type Line = { item: Item; qty: number };
 
 export default function NewOrderPage() {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [category, setCategory] = useState("all");
   const [tables, setTables] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<Record<string, Line>>({});
@@ -33,10 +42,15 @@ export default function NewOrderPage() {
   const [orgName, setOrgName] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([Menu.items(), Tables.list().catch(() => [])])
-      .then(([m, t]) => {
+    Promise.all([
+      Menu.items(),
+      Tables.list().catch(() => []),
+      Menu.categories().catch(() => []),
+    ])
+      .then(([m, t, c]) => {
         setItems(m.filter((i: any) => i.is_available !== false));
         setTables(t);
+        setCategories(c);
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
@@ -73,9 +87,19 @@ export default function NewOrderPage() {
     [lines],
   );
 
-  const filtered = items.filter((i) =>
-    i.name.toLowerCase().includes(search.toLowerCase()),
+  const filtered = items.filter(
+    (i) =>
+      i.name.toLowerCase().includes(search.toLowerCase()) &&
+      (category === "all" || i.category === category),
   );
+
+  // Only offer categories that actually have available items, plus "All".
+  const usedCategories = useMemo(() => {
+    const present = new Set(
+      items.map((i) => (i.category || "").trim()).filter(Boolean),
+    );
+    return categories.filter((c) => present.has(c.name));
+  }, [items, categories]);
 
   async function placeOrder() {
     if (lines.length === 0) {
@@ -137,6 +161,31 @@ export default function NewOrderPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="mt-2"
             />
+            {usedCategories.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => setCategory("all")}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    category === "all"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "hover:bg-muted"
+                  }`}>
+                  All
+                </button>
+                {usedCategories.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setCategory(c.name)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      category === c.name
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "hover:bg-muted"
+                    }`}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {loading ? (

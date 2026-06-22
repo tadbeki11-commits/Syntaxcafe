@@ -67,7 +67,7 @@ export default function BulkMenuImportPage() {
 
   // Load existing names + departments so we can flag duplicates / unknown depts.
   useEffect(() => {
-    Promise.all([Menu.items(), Menu.categories()])
+    Promise.all([Menu.items(), Menu.departments()])
       .then(([items, cats]) => {
         ctxRef.current = {
           existingNames: new Set(
