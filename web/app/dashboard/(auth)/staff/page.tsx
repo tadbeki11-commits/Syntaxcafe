@@ -10,6 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { StaffActivity } from "@/components/staff/staff-activity";
 import { Users } from "@/lib/resources";
+import { CONFIGURABLE_ROLES } from "@/lib/permissions";
+
+// Selectable roles for staff accounts, sourced from the shared RBAC list so the
+// dropdown and the permission editor stay in sync.
+const ROLE_OPTIONS = CONFIGURABLE_ROLES.map((r) => ({ value: r.value, label: r.label }));
 
 type U = {
   id: string;
@@ -49,13 +54,7 @@ function StaffAccounts() {
         {
           key: "role",
           label: "Role",
-          options: [
-            { value: "admin", label: "Admin" },
-            { value: "fb_manager", label: "F&B manager" },
-            { value: "cashier", label: "Cashier" },
-            { value: "kitchen_staff", label: "Kitchen staff" },
-            { value: "cafe_waiter", label: "Waiter" },
-          ],
+          options: ROLE_OPTIONS,
         },
         {
           key: "is_active",
@@ -77,13 +76,7 @@ function StaffAccounts() {
           type: "select",
           default: "cashier",
           createOnly: true,
-          options: [
-            { value: "admin", label: "Admin" },
-            { value: "fb_manager", label: "F&B manager" },
-            { value: "cashier", label: "Cashier" },
-            { value: "kitchen_staff", label: "Kitchen staff" },
-            { value: "cafe_waiter", label: "Waiter" },
-          ],
+          options: ROLE_OPTIONS,
         },
         { key: "phone", label: "Phone" },
       ]}

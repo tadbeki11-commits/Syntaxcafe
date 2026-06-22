@@ -59,6 +59,18 @@ export async function apiFetch<T = any>(
     },
   });
 
+  // An expired/invalid session comes back as 401. The pa_token cookie can outlive
+  // the 8h JWT, so the app may look "signed in" while every call is rejected.
+  // Only act when we actually sent a token (so a wrong-password 401 on a login
+  // page, which carries no token, still surfaces its error normally). Clear the
+  // stale cookie and bounce to login instead of leaking a raw error to the UI.
+  if (res.status === 401 && token && typeof window !== "undefined") {
+    document.cookie = "pa_token=; path=/; max-age=0";
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+  }
+
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {

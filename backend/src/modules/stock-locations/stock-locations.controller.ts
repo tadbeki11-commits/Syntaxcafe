@@ -10,8 +10,10 @@ import {
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { StockLocationsService } from "./stock-locations.service";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("stock-locations")
+@RequirePermission("stock_locations")
 @Controller("stock-locations")
 export class StockLocationsController {
   constructor(private readonly stockLocationsService: StockLocationsService) {}

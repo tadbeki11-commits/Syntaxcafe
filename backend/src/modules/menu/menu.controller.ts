@@ -25,8 +25,10 @@ import {
   MenuItemUpdateDto,
   MenuItemsResponseDto,
 } from "./dto/menu.dto";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("menu")
+@RequirePermission("menu")
 @Controller("menu")
 export class MenuController {
   constructor(private menuService: MenuService) {}

@@ -12,8 +12,10 @@ import { ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { OrganizationService } from "./organization.service";
 import { OrganizationRequestDto } from "./dto/organization.dto";
 import { AddOrgPaymentDto, AddOrgTransactionDto } from "./dto/org-credit.dto";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("organizations")
+@RequirePermission("customers")
 @Controller("organizations")
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}

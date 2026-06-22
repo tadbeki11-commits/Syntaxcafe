@@ -22,8 +22,10 @@ import {
   RoleResponseDto,
   RolesResponseDto,
 } from "../settings/dto/role.dto";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("roles")
+@RequirePermission("roles")
 @Controller("roles")
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}

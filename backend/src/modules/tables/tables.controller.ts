@@ -9,8 +9,10 @@ import {
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { TablesService } from "./tables.service";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("tables")
+@RequirePermission("tables")
 @Controller("tables")
 export class TablesController {
   constructor(private readonly tablesService: TablesService) {}

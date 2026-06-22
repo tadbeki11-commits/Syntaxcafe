@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar";
 import { SiteHeader } from "@/components/layout/header";
+import { PermissionGate } from "@/components/permission-gate";
 
 export default async function AuthLayout({
   children
@@ -29,7 +30,7 @@ export default async function AuthLayout({
         <SiteHeader />
         <div className="flex flex-1 flex-col">
           <div className="@container/main p-4 xl:group-data-[theme-content-layout=centered]/layout:container xl:group-data-[theme-content-layout=centered]/layout:mx-auto">
-            {children}
+            <PermissionGate>{children}</PermissionGate>
           </div>
         </div>
       </SidebarInset>

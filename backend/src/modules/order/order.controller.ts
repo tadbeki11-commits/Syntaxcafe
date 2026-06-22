@@ -32,8 +32,10 @@ import {
 import db from "../../db/drizzle";
 import { syncEvents } from "../../db/tables/sync-events.table";
 import { desc, gt } from "drizzle-orm";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("orders")
+@RequirePermission("orders")
 @Controller("orders")
 export class OrderController {
   constructor(

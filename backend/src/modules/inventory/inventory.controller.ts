@@ -10,8 +10,10 @@ import {
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { InventoryService } from "./inventory.service";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("inventory")
+@RequirePermission("inventory")
 @Controller("inventory")
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}

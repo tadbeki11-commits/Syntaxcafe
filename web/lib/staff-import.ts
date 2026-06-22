@@ -6,9 +6,15 @@ import { AliasMap, str, tabularToRawRows, toBool } from "./bulk-import";
 export const STAFF_ROLES = [
   "admin",
   "fb_manager",
+  "finance",
   "cashier",
   "kitchen_staff",
   "cafe_waiter",
+  "barista",
+  "host",
+  "storekeeper",
+  "accountant",
+  "housekeeping",
 ] as const;
 
 export interface ParsedStaffRow {

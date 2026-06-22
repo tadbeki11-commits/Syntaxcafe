@@ -16,8 +16,10 @@ import {
   PaymentsResponseDto,
   QRDataRequestDto,
 } from "./dto/payment.dto";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("payments")
+@RequirePermission("payments")
 @Controller("payments")
 export class PaymentController {
   constructor(private paymentService: PaymentService) {}

@@ -40,6 +40,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { getUser } from "@/lib/auth";
+import { can, isAllAccessRole, type ResourceId } from "@/lib/permissions";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { usePathname } from "next/navigation";
@@ -64,6 +65,8 @@ type NavItem = {
   isDataBadge?: string;
   isNew?: boolean;
   newTab?: boolean;
+  // Resource that gates this item. Items without one are always shown.
+  resource?: ResourceId;
   items?: NavItem;
 }[];
 
@@ -90,62 +93,64 @@ const ownerNav: NavGroup[] = [
   {
     title: "Operations",
     items: [
-      { title: "Orders", href: "/dashboard/orders", icon: ReceiptTextIcon },
-      { title: "Payments", href: "/dashboard/payments", icon: CreditCardIcon },
-      { title: "Items Sold", href: "/dashboard/payments/items", icon: CoffeeIcon },
-      { title: "Tables", href: "/dashboard/tables", icon: ArmchairIcon }
+      { title: "Orders", href: "/dashboard/orders", icon: ReceiptTextIcon, resource: "orders" },
+      { title: "Payments", href: "/dashboard/payments", icon: CreditCardIcon, resource: "payments" },
+      { title: "Items Sold", href: "/dashboard/payments/items", icon: CoffeeIcon, resource: "items_sold" },
+      { title: "Tables", href: "/dashboard/tables", icon: ArmchairIcon, resource: "tables" }
     ]
   },
   {
     title: "Catalog & Inventory",
     items: [
-      { title: "Menu", href: "/dashboard/menu", icon: UtensilsCrossedIcon },
-      { title: "Inventory", href: "/dashboard/inventory", icon: BoxesIcon },
-      { title: "Stock Locations", href: "/dashboard/inventory/locations", icon: WarehouseIcon },
-      { title: "Transfers", href: "/dashboard/inventory/transfers", icon: ArrowLeftRightIcon }
+      { title: "Menu", href: "/dashboard/menu", icon: UtensilsCrossedIcon, resource: "menu" },
+      { title: "Inventory", href: "/dashboard/inventory", icon: BoxesIcon, resource: "inventory" },
+      { title: "Stock Locations", href: "/dashboard/inventory/locations", icon: WarehouseIcon, resource: "stock_locations" },
+      { title: "Transfers", href: "/dashboard/inventory/transfers", icon: ArrowLeftRightIcon, resource: "transfers" }
     ]
   },
   {
     title: "People",
     items: [
-      { title: "Staff", href: "/dashboard/staff", icon: UsersIcon },
-      { title: "Organizations", href: "/dashboard/customers", icon: Building2Icon }
+      { title: "Staff", href: "/dashboard/staff", icon: UsersIcon, resource: "staff" },
+      { title: "Organizations", href: "/dashboard/customers", icon: Building2Icon, resource: "customers" }
     ]
   },
   {
     title: "Insights",
     items: [
-      { title: "Reports", href: "/dashboard/reports", icon: BarChart3Icon },
-      { title: "Expenses", href: "/dashboard/expenses", icon: BanknoteIcon }
+      { title: "Reports", href: "/dashboard/reports", icon: BarChart3Icon, resource: "reports" },
+      { title: "Expenses", href: "/dashboard/expenses", icon: BanknoteIcon, resource: "expenses" }
     ]
   },
   {
     title: "Settings",
     items: [
-      { title: "All Settings", href: "/dashboard/settings", icon: SettingsIcon },
-      { title: "Order Rules", href: "/dashboard/settings/preferences", icon: SlidersHorizontalIcon },
-      { title: "Payment Methods", href: "/dashboard/settings/payment-methods", icon: WalletCardsIcon },
-      { title: "Roles", href: "/dashboard/settings/roles", icon: ShieldIcon },
-      { title: "Devices", href: "/dashboard/settings/devices", icon: MonitorSmartphoneIcon }
+      { title: "All Settings", href: "/dashboard/settings", icon: SettingsIcon, resource: "settings" },
+      { title: "Order Rules", href: "/dashboard/settings/preferences", icon: SlidersHorizontalIcon, resource: "settings" },
+      { title: "Payment Methods", href: "/dashboard/settings/payment-methods", icon: WalletCardsIcon, resource: "payment_methods" },
+      { title: "Roles", href: "/dashboard/settings/roles", icon: ShieldIcon, resource: "roles" },
+      { title: "Devices", href: "/dashboard/settings/devices", icon: MonitorSmartphoneIcon, resource: "devices" }
     ]
   }
 ];
 
-// The F&B (Food & Beverage) manager runs the food-and-beverage operation of a
-// single branch: menu engineering, item performance and cost control. They get
-// a trimmed, branch-scoped slice of the owner nav (their branch is pinned by the
-// JWT, so there's no branch switcher) plus a dedicated F&B overview.
-const fbManagerNav: NavGroup[] = [
-  {
-    title: "Food & Beverage",
-    items: [
-      { title: "F&B Overview", href: "/dashboard/fb", icon: GaugeIcon },
-      { title: "Menu", href: "/dashboard/menu", icon: UtensilsCrossedIcon },
-      { title: "Items Sold", href: "/dashboard/payments/items", icon: CoffeeIcon },
-      { title: "Reports", href: "/dashboard/reports", icon: BarChart3Icon }
-    ]
-  }
-];
+// Keep only the items (and groups) whose resource the user can read. Items with
+// no resource (e.g. the Dashboard home) are always kept. Empty groups drop out.
+function filterNavByPermissions(groups: NavGroup[]): NavGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.resource || can(item.resource, "read")),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+// The F&B manager keeps a dedicated overview landing page; it's prepended to the
+// permission-filtered nav when present so they still get their branch snapshot.
+const fbOverviewGroup: NavGroup = {
+  title: "Food & Beverage",
+  items: [{ title: "F&B Overview", href: "/dashboard/fb", icon: GaugeIcon }],
+};
 
 export function NavMain() {
   const pathname = usePathname();
@@ -154,13 +159,14 @@ export function NavMain() {
 
   useEffect(() => {
     const role = getUser()?.role;
-    setItems(
-      role === "super_admin"
-        ? platformNav
-        : role === "fb_manager"
-          ? fbManagerNav
-          : ownerNav,
-    );
+    if (role === "super_admin") {
+      setItems(platformNav);
+      return;
+    }
+    // Owners/business admins see the full nav; everyone else is filtered by the
+    // permissions cached at login.
+    const base = isAllAccessRole(role) ? ownerNav : filterNavByPermissions(ownerNav);
+    setItems(role === "fb_manager" ? [fbOverviewGroup, ...base] : base);
   }, []);
 
   return (

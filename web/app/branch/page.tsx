@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { operatorLogin } from "@/lib/auth";
+import { landingRoute } from "@/lib/permissions";
 import {
   clearDeviceEnrollment,
   enrollDevice,
@@ -123,9 +124,7 @@ export default function BranchLoginPage() {
     try {
       const user = await operatorLogin(username.trim(), password);
       toast.success("Welcome back");
-      router.push(
-        user.role === "fb_manager" ? "/dashboard/fb" : "/dashboard/home",
-      );
+      router.push(landingRoute(user.role));
     } catch (err: any) {
       toast.error(err.message || "Login failed");
     } finally {

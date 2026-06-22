@@ -22,8 +22,10 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { UsersService } from "./users.service";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("users")
+@RequirePermission("staff")
 @Controller("users")
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}

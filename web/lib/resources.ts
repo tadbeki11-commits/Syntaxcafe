@@ -198,6 +198,17 @@ export const Settings = {
   cleanupData: () => apiFetch("/settings/cleanup-data", j({})),
 };
 
+// Per-role permission matrices (owner-configurable). `me` is the effective
+// matrix for the signed-in user; `list` returns every configurable role for the
+// editor; `save` upserts one role's matrix.
+export const Permissions = {
+  me: () => apiFetch("/role-permissions/me").then((d) => d.data),
+  list: () =>
+    apiFetch("/role-permissions").then((d) => d.data.roles ?? []),
+  save: (role: string, permissions: Record<string, Record<string, boolean>>) =>
+    apiFetch(`/role-permissions/${encodeURIComponent(role)}`, put({ permissions })),
+};
+
 export const Account = {
   // Update the signed-in user's profile. The backend splits full_name into
   // first/last and returns the refreshed user under `user`.

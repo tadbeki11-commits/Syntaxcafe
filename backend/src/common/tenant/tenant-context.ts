@@ -16,6 +16,8 @@ export interface TenantContext {
   scope: TenantScope;
   userId?: string | null;
   username?: string | null;
+  /** Role string from the JWT (web back office). Null for device-token (POS). */
+  role?: string | null;
 }
 
 const storage = new AsyncLocalStorage<TenantContext>();

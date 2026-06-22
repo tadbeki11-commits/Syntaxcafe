@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { DevicesService } from "./devices.service";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("devices")
+@RequirePermission("devices")
 @Controller("devices")
 export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}

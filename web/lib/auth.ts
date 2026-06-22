@@ -1,4 +1,9 @@
 import { apiFetch } from "./api";
+import {
+  CONFIGURABLE_ROLES,
+  clearPermissions,
+  fetchMyPermissions,
+} from "./permissions";
 
 export type SessionUser = {
   id: string;
@@ -28,7 +33,9 @@ const SESSION_MAX_AGE = 7 * 24 * 3600;
 // platform admins on /login, branch operators (who must enroll a device first)
 // on /branch. The role gate below is what keeps the wrong tier out of each page.
 const OWNER_PORTAL_ROLES = ["super_admin", "owner", "business_admin"];
-const OPERATOR_PORTAL_ROLES = ["admin", "fb_manager"];
+// Every configurable (operation-level) role signs in through the branch portal;
+// what they can then see is governed by their role's permissions.
+const OPERATOR_PORTAL_ROLES = CONFIGURABLE_ROLES.map((r) => r.value);
 
 // Token lives in a JS-readable cookie so middleware can guard routes and the API
 // client can attach it. This is a back-office tool; if you later need stronger
@@ -52,6 +59,9 @@ async function authenticate(
 
   setCookie("pa_token", token, SESSION_MAX_AGE);
   localStorage.setItem("pa_user", JSON.stringify(data.user));
+  // Load this user's effective permissions so the nav and route guard are ready
+  // before the dashboard renders. Best-effort: failures fall back to all-allowed.
+  await fetchMyPermissions();
   return data.user;
 }
 
@@ -61,12 +71,12 @@ export function login(username: string, password: string): Promise<SessionUser> 
     username,
     password,
     OWNER_PORTAL_ROLES,
-    "This sign-in is for platform admins and business owners. Branch admins and F&B managers should use the branch sign-in.",
+    "This sign-in is for platform admins and business owners. Branch admins, F&B managers and finance staff should use the branch sign-in.",
   );
 }
 
-// Branch-operator sign-in (/branch) for branch admins and F&B managers, used
-// after the device has been enrolled to a branch.
+// Branch-operator sign-in (/branch) for branch admins, F&B managers and finance
+// staff, used after the device has been enrolled to a branch.
 export function operatorLogin(
   username: string,
   password: string,
@@ -75,13 +85,14 @@ export function operatorLogin(
     username,
     password,
     OPERATOR_PORTAL_ROLES,
-    "This sign-in is for branch admins and F&B managers. Owners and platform admins should use the main sign-in.",
+    "This sign-in is for branch staff. Owners and platform admins should use the main sign-in.",
   );
 }
 
 export function logout() {
   document.cookie = "pa_token=; path=/; max-age=0";
   localStorage.removeItem("pa_user");
+  clearPermissions();
 }
 
 export function getUser(): SessionUser | null {
@@ -104,6 +115,7 @@ const ROLE_LABELS: Record<string, string> = {
   owner: "Owner",
   business_admin: "Business Admin",
   fb_manager: "F&B Manager",
+  finance: "Finance",
   admin: "Administrator",
   cashier: "Cashier",
   kitchen_staff: "Kitchen Staff",

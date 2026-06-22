@@ -4,6 +4,7 @@ export * from "./branch-devices.table";
 export * from "./platform-audit-logs.table";
 export * from "./users.table";
 export * from "./roles.table";
+export * from "./role-permissions.table";
 export * from "./payment_methods.table";
 export * from "./menu-items.table";
 export * from "./main-categories.table";

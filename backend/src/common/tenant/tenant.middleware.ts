@@ -1,4 +1,8 @@
-import { Injectable, NestMiddleware } from "@nestjs/common";
+import {
+  Injectable,
+  NestMiddleware,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { DevicesService } from "../../modules/devices/devices.service";
 import { BranchesService } from "../../modules/branches/branches.service";
@@ -36,11 +40,18 @@ export class TenantMiddleware implements NestMiddleware {
     if (deviceToken) {
       const tenant = await this.devices.resolveToken(deviceToken);
       if (tenant) {
+        // The device token pins the branch, but a web back-office operator also
+        // sends a Bearer JWT — decode it (if present) to carry their role, which
+        // the permission guard needs. The desktop POS sends no JWT, so role stays
+        // null and the guard treats it as exempt.
+        const jwt = this.tryDecodeBearer(req);
         return {
           businessId: tenant.businessId,
           branchId: tenant.branchId,
           scope: "branch",
-          userId: (req.headers["x-user-id"] as string) || null,
+          userId: (jwt?.userId ?? (req.headers["x-user-id"] as string)) || null,
+          username: jwt?.username ?? null,
+          role: jwt?.role ?? null,
         };
       }
     }
@@ -55,6 +66,7 @@ export class TenantMiddleware implements NestMiddleware {
           scope: (p.scope as TenantScope) ?? "branch",
           userId: p.sub ?? null,
           username: p.username ?? null,
+          role: p.role ?? null,
         };
 
         // Owners/platform admins aren't pinned to a branch — they pick one via
@@ -62,7 +74,9 @@ export class TenantMiddleware implements NestMiddleware {
         const selected = req.headers["x-branch-id"] as string | undefined;
         if (selected && ctx.scope === "platform") {
           ctx.branchId = selected;
-          const selBusiness = req.headers["x-business-id"] as string | undefined;
+          const selBusiness = req.headers["x-business-id"] as
+            | string
+            | undefined;
           if (selBusiness) ctx.businessId = selBusiness;
         } else if (selected && ctx.scope === "owner" && ctx.businessId) {
           if (await this.branches.belongsToBusiness(selected, ctx.businessId)) {
@@ -78,7 +92,14 @@ export class TenantMiddleware implements NestMiddleware {
         }
         return ctx;
       } catch {
-        // Invalid/expired token: fall through to header/default resolution.
+        // A Bearer token was explicitly presented but is invalid/expired. Don't
+        // silently degrade to branch/default scope — that's what made an expired
+        // web session resurface as a confusing 403 ("Platform administrator
+        // access required") instead of a clean "log in again". Reject with 401 so
+        // the web client can clear the stale cookie and redirect to login. (The
+        // desktop POS never sends a Bearer — it uses x-device-token — so this
+        // can't affect it.)
+        throw new UnauthorizedException("Session expired. Please sign in again.");
       }
     }
 
@@ -90,5 +111,27 @@ export class TenantMiddleware implements NestMiddleware {
       scope: "branch",
       userId: (req.headers["x-user-id"] as string) || null,
     };
+  }
+
+  /** Best-effort decode of a Bearer JWT for identity/role. Null if absent/invalid. */
+  private tryDecodeBearer(
+    req: any,
+  ): {
+    role: string | null;
+    userId: string | null;
+    username: string | null;
+  } | null {
+    const auth: string | undefined = req.headers["authorization"];
+    if (!auth?.startsWith("Bearer ")) return null;
+    try {
+      const p: any = this.jwt.verify(auth.slice(7));
+      return {
+        role: p.role ?? null,
+        userId: p.sub ?? null,
+        username: p.username ?? null,
+      };
+    } catch {
+      return null;
+    }
   }
 }

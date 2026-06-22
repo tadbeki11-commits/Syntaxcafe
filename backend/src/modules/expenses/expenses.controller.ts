@@ -10,8 +10,10 @@ import {
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { ExpensesService } from "./expenses.service";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 
 @ApiTags("expenses")
+@RequirePermission("expenses")
 @Controller("expenses")
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}

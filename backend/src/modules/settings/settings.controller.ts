@@ -21,6 +21,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { SettingsService } from "./settings.service";
+import { RequirePermission } from "../../common/permissions/require-permission.decorator";
 import {
   PaymentMethodRequestDto,
   PaymentMethodResponseDto,
@@ -36,6 +37,7 @@ import {
 } from "./dto/role.dto";
 
 @ApiTags("settings")
+@RequirePermission("settings")
 @Controller("settings")
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}

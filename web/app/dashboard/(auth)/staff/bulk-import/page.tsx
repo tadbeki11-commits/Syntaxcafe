@@ -192,7 +192,8 @@ export default function BulkStaffImportPage() {
           <p className="text-muted-foreground text-xs">
             Required columns: <strong>full_name</strong> and{" "}
             <strong>username</strong>. Optional: role (admin, fb_manager,
-            cashier, kitchen_staff, cafe_waiter), phone, password, pin (4
+            finance, cashier, kitchen_staff, cafe_waiter, barista, host,
+            storekeeper, accountant, housekeeping), phone, password, pin (4
             digits), is_active. If neither password nor PIN is given, a default
             password is set.
           </p>
