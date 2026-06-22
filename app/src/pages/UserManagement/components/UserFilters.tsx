@@ -43,9 +43,7 @@ export const UserFilters: React.FC<UserFiltersProps> = ({
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
               <SelectItem value="admin">Administrator</SelectItem>
-              <SelectItem value="cafe_waiter">Café Waiter</SelectItem>
               <SelectItem value="cashier">Cashier</SelectItem>
-              <SelectItem value="kitchen_staff">Kitchen Staff</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>

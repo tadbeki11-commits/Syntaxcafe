@@ -11,8 +11,8 @@ import { useCashierCreateOrder } from './hooks/useCashierCreateOrder';
 // Components
 import CreateOrderHeader from './components/CreateOrder/CreateOrderHeader';
 import OrderFiltersPanel from './components/CreateOrder/OrderFiltersPanel';
-import WaiterCartSidebar from '../waiter/components/CreateOrder/WaiterCartSidebar';
-import MobileCartDialog from '../waiter/components/CreateOrder/MobileCartDialog';
+import WaiterCartSidebar from './components/CreateOrder/WaiterCartSidebar';
+import MobileCartDialog from './components/CreateOrder/MobileCartDialog';
 import MenuItemCard from './components/CreateOrder/MenuItemCard';
 
 const CashierCreateOrderAsWaiter = () => {

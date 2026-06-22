@@ -10,11 +10,65 @@ interface PrintingProps {
   refreshDashboardData: () => Promise<void>;
 }
 
+export interface StuckPrintOrder {
+  id: number;
+  table_number?: any;
+  attempts: number;
+  error: string;
+}
+
+// After this many consecutive failed print attempts, surface the order in a
+// persistent banner so the cashier knows it's stuck retrying (e.g. printer is
+// truly offline / out of paper) rather than silently looping forever.
+const FAILURE_BANNER_THRESHOLD = 3;
+
 export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
   const [qzStatus, setQzStatus] = useState<any>({
     connected: true,
     error: null,
   });
+
+  // Per-order consecutive failure counts + the subset that crossed the
+  // threshold (kept in state so the banner re-renders).
+  const failureCountsRef = useRef<Map<number, number>>(new Map());
+  const [stuckPrintOrders, setStuckPrintOrders] = useState<StuckPrintOrder[]>(
+    [],
+  );
+
+  const errToString = useCallback((err: any) => {
+    return typeof err === "string"
+      ? err
+      : err?.message
+        ? String(err.message)
+        : String(err || "Unknown native printing error");
+  }, []);
+
+  const recordPrintFailure = useCallback(
+    (order: any, err: any) => {
+      const id = Number(order?.id);
+      if (!Number.isFinite(id)) return;
+      const attempts = (failureCountsRef.current.get(id) || 0) + 1;
+      failureCountsRef.current.set(id, attempts);
+      if (attempts < FAILURE_BANNER_THRESHOLD) return;
+      const msg = errToString(err);
+      setStuckPrintOrders((prev) => {
+        const others = prev.filter((o) => o.id !== id);
+        return [
+          ...others,
+          { id, table_number: order?.table_number, attempts, error: msg },
+        ];
+      });
+    },
+    [errToString],
+  );
+
+  const recordPrintSuccess = useCallback((orderId: number) => {
+    const id = Number(orderId);
+    failureCountsRef.current.delete(id);
+    setStuckPrintOrders((prev) =>
+      prev.some((o) => o.id === id) ? prev.filter((o) => o.id !== id) : prev,
+    );
+  }, []);
 
   const printingRef = useRef(new Set());
   const pollIntervalRef = useRef<any>(null);
@@ -112,8 +166,6 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
         printingRef.current.add(order.id);
         try {
           // console.log(`[Tauri Print] Attempting to print order #${order.id}`);
-          // Mark printed before sending to printer so the next poll cannot re-queue it.
-          await api.orders.markPrinted(order.id);
 
           // Respect cashier's configured number of copies
           const copies = (() => {
@@ -129,7 +181,14 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
           for (let i = 0; i < copies; i++) {
             await (api.orders as any).printOrderNative(order.id);
           }
+
+          // Mark printed only AFTER the ticket physically printed. If the
+          // native print above throws, the order stays unprinted and the next
+          // poll re-queues it — so a printer failure never loses a ticket.
+          await api.orders.markPrinted(order.id);
+
           setQzStatus({ connected: true, error: null });
+          recordPrintSuccess(order.id);
 
           const tablePart = order.table_number
             ? ` (Table ${order.table_number})`
@@ -145,6 +204,7 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
             order.id,
             err,
           );
+          recordPrintFailure(order, err);
           maybeToastError(err);
         } finally {
           printingRef.current.delete(order.id);
@@ -168,15 +228,19 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
     } finally {
       isPollingUnprintedRef.current = false;
     }
-  }, [maybeToastError, refreshDashboardData, tryAcquirePrintLeadership]);
+  }, [
+    maybeToastError,
+    refreshDashboardData,
+    tryAcquirePrintLeadership,
+    recordPrintFailure,
+    recordPrintSuccess,
+  ]);
 
   const printOrderImmediately = useCallback(
     async (orderId: number) => {
       if (printingRef.current.has(orderId)) return;
       printingRef.current.add(orderId);
       try {
-        await api.orders.markPrinted(orderId);
-
         // Respect cashier's configured number of copies
         const copies = (() => {
           try {
@@ -191,7 +255,13 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
         for (let i = 0; i < copies; i++) {
           await (api.orders as any).printOrderNative(orderId);
         }
+
+        // Mark printed only AFTER the ticket physically printed, so a printer
+        // failure leaves the order queued for the background poll to retry.
+        await api.orders.markPrinted(orderId);
+
         setQzStatus({ connected: true, error: null });
+        recordPrintSuccess(orderId);
         toast.success(
           `🖨️ Order printed successfully (${copies} copy${copies > 1 ? "ies" : ""})`,
           { duration: 2000 },
@@ -201,12 +271,13 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
           `[Immediate Tauri Print] Print failed for order #${orderId}:`,
           err,
         );
+        recordPrintFailure({ id: orderId }, err);
         maybeToastError(err);
       } finally {
         printingRef.current.delete(orderId);
       }
     },
-    [maybeToastError],
+    [maybeToastError, recordPrintFailure, recordPrintSuccess],
   );
 
   // Background Polling Effect
@@ -284,5 +355,8 @@ export const useCashierPrinting = ({ refreshDashboardData }: PrintingProps) => {
     testQzPrint,
     printOrderImmediately,
     pollUnprintedOrders,
+    stuckPrintOrders,
+    // Manual "retry now" — kicks an immediate print attempt for a stuck order.
+    retryStuckPrint: printOrderImmediately,
   };
 };

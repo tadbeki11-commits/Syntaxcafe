@@ -16,7 +16,6 @@ export class UserFacade {
   getByRole = (role: string) => this.adapter.getByRole(role);
   getEmployees = () => this.adapter.getEmployees();
   getWaiters = () => this.adapter.getWaiters();
-  getKitchenStaff = () => this.adapter.getKitchenStaff();
   getCashiers = () => this.adapter.getCashiers();
 
   create = async (userData: Record<string, unknown>) => {

@@ -4,6 +4,7 @@ import api from "@/application";
 import { getLocalDb, localDbTables } from "@/db/localDb";
 import { isOnline } from "@/infrastructure/api/http-client";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
+import { useSyncRefetch } from "@/hooks/useSyncRefetch";
 import toast from "react-hot-toast";
 import { eq } from "drizzle-orm";
 
@@ -349,6 +350,11 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
     };
     fetchData();
   }, [user?.id, refreshDashboardData]);
+
+  // Refresh once background hydration / reconnect / manual sync completes.
+  useSyncRefetch(() => {
+    refreshDashboardData();
+  });
 
   // Auto-refresh pending payments every 5 s  (sync inertia across dashboards)
   useEffect(() => {

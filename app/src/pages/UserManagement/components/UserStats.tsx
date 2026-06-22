@@ -11,7 +11,7 @@ export const UserStats: React.FC<UserStatsProps> = ({ users }) => {
   const total = users.length;
   const active = users.filter(u => u.is_active).length;
   const admins = users.filter(u => u.role === 'admin').length;
-  const staff = users.filter(u => ['cafe_waiter', 'cashier', 'kitchen_staff'].includes(u.role)).length;
+  const staff = users.filter(u => u.role === 'cashier').length;
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

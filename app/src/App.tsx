@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import SyncProgressBar from './components/SyncProgressBar';
 import { isDeviceEnrolled, loadDeviceEnrollment } from '@/shared/utils/deviceToken';
 import EnrollmentPage from './pages/EnrollmentPage';
 
@@ -10,12 +11,6 @@ import LoginPage from './pages/LoginPage';
 import DashboardLayout from './components/layout/DashboardLayout';
 import AdminDashboard from './pages/Dashboards/AdminDashboard/index';
 import CashierDashboard from './pages/Dashboards/CashierDashboard';
-import CafeWaiterDashboard from './pages/Dashboards/CafeWaiterDashboard';
-import KitchenStaffDashboard from './pages/Dashboards/KitchenStaffDashboard';
-
-// Import waiter pages
-import CreateOrder from './pages/waiter/CreateOrder';
-import OrderHistory from './pages/waiter/OrderHistory';
 
 // Import cashier pages
 import CashierEmployees from './pages/cashier/CashierEmployees';
@@ -67,31 +62,13 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: ProtectedRouteProps) =>
   }
 
   if (allowedRoles.length > 0 && user?.role && !allowedRoles.includes(user.role)) {
-    const getHomePath = () => {
-      if (user?.role === 'cafe_waiter') return "/waiter/create-order";
-      return "/dashboard";
-    };
-    return <Navigate to={getHomePath()} replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 };
 
-// Waiter Router Component
-const WaiterRouter = () => {
-  return (
-    <Routes>
-      <Route index element={<CafeWaiterDashboard />} />
-      <Route path="dashboard" element={<CafeWaiterDashboard />} />
-      <Route path="create-order" element={<CreateOrder />} />
-      <Route path="order-history" element={<OrderHistory />} />
-      <Route path="profile" element={<Profile />} />
-      <Route path="*" element={<Navigate to="/waiter" replace />} />
-    </Routes>
-  );
-};
-
-// Dashboard Router Component for non-waiter roles
+// Dashboard Router Component
 const DashboardRouter = () => {
   const { user } = useAuth();
 
@@ -101,8 +78,6 @@ const DashboardRouter = () => {
         return <AdminDashboard />;
       case 'cashier':
         return <CashierDashboard />;
-      case 'kitchen_staff':
-        return <KitchenStaffDashboard />;
       default:
         return <div className="p-6 text-center">Invalid user role</div>;
     }
@@ -116,10 +91,10 @@ const DashboardRouter = () => {
 
         <Route path="profile" element={<Profile />} />
 
-        <Route path="orders" element={<ProtectedRoute allowedRoles={['admin', 'cafe_waiter', 'kitchen_staff']}><OrderManagement /></ProtectedRoute>} />
+        <Route path="orders" element={<ProtectedRoute allowedRoles={['admin']}><OrderManagement /></ProtectedRoute>} />
         <Route path="users" element={<ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>} />
         <Route path="employees" element={<ProtectedRoute allowedRoles={['admin']}><EmployeeManagement /></ProtectedRoute>} />
-        <Route path="menu" element={<ProtectedRoute allowedRoles={['admin', 'cafe_waiter', 'kitchen_staff']}><MenuManagement /></ProtectedRoute>} />
+        <Route path="menu" element={<ProtectedRoute allowedRoles={['admin']}><MenuManagement /></ProtectedRoute>} />
         <Route path="menu/bulk-import" element={<ProtectedRoute allowedRoles={['admin']}><BulkMenuImport /></ProtectedRoute>} />
         <Route path="inventory" element={<ProtectedRoute allowedRoles={['admin']}><InventoryManagement /></ProtectedRoute>} />
         <Route path="inventory/locations" element={<ProtectedRoute allowedRoles={['admin']}><StockLocationManagement /></ProtectedRoute>} />
@@ -164,15 +139,13 @@ const AppContent = () => {
 
   const getRedirectPath = () => {
     if (!isAuthenticated) return "/login";
-    if (user?.role === 'cafe_waiter') return "/waiter/create-order";
     return "/dashboard";
   };
 
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to={getRedirectPath()} replace /> : <LoginPage />} />
-      <Route path="/waiter/*" element={<ProtectedRoute allowedRoles={['cafe_waiter']}><WaiterRouter /></ProtectedRoute>} />
-      <Route path="/dashboard/*" element={<ProtectedRoute allowedRoles={['admin', 'cashier', 'kitchen_staff']}><DashboardRouter /></ProtectedRoute>} />
+      <Route path="/dashboard/*" element={<ProtectedRoute allowedRoles={['admin', 'cashier']}><DashboardRouter /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to={getRedirectPath()} replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -215,6 +188,7 @@ function App() {
     <EnrollmentGate>
       <AuthProvider>
         <div className="App">
+          <SyncProgressBar />
           <AppContent />
         </div>
       </AuthProvider>

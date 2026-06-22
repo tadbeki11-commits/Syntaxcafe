@@ -27,7 +27,7 @@ export const RoleStats: React.FC<RoleStatsProps> = ({ roles }) => {
         <CardContent className="pt-6">
           <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Custom</div>
           <div className="text-2xl font-extrabold">
-            {roles.filter(r => r.name !== 'admin' && r.name !== 'cafe_waiter' && r.name !== 'cashier' && r.name !== 'kitchen_staff').length}
+            {roles.filter(r => r.name !== 'admin' && r.name !== 'cashier').length}
           </div>
         </CardContent>
       </Card>

@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import api from "@/application";
 import { SESSION_KEY } from "../CashierSelectWaiterForOrder";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
+import { useSyncRefetch } from "@/hooks/useSyncRefetch";
 import { useAuth } from "@/context/AuthContext";
 
 export const useCashierCreateOrder = () => {
@@ -26,6 +27,11 @@ export const useCashierCreateOrder = () => {
 
   const submitLockRef = useRef(false);
   const [isOnline, setIsOnline] = useState(true);
+
+  // Bumped when a sync cycle finishes so the menu/tables fetch effect re-runs
+  // once background hydration / reconnect / manual sync lands fresh local data.
+  const [reloadKey, setReloadKey] = useState(0);
+  useSyncRefetch(() => setReloadKey((k) => k + 1));
 
   useEffect(() => {
     const unsubscribe = syncEngine.subscribe((status) => {
@@ -207,7 +213,7 @@ export const useCashierCreateOrder = () => {
     return () => {
       cancelled = true;
     };
-  }, [isFastingCategory, extractMenuItemsFromResponse]);
+  }, [isFastingCategory, extractMenuItemsFromResponse, reloadKey]);
 
   useEffect(() => {
     const searchTerm = searchQuery.trim().toLowerCase();

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import api from "@/application";
 import toast from "react-hot-toast";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
+import { useSyncRefetch } from "@/hooks/useSyncRefetch";
 import {
   InventoryItem,
   NormalizedInventoryItem,
@@ -195,6 +196,11 @@ export const useInventoryData = () => {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Refresh once background hydration / reconnect / manual sync completes.
+  useSyncRefetch(() => {
+    fetchAll();
+  });
 
   // Reset page to 1 when search term changes
   useEffect(() => {

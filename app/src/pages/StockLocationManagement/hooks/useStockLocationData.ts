@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { useApplication } from '@/presentation/hooks/useApplication';
 import { useStockLocations } from '@/presentation/hooks/useStockLocations';
 import { syncEngine } from '@/infrastructure/sync/sync-engine';
+import { useSyncRefetch } from '@/hooks/useSyncRefetch';
 import {
   DEFAULT_STOCK_LOCATION_FORM,
   nameToSlug,
@@ -92,6 +93,12 @@ export const useStockLocationData = () => {
   useEffect(() => {
     void fetchMainCategories();
   }, [fetchMainCategories]);
+
+  // Refresh once background hydration / reconnect / manual sync completes.
+  useSyncRefetch(() => {
+    void refresh();
+    void fetchMainCategories();
+  });
 
   const openAdd = () => {
     setSelectedLocation(null);

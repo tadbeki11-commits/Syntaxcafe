@@ -50,7 +50,7 @@ export const useProfileData = () => {
   const [remoteStatus, setRemoteStatus] = useState<any>(null);
   const [syncBusy, setSyncBusy] = useState('');
 
-  const isWaiter = user?.role === 'cafe_waiter';
+  const isWaiter = false;
   const isAdmin = user?.role === 'admin';
   const hasDesktop = isDesktopRuntime();
 

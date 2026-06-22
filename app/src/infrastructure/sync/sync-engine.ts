@@ -1,12 +1,25 @@
-import api from '@/application';
-import toast from 'react-hot-toast';
-import { syncTasks, type SyncTask, type SyncTaskResult } from './tasks';
+import api from "@/application";
+import toast from "react-hot-toast";
+import { syncTasks, type SyncTask, type SyncTaskResult } from "./tasks";
 
 export type SyncStatusCallback = (status: {
   online: boolean;
   syncing: boolean;
   unsyncedCount: number;
 }) => void;
+
+export type SyncProgress = {
+  /** Whether a sync cycle is currently running. */
+  active: boolean;
+  /** Number of tasks finished in the current cycle. */
+  completed: number;
+  /** Total tasks in the current cycle. */
+  total: number;
+  /** Name of the task currently running (for status display). */
+  task?: string;
+};
+
+export type SyncProgressCallback = (progress: SyncProgress) => void;
 
 /**
  * Tasks that run automatically (e.g. right after login): the data the app needs
@@ -17,31 +30,30 @@ export type SyncStatusCallback = (status: {
  * "Sync" button press.
  */
 export const AUTO_SYNC_TASKS: readonly string[] = [
-  'users_pull',
-  'roles_pull',
-  'menu_items_pull',
-  'settings_pull',
-  // Push locally-created (offline) orders before pulling, so anything made while
-  // offline is flushed to the server as soon as we're back online.
-  'orders',
-  'orders_pull',
-  // Flush locally-recorded expenses so they appear in the admin/web reports.
-  'expenses',
+  "users_pull",
+  "roles_pull",
+  "menu_items_pull",
+  "settings_pull",
+  "orders",
+  "orders_pull",
+  "expenses",
 ];
 
 // Tasks run automatically when connectivity is restored mid-session: flush any
 // offline-created orders/expenses to the server, then reconcile today's list.
 export const RECONNECT_SYNC_TASKS: readonly string[] = [
-  'orders',
-  'orders_pull',
-  'expenses',
+  "orders",
+  "orders_pull",
+  "expenses",
 ];
 
 class SimpleSyncEngine {
   private online: boolean =
-    typeof navigator !== 'undefined' ? navigator.onLine : true;
+    typeof navigator !== "undefined" ? navigator.onLine : true;
   private syncing = false;
   private readonly listeners = new Set<SyncStatusCallback>();
+  private readonly progressListeners = new Set<SyncProgressCallback>();
+  private progress: SyncProgress = { active: false, completed: 0, total: 0 };
 
   constructor() {
     this.setupListeners();
@@ -53,6 +65,34 @@ class SimpleSyncEngine {
     return () => {
       this.listeners.delete(callback);
     };
+  }
+
+  /**
+   * Subscribe to fine-grained progress of the running sync cycle (task counts).
+   * Emits the current snapshot immediately on subscribe. Kept separate from
+   * `subscribe` so the lightweight progress ticks never trigger the expensive
+   * unsynced-count recompute that `subscribe` listeners receive.
+   */
+  subscribeProgress(callback: SyncProgressCallback): () => void {
+    this.progressListeners.add(callback);
+    try {
+      callback(this.progress);
+    } catch (error) {
+      console.error("[sync] Progress listener error", error);
+    }
+    return () => {
+      this.progressListeners.delete(callback);
+    };
+  }
+
+  private emitProgress(): void {
+    this.progressListeners.forEach((listener) => {
+      try {
+        listener(this.progress);
+      } catch (error) {
+        console.error("[sync] Progress listener error", error);
+      }
+    });
   }
 
   notifyListeners(): void {
@@ -67,7 +107,7 @@ class SimpleSyncEngine {
           try {
             return (await counter) ?? 0;
           } catch (error) {
-            console.error('[sync] Failed to count unsynced records', error);
+            console.error("[sync] Failed to count unsynced records", error);
             return 0;
           }
         }),
@@ -98,7 +138,7 @@ class SimpleSyncEngine {
     try {
       const online = await this.verifyConnection();
       if (!online) {
-        console.warn('[sync] Cannot start sync while offline.');
+        console.warn("[sync] Cannot start sync while offline.");
         return false;
       }
 
@@ -106,36 +146,52 @@ class SimpleSyncEngine {
         ? syncTasks.filter((task) => targetTasks.includes(task.name))
         : syncTasks;
 
+      this.progress = { active: true, completed: 0, total: tasksToRun.length };
+      this.emitProgress();
+
       for (const task of tasksToRun) {
+        this.progress = { ...this.progress, task: task.name };
+        this.emitProgress();
         await this.runTask(task, results);
+        this.progress = {
+          ...this.progress,
+          completed: this.progress.completed + 1,
+        };
+        this.emitProgress();
       }
 
       const pushed = results.reduce((sum, result) => sum + result.pushed, 0);
       if (pushed > 0) {
-        toast.success(`Synced ${pushed} change${pushed === 1 ? '' : 's'}.`, {
-          id: 'sync-success',
+        toast.success(`Synced ${pushed} change${pushed === 1 ? "" : "s"}.`, {
+          id: "sync-success",
         });
       }
 
       return true;
     } catch (error) {
-      console.error('[sync] Failed to complete sync cycle', error);
-      toast.error('Sync failed. Please try again.');
+      console.error("[sync] Failed to complete sync cycle", error);
+      toast.error("Sync failed. Please try again.");
       return false;
     } finally {
       this.syncing = false;
+      this.progress = {
+        active: false,
+        completed: this.progress.total,
+        total: this.progress.total,
+      };
+      this.emitProgress();
       this.notifyListeners();
     }
   }
 
   notifyOnlineState(online: boolean): void {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       (window as any).isSyncOnline = online;
     }
   }
 
   async verifyConnection(): Promise<boolean> {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
       this.setOnline(false);
       return false;
     }
@@ -143,17 +199,20 @@ class SimpleSyncEngine {
     try {
       const response = await api.health();
       const reachable =
-        response?.status === 200 || response?.data?.status === 'success';
+        response?.status === 200 || response?.data?.status === "success";
       this.setOnline(reachable);
       return reachable;
     } catch (error) {
-      console.warn('[sync] Health probe failed', error);
+      console.warn("[sync] Health probe failed", error);
       this.setOnline(false);
       return false;
     }
   }
 
-  private async runTask(task: SyncTask, results: SyncTaskResult[]): Promise<void> {
+  private async runTask(
+    task: SyncTask,
+    results: SyncTaskResult[],
+  ): Promise<void> {
     try {
       if (task.push) {
         const pushed = await task.push();
@@ -173,24 +232,24 @@ class SimpleSyncEngine {
   }
 
   private setupListeners(): void {
-    if (typeof window === 'undefined') return;
-    window.addEventListener('online', () => this.setOnline(true));
-    window.addEventListener('offline', () => this.setOnline(false));
+    if (typeof window === "undefined") return;
+    window.addEventListener("online", () => this.setOnline(true));
+    window.addEventListener("offline", () => this.setOnline(false));
   }
 
   private setOnline(next: boolean): void {
     if (this.online === next) return;
     this.online = next;
     if (next) {
-      toast.success('You are back online.', { id: 'sync-online' });
+      toast.success("You are back online.", { id: "sync-online" });
       // Flush offline-created orders as soon as connectivity returns so they
       // can never be stranded locally. Fire-and-forget; sync() self-guards
       // against overlapping runs and re-verifies the connection.
       void this.sync(RECONNECT_SYNC_TASKS).catch((error) =>
-        console.warn('[sync] Reconnect order flush failed', error),
+        console.warn("[sync] Reconnect order flush failed", error),
       );
     } else {
-      toast.error('You are offline. Sync is paused.', { id: 'sync-offline' });
+      toast.error("You are offline. Sync is paused.", { id: "sync-offline" });
     }
     this.notifyOnlineState(next);
     this.notifyListeners();
@@ -208,7 +267,7 @@ class SimpleSyncEngine {
       try {
         listener(snapshot);
       } catch (error) {
-        console.error('[sync] Listener error', error);
+        console.error("[sync] Listener error", error);
       }
     });
   }
@@ -218,7 +277,7 @@ class SimpleSyncEngine {
     try {
       listener({ online: this.online, syncing: this.syncing, unsyncedCount });
     } catch (error) {
-      console.error('[sync] Listener error', error);
+      console.error("[sync] Listener error", error);
     }
   }
 }

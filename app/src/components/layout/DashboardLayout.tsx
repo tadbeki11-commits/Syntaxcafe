@@ -32,10 +32,10 @@ interface NavItem {
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'cashier', 'kitchen_staff'], group: 'Main' },
-  { name: 'Profile', href: '/dashboard/profile', icon: User, roles: ['admin', 'cashier', 'kitchen_staff'], group: 'Main' },
-  { name: 'Orders', href: '/dashboard/orders', icon: ClipboardList, roles: ['admin', 'kitchen_staff'], group: 'Operations' },
-  { name: 'Menu', href: '/dashboard/menu', icon: Utensils, roles: ['admin', 'kitchen_staff'], group: 'Operations' },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'cashier'], group: 'Main' },
+  { name: 'Profile', href: '/dashboard/profile', icon: User, roles: ['admin', 'cashier'], group: 'Main' },
+  { name: 'Orders', href: '/dashboard/orders', icon: ClipboardList, roles: ['admin'], group: 'Operations' },
+  { name: 'Menu', href: '/dashboard/menu', icon: Utensils, roles: ['admin'], group: 'Operations' },
   { name: 'Tables', href: '/dashboard/tables', icon: Coffee, roles: ['admin'], group: 'Operations' },
   { name: 'Inventory Management', href: '/dashboard/inventory', icon: Package, roles: ['admin'], group: 'Inventory Management' },
   { name: 'Stock Locations', href: '/dashboard/inventory/locations', icon: MapPin, roles: ['admin'], group: 'Inventory Management' },
@@ -59,9 +59,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
 const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-primary',
-  cafe_waiter: 'bg-info',
   cashier: 'bg-success',
-  kitchen_staff: 'bg-destructive',
 };
 
 function getUserInitials(name: string) {

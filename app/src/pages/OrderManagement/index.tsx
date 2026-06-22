@@ -77,7 +77,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ initialFilterStatus =
     <div className="p-4 sm:p-6 space-y-6">
       <PageHeader
         title="Order Management"
-        description={user?.role === 'kitchen_staff' ? 'Kitchen Orders' : 'Manage orders and track progress'}
+        description="Manage orders and track progress"
       />
 
       <OrderStats orders={filteredOrders} paidOrderIdSet={paidOrderIdSet} />

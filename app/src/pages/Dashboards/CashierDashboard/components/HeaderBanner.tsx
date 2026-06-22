@@ -30,12 +30,12 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   return (
     <Card className="border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-background shadow-sm">
       <CardContent className="pt-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          
-          <div>
+        <div className="flex items-center gap-3 min-w-0">
+
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg text-foreground">Cashier Dashboard</h1>
-            
+              <h1 className="text-base sm:text-lg text-foreground">Cashier Dashboard</h1>
+
             </div>
             <div className="text-xs text-muted-foreground font-semibold flex items-center gap-2 flex-wrap mt-0.5">
              
@@ -73,13 +73,13 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto">
             {syncStatus.online && (
               <Button
                 variant={syncStatus.online ? 'default' : 'outline'}
                 size="sm"
-                className={`h-10 text-xs font-bold gap-1 transition-all ${syncStatus.online ? 'bg-warning hover:bg-warning/90 text-warning-foreground border-warning' : 'opacity-50 cursor-not-allowed'}`}
+                className={`h-10 flex-1 lg:flex-none text-xs font-bold gap-1 transition-all ${syncStatus.online ? 'bg-warning hover:bg-warning/90 text-warning-foreground border-warning' : 'opacity-50 cursor-not-allowed'}`}
                 onClick={onManualSync}
                 disabled={syncStatus.syncing || !syncStatus.online}
               >
@@ -97,15 +97,15 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               </Button>
             )}
 
-            <Button variant="outline" size="sm" className="h-10 text-xs font-bold" onClick={() => navigate('/dashboard/cashier/employees')}>
+            <Button variant="outline" size="sm" className="h-10 flex-1 lg:flex-none text-xs font-bold" onClick={() => navigate('/dashboard/cashier/employees')}>
               <User className="w-3.5 h-3.5 mr-1" /> Waiters
             </Button>
 
-            <Button variant="outline" size="sm" className="h-10 text-xs font-bold" onClick={onTestPrint}>
+            <Button variant="outline" size="sm" className="h-10 flex-1 lg:flex-none text-xs font-bold" onClick={onTestPrint}>
               <Printer className="w-3.5 h-3.5 mr-1" /> Test Print
             </Button>
 
-            <Button variant="outline" size="sm" className="h-10 text-xs font-bold" onClick={() => navigate('/dashboard/cashier/printer-settings')}>
+            <Button variant="outline" size="sm" className="h-10 flex-1 lg:flex-none text-xs font-bold" onClick={() => navigate('/dashboard/cashier/printer-settings')}>
               <Settings2 className="w-3.5 h-3.5 mr-1" /> Printer
             </Button>
           </div>

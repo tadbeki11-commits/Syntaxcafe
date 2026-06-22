@@ -57,12 +57,12 @@ interface NavItem {
 
 const ALL_NAV_ITEMS: NavItem[] = [
   // Base
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'cashier', 'kitchen_staff'], group: 'Main' },
-  { name: 'Profile', href: '/dashboard/profile', icon: User, roles: ['admin', 'cashier', 'kitchen_staff'], group: 'Main' },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'cashier'], group: 'Main' },
+  { name: 'Profile', href: '/dashboard/profile', icon: User, roles: ['admin', 'cashier'], group: 'Main' },
 
   // Admin - Operations
-  { name: 'Orders', href: '/dashboard/orders', icon: ClipboardList, roles: ['admin', 'kitchen_staff'], group: 'Operations' },
-  { name: 'Menu', href: '/dashboard/menu', icon: Utensils, roles: ['admin', 'kitchen_staff'], group: 'Operations' },
+  { name: 'Orders', href: '/dashboard/orders', icon: ClipboardList, roles: ['admin'], group: 'Operations' },
+  { name: 'Menu', href: '/dashboard/menu', icon: Utensils, roles: ['admin'], group: 'Operations' },
   { name: 'Tables', href: '/dashboard/tables', icon: Coffee, roles: ['admin'], group: 'Operations' },
   { name: 'Inventory', href: '/dashboard/inventory', icon: Package, roles: ['admin'], group: 'Operations' },
   { name: 'Stock Locations', href: '/dashboard/inventory/locations', icon: MapPin, roles: ['admin'], group: 'Operations' },
@@ -104,9 +104,7 @@ function getUserInitials(name: string): string {
 
 const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-primary text-primary-foreground',
-  cafe_waiter: 'bg-info text-info-foreground',
   cashier: 'bg-success text-success-foreground',
-  kitchen_staff: 'bg-destructive text-destructive-foreground',
 };
 
 export function AppSidebar() {

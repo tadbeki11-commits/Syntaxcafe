@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLoginForm } from './hooks/useLoginForm';
 import { useLoginPhase } from './hooks/useLoginPhase';
 import { AdminLoginScreen } from './components/AdminLoginScreen';
-import syncEngine, { AUTO_SYNC_TASKS } from '@/infrastructure/sync/sync-engine';
+import syncEngine from '@/infrastructure/sync/sync-engine';
 import { WifiOff, RefreshCw } from 'lucide-react';
 
 const LoginPageContainer = () => {
@@ -91,17 +91,8 @@ const LoginPageContainer = () => {
       }
 
       if (result?.success && result?.user) {
-        // Auto-sync only auth + menu right after login (non-blocking).
-        // Everything else syncs via the manual "Sync" buttons.
-        syncEngine.sync(AUTO_SYNC_TASKS).catch((err) =>
-          console.warn('[login] Post-login sync failed', err)
-        );
-
-        let redirectPath = '/dashboard';
-        if (result.user.role === 'cafe_waiter') {
-          redirectPath = '/waiter/create-order';
-        }
-        navigate(redirectPath);
+        // login() hydrates the essentials in the background, so navigate immediately.
+        navigate('/dashboard');
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -136,11 +127,25 @@ const LoginPageContainer = () => {
   }, [loginPhase]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex flex-col justify-center items-center p-4 overflow-hidden">
-      {/* Animated background shapes */}
+    <div className="relative min-h-screen flex flex-col justify-center items-center p-4 overflow-hidden bg-gradient-to-br from-background via-background to-muted/50">
+      {/* Subtle dotted grid */}
+      <div
+        className="absolute inset-0 opacity-[0.4] dark:opacity-[0.25] pointer-events-none"
+        style={{
+          backgroundImage:
+            'radial-gradient(hsl(var(--muted-foreground) / 0.18) 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+          maskImage:
+            'radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%)',
+          WebkitMaskImage:
+            'radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%)',
+        }}
+      />
+
+      {/* Soft ambient glows */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-200/20 dark:bg-info/20/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-200/20 dark:bg-purple-900/20 rounded-full blur-3xl animate-pulse animation-delay-2000" />
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/[0.07] rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-info/[0.08] rounded-full blur-3xl animate-pulse animation-delay-2000" />
       </div>
 
       {/* Main content */}
@@ -185,19 +190,12 @@ const LoginPageContainer = () => {
         )}
 
         {/* Footer */}
-        <div className="text-center text-xs text-muted-foreground font-semibold mt-8 space-y-2">
-          <div className="flex justify-center">
-            <img
-              src="/assets/logo.png?v=8"
-              alt="Logo"
-              className="w-8 h-8 object-contain opacity-60"
-            />
-          </div>
+        <div className="text-center mt-8">
           <a
             href="https://syntaxsoftwaresolution.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:text-primary transition-colors text-[10px] uppercase tracking-wider block"
+            className="text-[10px] uppercase tracking-[0.15em] font-semibold text-muted-foreground/70 hover:text-foreground transition-colors"
           >
             © Syntax Software Solution
           </a>

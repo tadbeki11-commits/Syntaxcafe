@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Role } from '../types';
 
-const DEFAULT_ROLES = ['admin', 'cafe_waiter', 'cashier', 'kitchen_staff'];
+const DEFAULT_ROLES = ['admin', 'cashier'];
 
 interface RolesTableProps {
   loading: boolean;

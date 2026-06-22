@@ -12,6 +12,7 @@ import { useCashierPrinting } from './hooks/useCashierPrinting';
 
 // Components
 import { HeaderBanner } from './components/HeaderBanner';
+import { PrintFailureBanner } from './components/PrintFailureBanner';
 import { DateFilterBar } from './components/DateFilterBar';
 import { OrdersForPaymentPanel } from './components/OrdersForPaymentPanel';
 import { RecentPaymentsPanel } from './components/RecentPaymentsPanel';
@@ -27,6 +28,8 @@ const CashierDashboard = () => {
     testQzPrint,
     printOrderImmediately,
     pollUnprintedOrders,
+    stuckPrintOrders,
+    retryStuckPrint,
   } = useCashierPrinting({
     refreshDashboardData: async () => {
       await refreshDashboardData();
@@ -163,8 +166,9 @@ const CashierDashboard = () => {
   // Filter orders for payment by business unit and table
   const visibleOrders = ordersForPaymentSorted.filter((o: any) => {
     const matchesUnit = orderMatchesBusinessUnit(o);
-    const matchesTable = !tableNumberFilter ||
-      String(o.table_number || '').toLowerCase().includes(tableNumberFilter.toLowerCase());
+    const filter = tableNumberFilter.trim().toLowerCase();
+    const matchesTable = !filter ||
+      String(o.table_number ?? '').trim().toLowerCase() === filter;
     return matchesUnit && matchesTable;
   });
 
@@ -195,8 +199,8 @@ const CashierDashboard = () => {
     return (
       <div className="p-4 sm:p-6 space-y-6">
         <Skeleton className="h-24 w-full rounded-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {[1, 2, 3, 4, 5].map(i => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
@@ -229,6 +233,12 @@ const CashierDashboard = () => {
         syncStatus={syncStatus}
         onManualSync={handleManualSync}
         onTestPrint={testQzPrint}
+      />
+
+      {/* Persistent alert for orders stuck failing to print */}
+      <PrintFailureBanner
+        stuckOrders={stuckPrintOrders}
+        onRetry={retryStuckPrint}
       />
 
       {/* Stats Cards */}

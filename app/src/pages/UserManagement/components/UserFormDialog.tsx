@@ -38,9 +38,7 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
 }) => {
   const roleList = roles.length > 0 ? roles : [
     { id: 1, name: 'admin', display_name: 'Administrator', is_active: true },
-    { id: 2, name: 'cafe_waiter', display_name: 'Café Waiter', is_active: true },
-    { id: 3, name: 'cashier', display_name: 'Cashier', is_active: true },
-    { id: 4, name: 'kitchen_staff', display_name: 'Kitchen Staff', is_active: true }
+    { id: 3, name: 'cashier', display_name: 'Cashier', is_active: true }
   ];
 
   const activeRoles = roleList.filter(r => r.is_active || r.name === formData.role);

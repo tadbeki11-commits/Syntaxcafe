@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import api from "@/application";
 import toast from "react-hot-toast";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
+import { useSyncRefetch } from "@/hooks/useSyncRefetch";
 import { UserItem, UserFormData, SyncStatusData, RoleOption } from "../types";
 import { DEFAULT_FORM } from "../constants";
 
@@ -58,6 +59,12 @@ export const useUserData = () => {
     fetchUsers();
     fetchRoles();
   }, []);
+
+  // Refresh once background hydration / reconnect / manual sync completes.
+  useSyncRefetch(() => {
+    fetchUsers();
+    fetchRoles();
+  });
 
   const handleManualSync = async () => {
     if (syncStatus.syncing) return;

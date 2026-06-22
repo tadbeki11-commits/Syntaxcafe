@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import api from "@/application";
 import { useAuth } from "@/context/AuthContext";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
+import { useSyncRefetch } from "@/hooks/useSyncRefetch";
 import { MenuItem, MenuFormData, SyncStatus } from "../types";
 import { DEFAULT_FORM } from "../constants";
 import {
@@ -148,6 +149,12 @@ export const useMenuData = () => {
   useEffect(() => {
     fetchMenu();
   }, []);
+
+  // Refresh once background hydration / reconnect / manual sync completes.
+  useSyncRefetch(() => {
+    fetchMenu();
+    fetchRecipes();
+  });
 
   // ── Fetch recipes + inventory items for admin ────────────────────────────
   const fetchRecipes = useCallback(async () => {

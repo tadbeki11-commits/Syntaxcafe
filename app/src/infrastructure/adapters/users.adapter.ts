@@ -188,18 +188,6 @@ export const usersAdapter = {
       config: {} as any,
     };
   },
-  getKitchenStaff: async () => {
-    const resp = await usersAdapter.getAll();
-    const usersList = resp.data?.data?.users ?? [];
-    const filtered = usersList.filter((u: any) => u.role === "kitchen_staff");
-    return {
-      data: { status: "success", data: { users: filtered } },
-      status: 200,
-      statusText: "OK",
-      headers: {},
-      config: {} as any,
-    };
-  },
   getCashiers: async () => {
     const resp = await usersAdapter.getAll();
     const usersList = resp.data?.data?.users ?? [];

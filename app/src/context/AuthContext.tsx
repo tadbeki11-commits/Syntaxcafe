@@ -134,21 +134,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setServerTimeOffset(data.server_time);
         } else {
           clearServerTimeOffset();
-          await refreshServerTime();
+          void refreshServerTime();
         }
 
         setUser(userData);
         setIsAuthenticated(true);
         setSessionUser(userData as SessionUser);
 
-        // Clear local data, then fetch and cache system settings and trigger full sync
-        try {
-          await clearAllLocalData();
-          await api.settings.syncAllSystemSettings();
-          await syncEngine.sync();
-        } catch (settingsError) {
-          console.warn('Failed to sync system settings on login:', settingsError);
-        }
+        // Hydrate local data in the background so navigation is instant.
+        // Wipe stale local data, then run a full sync to repopulate it.
+        // Fire-and-forget — the sync engine notifies subscribers as it
+        // progresses, so pages (via useSyncRefetch) refresh once it lands.
+        void (async () => {
+          try {
+            await clearAllLocalData();
+            await syncEngine.sync();
+          } catch (hydrationError) {
+            console.warn('Background hydration after login failed:', hydrationError);
+          }
+        })();
 
         return { success: true, user: userData };
       }
@@ -290,9 +294,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const getRoleDisplayName = (role: string | undefined = user?.role) => {
     const roleNames: Record<string, string> = {
       admin: 'Administrator',
-      cafe_waiter: 'Café Waiter',
-      cashier: 'Cashier',
-      kitchen_staff: 'Kitchen Staff'
+      cashier: 'Cashier'
     };
     return roleNames[role || ''] || role || '';
   };

@@ -12,9 +12,7 @@ export const isDesktopRuntime = (): boolean => {
 export const getRoleVariant = (role: string | undefined): 'default' | 'success' | 'warning' | 'destructive' | 'info' => {
   const variants: { [key: string]: 'default' | 'success' | 'warning' | 'destructive' | 'info' } = {
     admin: 'default',
-    cafe_waiter: 'info',
-    cashier: 'success',
-    kitchen_staff: 'destructive'
+    cashier: 'success'
   };
   return variants[role || ''] || 'default';
 };

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import api from "@/application";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
+import { useSyncRefetch } from "@/hooks/useSyncRefetch";
 import { Table, TableFormData } from "../types";
 import { INITIAL_FORM } from "../constants";
 
@@ -62,6 +63,11 @@ export const useTableData = () => {
   useEffect(() => {
     fetchTables();
   }, []);
+
+  // Refresh once background hydration / reconnect / manual sync completes.
+  useSyncRefetch(() => {
+    fetchTables();
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

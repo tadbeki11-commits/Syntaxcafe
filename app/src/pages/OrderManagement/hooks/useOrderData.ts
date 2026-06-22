@@ -20,8 +20,6 @@ export const useOrderData = (showCreateModal: boolean, user: any) => {
 
         if (user?.role === 'admin') {
           response = await api.orders.getAll();
-        } else if (user?.role === 'kitchen_staff') {
-          response = await api.orders.getKitchenOrders();
         } else {
           response = await api.orders.getAll({ employee_id: user?.id });
         }

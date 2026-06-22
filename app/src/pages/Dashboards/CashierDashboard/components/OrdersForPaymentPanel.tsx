@@ -60,13 +60,18 @@ export const OrdersForPaymentPanel: React.FC<OrdersForPaymentPanelProps> = ({
 
   return (
     <Card className="flex flex-col min-h-[400px] lg:min-h-[550px] overflow-hidden">
-      <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
-        <div className="flex-1">
-          <CardTitle className="text-sm">Ready for Payment</CardTitle>
-          <CardDescription>Finalized wait staff services</CardDescription>
+      <CardHeader className="pb-3 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2 sm:flex-1 sm:justify-start">
+          <div>
+            <CardTitle className="text-sm">Ready for Payment</CardTitle>
+            <CardDescription>Finalized wait staff services</CardDescription>
+          </div>
+          <Badge variant="info" className="text-xs font-bold shrink-0 sm:hidden">
+            {orders.length} Orders
+          </Badge>
         </div>
 
-        <div className="flex items-center gap-2 mr-4 flex-[1.5]">
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-[1.5] sm:mr-4">
           <div className="relative w-full">
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
             <Input
@@ -78,7 +83,7 @@ export const OrdersForPaymentPanel: React.FC<OrdersForPaymentPanelProps> = ({
           </div>
         </div>
 
-        <Badge variant="info" className="text-xs font-bold shrink-0">
+        <Badge variant="info" className="hidden sm:inline-flex text-xs font-bold shrink-0">
           {orders.length} Orders
         </Badge>
       </CardHeader>
@@ -132,12 +137,12 @@ export const OrdersForPaymentPanel: React.FC<OrdersForPaymentPanelProps> = ({
               );
             })()}
 
-            <div className="flex items-center justify-between text-[10px] pt-1.5 border-t">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] pt-1.5 border-t">
               <span className="text-muted-foreground font-semibold">
                 Completed: {new Date(order.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto">
                 <Button
                   size="sm"
                   className="h-9 text-[11px] bg-success hover:bg-green-700 text-white font-extrabold"
