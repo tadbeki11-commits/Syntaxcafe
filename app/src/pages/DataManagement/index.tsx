@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Package, MapPin, Receipt, MonitorSmartphone } from 'lucide-react';
+import { AlertTriangle, Package, MapPin, Receipt, MonitorSmartphone, Eraser } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import PageHeader from '@/components/layout/PageHeader';
@@ -11,6 +11,7 @@ import OfflineBanner from '@/components/OfflineBanner';
 import { useSyncOnline } from '@/hooks/useSyncOnline';
 import { getDeviceEnrollment, clearDeviceEnrollment } from '@/shared/utils/deviceToken';
 import { clearSessionUser } from '@/shared/utils/sessionUser';
+import { createCleanupRequest, getActiveCleanupRequest, type CleanupRequest } from '@/infrastructure/api/data-cleanup';
 
 const DataManagement = () => {
     const [allowLowStock, setAllowLowStock] = useState(false);
@@ -21,6 +22,9 @@ const DataManagement = () => {
     const [savingReceiptSettings, setSavingReceiptSettings] = useState(false);
     const [isResetDeviceOpen, setIsResetDeviceOpen] = useState(false);
     const [resettingDevice, setResettingDevice] = useState(false);
+    const [cleanupRequest, setCleanupRequest] = useState<CleanupRequest | null>(null);
+    const [isRequestCleanupOpen, setIsRequestCleanupOpen] = useState(false);
+    const [requestingCleanup, setRequestingCleanup] = useState(false);
     const enrollment = getDeviceEnrollment();
     const online = useSyncOnline();
 
@@ -37,6 +41,28 @@ const DataManagement = () => {
             console.error('Failed to load settings:', err);
         });
     }, []);
+
+    useEffect(() => {
+        if (!online) return;
+        getActiveCleanupRequest()
+            .then(setCleanupRequest)
+            .catch(() => { /* offline / transient */ });
+    }, [online]);
+
+    const handleRequestCleanup = async () => {
+        setRequestingCleanup(true);
+        try {
+            const request = await createCleanupRequest();
+            setCleanupRequest(request);
+            setIsRequestCleanupOpen(false);
+            toast.success('Cleanup requested. Waiting for owner approval.');
+        } catch (error) {
+            console.error('Cleanup request failed:', error);
+            toast.error('Failed to request cleanup. Please try again.');
+        } finally {
+            setRequestingCleanup(false);
+        }
+    };
 
     const handleToggleLowStock = async (enabled: boolean) => {
         setSavingInventorySettings(true);
@@ -265,6 +291,56 @@ const DataManagement = () => {
                     </CardContent>
                 </Card>
 
+                {/* Request Data Cleanup */}
+                <Card>
+                    <CardHeader className="pb-3 border-b">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Eraser className="h-5 w-5 text-primary" />
+                            Request Data Cleanup
+                        </CardTitle>
+                        <CardDescription>
+                            Ask the owner to approve clearing this device's local data. Once approved, all local tables are wiped and this branch's orders &amp; payments are deleted.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-background gap-4">
+                            <div className="space-y-1">
+                                {cleanupRequest?.status === 'pending' ? (
+                                    <>
+                                        <h4 className="font-medium text-sm text-warning">Waiting for owner approval</h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            Your cleanup request is pending. The device will clear its data automatically once the owner approves it in the web dashboard.
+                                        </p>
+                                    </>
+                                ) : cleanupRequest?.status === 'approved' ? (
+                                    <>
+                                        <h4 className="font-medium text-sm text-success">Approved — clearing data…</h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            The owner approved the cleanup. The device will finish syncing and then wipe its local data.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <h4 className="font-medium text-sm">Clear all local data</h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            Sends a cleanup request to the owner. Nothing is deleted until they approve it. The device stays enrolled and re-downloads menu, users and settings afterwards.
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsRequestCleanupOpen(true)}
+                                disabled={!online || cleanupRequest?.status === 'pending' || cleanupRequest?.status === 'approved'}
+                                className="w-full sm:w-auto shrink-0"
+                            >
+                                {cleanupRequest?.status === 'pending' ? 'Request pending' : 'Request Cleanup'}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Device Enrollment */}
                 <Card>
                     <CardHeader className="pb-3 border-b">
@@ -301,6 +377,27 @@ const DataManagement = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            <Dialog open={isRequestCleanupOpen} onOpenChange={setIsRequestCleanupOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Request data cleanup?</DialogTitle>
+                        <DialogDescription>
+                            This sends a request to the owner. After they approve it, all local
+                            data on this device is cleared and this branch's orders &amp; payments
+                            are permanently deleted. The device stays enrolled. This cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsRequestCleanupOpen(false)} disabled={requestingCleanup}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleRequestCleanup} disabled={requestingCleanup}>
+                            {requestingCleanup ? 'Requesting…' : 'Send Request'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isResetDeviceOpen} onOpenChange={setIsResetDeviceOpen}>
                 <DialogContent>

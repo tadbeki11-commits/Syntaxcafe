@@ -8,6 +8,9 @@ import {
   RefreshCwIcon,
   Trash2Icon,
   Loader2Icon,
+  DatabaseIcon,
+  CheckIcon,
+  XIcon,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -30,7 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
-import { Devices } from "@/lib/resources";
+import { Devices, DataCleanup } from "@/lib/resources";
 import { getBranchId } from "@/lib/api";
 
 type EnrolledDevice = {
@@ -39,6 +42,14 @@ type EnrolledDevice = {
   status: string;
   last_seen_at: string | null;
   online: boolean;
+};
+
+type CleanupRequest = {
+  id: string;
+  device_name: string | null;
+  status: string;
+  reason: string | null;
+  requested_at: string | null;
 };
 
 function relativeTime(iso: string | null): string {
@@ -62,31 +73,58 @@ export default function DevicesPage() {
   // The device the operator is about to kick out (drives the confirm dialog).
   const [toKick, setToKick] = useState<EnrolledDevice | null>(null);
   const [kicking, setKicking] = useState(false);
+  const [cleanups, setCleanups] = useState<CleanupRequest[]>([]);
+  const [cleanupsLoading, setCleanupsLoading] = useState(true);
+  // Id of the request currently being approved/rejected (drives button spinner).
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const branchId = getBranchId();
     if (!branchId) {
       setLoading(false);
       setDevicesLoading(false);
+      setCleanupsLoading(false);
       return;
     }
     setLoading(true);
     setDevicesLoading(true);
+    setCleanupsLoading(true);
     try {
-      const [codeRes, devicesRes] = await Promise.all([
+      const [codeRes, devicesRes, cleanupRes] = await Promise.all([
         Devices.getEnrollmentCode(branchId),
         Devices.list(branchId),
+        DataCleanup.list(branchId),
       ]);
       setCode(codeRes.code);
       setDevices(devicesRes.devices ?? []);
       setOnlineCount(devicesRes.online_count ?? 0);
+      setCleanups(cleanupRes);
     } catch (e: any) {
       toast.error(e.message);
     } finally {
       setLoading(false);
       setDevicesLoading(false);
+      setCleanupsLoading(false);
     }
   }, []);
+
+  async function review(id: string, action: "approve" | "reject") {
+    setReviewingId(id);
+    try {
+      if (action === "approve") {
+        await DataCleanup.approve(id);
+        toast.success("Cleanup approved. The device will wipe once it syncs.");
+      } else {
+        await DataCleanup.reject(id);
+        toast.success("Cleanup request rejected.");
+      }
+      await load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setReviewingId(null);
+    }
+  }
 
   useEffect(() => {
     load();
@@ -251,6 +289,79 @@ export default function DevicesPage() {
                       <Trash2Icon className="size-4" />
                     </Button>
                   </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DatabaseIcon className="size-5" />
+            Data cleanup requests
+          </CardTitle>
+          <CardDescription>
+            When a desktop admin requests a data cleanup, approve it here. On
+            approval the device clears its local data and this branch&apos;s
+            orders &amp; payments are permanently deleted. This can&apos;t be
+            undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {cleanupsLoading ? (
+            <p className="text-muted-foreground text-sm">Loading requests…</p>
+          ) : cleanups.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No cleanup requests for this branch.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {cleanups.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <div className="font-medium">
+                      {r.device_name ?? "Unnamed device"}
+                    </div>
+                    <div className="text-muted-foreground text-xs">
+                      Requested {relativeTime(r.requested_at)}
+                      {r.reason ? ` · ${r.reason}` : ""}
+                    </div>
+                  </div>
+                  {r.status === "pending" ? (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={reviewingId === r.id}
+                        onClick={() => review(r.id, "reject")}>
+                        <XIcon className="size-4" />
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={reviewingId === r.id}
+                        onClick={() => review(r.id, "approve")}>
+                        {reviewingId === r.id ? (
+                          <Loader2Icon className="size-4 animate-spin" />
+                        ) : (
+                          <CheckIcon className="size-4" />
+                        )}
+                        Approve
+                      </Button>
+                    </div>
+                  ) : (
+                    <Badge
+                      variant={
+                        r.status === "approved" ? "default" : "muted"
+                      }
+                      className="shrink-0 capitalize">
+                      {r.status}
+                    </Badge>
+                  )}
                 </li>
               ))}
             </ul>

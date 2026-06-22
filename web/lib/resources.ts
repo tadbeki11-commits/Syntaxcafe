@@ -235,3 +235,17 @@ export const Devices = {
       del,
     ),
 };
+
+// Desktop devices request a local data wipe; the owner approves/rejects it here.
+// Once approved, the device clears its local tables and the backend drops this
+// branch's orders & payments. Scoped to the branch via branch_id / x-branch-id.
+export const DataCleanup = {
+  list: (branch_id: string) =>
+    apiFetch(
+      `/data-cleanup/requests?branch_id=${encodeURIComponent(branch_id)}`,
+    ).then((d) => d.requests ?? []),
+  approve: (id: string) =>
+    apiFetch(`/data-cleanup/requests/${id}/approve`, j({})),
+  reject: (id: string) =>
+    apiFetch(`/data-cleanup/requests/${id}/reject`, j({})),
+};

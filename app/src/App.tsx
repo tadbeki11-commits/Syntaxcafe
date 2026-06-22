@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import SyncProgressBar from './components/SyncProgressBar';
+import CleanupApprovalWatcher from './components/CleanupApprovalWatcher';
 import { isDeviceEnrolled, loadDeviceEnrollment } from '@/shared/utils/deviceToken';
 import EnrollmentPage from './pages/EnrollmentPage';
 
@@ -189,6 +190,7 @@ function App() {
       <AuthProvider>
         <div className="App">
           <SyncProgressBar />
+          <CleanupApprovalWatcher />
           <AppContent />
         </div>
       </AuthProvider>

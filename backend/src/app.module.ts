@@ -20,6 +20,7 @@ import { BranchesModule } from "./modules/branches/branches.module";
 import { PlatformModule } from "./modules/platform/platform.module";
 import { ExpensesModule } from "./modules/expenses/expenses.module";
 import { RolePermissionsModule } from "./modules/role-permissions/role-permissions.module";
+import { DataCleanupModule } from "./modules/data-cleanup/data-cleanup.module";
 import { DbModule } from "./db/db.module";
 import { AppController } from "./app.controller";
 
@@ -49,6 +50,7 @@ import { AppController } from "./app.controller";
     PlatformModule,
     ExpensesModule,
     RolePermissionsModule,
+    DataCleanupModule,
   ],
   controllers: [AppController],
   providers: [],

@@ -1,6 +1,7 @@
 export * from "./businesses.table";
 export * from "./branches.table";
 export * from "./branch-devices.table";
+export * from "./data-cleanup-requests.table";
 export * from "./platform-audit-logs.table";
 export * from "./users.table";
 export * from "./roles.table";

@@ -92,6 +92,21 @@ export async function clearAllLocalData(): Promise<void> {
   await db.delete(localDbTables.recipeIngredients);
 }
 
+/**
+ * Full local wipe used by the owner-approved data cleanup. Clears everything
+ * clearAllLocalData() does, plus orders/payments/expenses (which it protects on
+ * logout), but deliberately KEEPS device_enrollment so the device stays pinned
+ * to its branch and re-pulls reference data on the next sync. Deletes run
+ * sequentially — the pooled SQLite connection has no working transactions.
+ */
+export async function wipeAllLocalDataKeepEnrollment(): Promise<void> {
+  const db = await getLocalDb();
+  await clearAllLocalData();
+  await db.delete(localDbTables.orders);
+  await db.delete(localDbTables.payments);
+  await db.delete(localDbTables.expenses);
+}
+
 // Global script to instantly wipe all local data from the Developer Console
 if (typeof window !== "undefined") {
   (window as any).clearDb = async () => {
