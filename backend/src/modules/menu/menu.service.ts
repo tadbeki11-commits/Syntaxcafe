@@ -15,6 +15,25 @@ const slugify = (value: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/(^-|-$)/g, "");
 
+// Predefined notes are short pick-list values an admin attaches to a menu item
+// (e.g. "No sugar", "Extra hot") that waiters/cashiers can quick-select when
+// adding the item to an order. Stored on the item's `meta` jsonb column.
+const normalizePredefinedNotes = (input: any): string[] => {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const notes: string[] = [];
+  for (const entry of input) {
+    const value = String(entry ?? "").trim().slice(0, 100);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    notes.push(value);
+    if (notes.length >= 30) break;
+  }
+  return notes;
+};
+
 const asCategoryInputs = (menuData: any) => {
   const raw = Array.isArray(menuData.categories) ? menuData.categories : [];
   const categoryInputs = raw
@@ -64,6 +83,10 @@ export class MenuService {
           prep_time_minutes: menuData.prep_time_minutes ?? 0,
           sku: menuData.sku ?? null,
           barcode: menuData.barcode ?? null,
+          meta: {
+            ...(menuData.meta && typeof menuData.meta === "object" ? menuData.meta : {}),
+            predefined_notes: normalizePredefinedNotes(menuData.predefined_notes),
+          },
         })
         .returning();
 
@@ -246,6 +269,21 @@ export class MenuService {
     });
 
     const categoryInputs = asCategoryInputs(menuData);
+
+    if (menuData.predefined_notes !== undefined) {
+      const [existing] = await db
+        .select({ meta: menuItems.meta })
+        .from(menuItems)
+        .where(and(eq(menuItems.id, id), eq(menuItems.branch_id, requireBranchId())))
+        .limit(1);
+      const currentMeta =
+        existing?.meta && typeof existing.meta === "object" ? existing.meta : {};
+      updates.meta = {
+        ...currentMeta,
+        predefined_notes: normalizePredefinedNotes(menuData.predefined_notes),
+      };
+    }
+
     if (Object.keys(updates).length === 0 && categoryInputs.length === 0) {
       throw new Error("No fields to update");
     }
@@ -486,6 +524,9 @@ export class MenuService {
         byId.get(row.item.id) ??
         {
           ...row.item,
+          predefined_notes: Array.isArray(row.item?.meta?.predefined_notes)
+            ? row.item.meta.predefined_notes
+            : [],
           categories: [],
         };
 

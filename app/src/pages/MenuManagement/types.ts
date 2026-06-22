@@ -20,6 +20,7 @@ export interface MenuItem {
   prep_time_minutes?: number;
   sku?: string;
   barcode?: string;
+  predefined_notes?: string[];
 }
 
 export interface MenuFormData {
@@ -35,6 +36,7 @@ export interface MenuFormData {
   prep_time_minutes: string;
   sku: string;
   barcode: string;
+  predefined_notes: string[];
 }
 
 export interface SyncStatus {

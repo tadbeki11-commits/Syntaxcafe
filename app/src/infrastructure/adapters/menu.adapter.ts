@@ -292,6 +292,11 @@ const normalizeMenuItem = (item: any) => {
     ),
     sku: item?.sku ?? "",
     barcode: item?.barcode ?? "",
+    predefined_notes: Array.isArray(item?.predefined_notes)
+      ? item.predefined_notes
+      : Array.isArray(item?.meta?.predefined_notes)
+        ? item.meta.predefined_notes
+        : [],
     synced: 1,
   };
 };

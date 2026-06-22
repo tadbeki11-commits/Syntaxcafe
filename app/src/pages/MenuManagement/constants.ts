@@ -15,4 +15,5 @@ export const DEFAULT_FORM: MenuFormData = {
   prep_time_minutes: "",
   sku: "",
   barcode: "",
+  predefined_notes: [],
 };

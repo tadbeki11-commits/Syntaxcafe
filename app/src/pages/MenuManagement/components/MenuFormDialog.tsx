@@ -54,6 +54,26 @@ export const MenuFormDialog: React.FC<MenuFormDialogProps> = ({
 }) => {
   const [newMainCategoryName, setNewMainCategoryName] = React.useState('');
   const [addingMainCategory, setAddingMainCategory] = React.useState(false);
+  const [newNote, setNewNote] = React.useState('');
+  const predefinedNotes = formData.predefined_notes ?? [];
+
+  const addPredefinedNote = () => {
+    const value = newNote.trim().slice(0, 100);
+    if (!value) return;
+    if (predefinedNotes.some((note) => note.toLowerCase() === value.toLowerCase())) {
+      setNewNote('');
+      return;
+    }
+    setFormData((p) => ({ ...p, predefined_notes: [...(p.predefined_notes ?? []), value] }));
+    setNewNote('');
+  };
+
+  const removePredefinedNote = (note: string) => {
+    setFormData((p) => ({
+      ...p,
+      predefined_notes: (p.predefined_notes ?? []).filter((n) => n !== note),
+    }));
+  };
   const suggestedCategories = availableCategories.filter(Boolean);
   const [categoryMode, setCategoryMode] = React.useState<'existing' | 'custom'>(
     suggestedCategories.includes(formData.category) ? 'existing' : 'custom',
@@ -222,6 +242,50 @@ export const MenuFormDialog: React.FC<MenuFormDialogProps> = ({
         />
         <p className="text-xs text-muted-foreground">
           Separate multiple category tags with commas.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Predefined notes</Label>
+        <div className="flex gap-2">
+          <Input
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addPredefinedNote();
+              }
+            }}
+            maxLength={100}
+            placeholder="e.g. No sugar, Extra hot"
+          />
+          <Button type="button" variant="outline" onClick={addPredefinedNote}>
+            Add
+          </Button>
+        </div>
+        {predefinedNotes.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {predefinedNotes.map((note) => (
+              <span
+                key={note}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/50 px-2.5 py-1 text-xs font-medium text-foreground"
+              >
+                {note}
+                <button
+                  type="button"
+                  onClick={() => removePredefinedNote(note)}
+                  className="text-muted-foreground/70 transition-colors hover:text-destructive"
+                  aria-label={`Remove ${note}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Waiters and cashiers can quick-select these when adding this item to an order.
         </p>
       </div>
 

@@ -360,6 +360,11 @@ export const useMenuData = () => {
           : "",
         sku: item.sku || "",
         barcode: item.barcode || "",
+        predefined_notes: Array.isArray(item.predefined_notes)
+          ? item.predefined_notes
+          : Array.isArray((item as any)?.meta?.predefined_notes)
+            ? (item as any).meta.predefined_notes
+            : [],
       });
       setImagePreview(item.image_url || null);
       setDialogOpen(true);

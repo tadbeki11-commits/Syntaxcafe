@@ -335,6 +335,11 @@ export const useCashierCreateOrder = () => {
             price: menuItem.price,
             quantity: 1,
             main_category: menuItem.main_category,
+            predefined_notes: Array.isArray(menuItem.predefined_notes)
+              ? menuItem.predefined_notes
+              : Array.isArray(menuItem?.meta?.predefined_notes)
+                ? menuItem.meta.predefined_notes
+                : [],
           },
         ]);
       }

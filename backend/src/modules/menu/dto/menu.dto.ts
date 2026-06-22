@@ -40,6 +40,9 @@ export class MenuItemDto {
   @ApiPropertyOptional()
   categories?: any[];
 
+  @ApiPropertyOptional({ type: [String] })
+  predefined_notes?: string[];
+
   @ApiPropertyOptional()
   created_at?: string;
 
@@ -83,6 +86,9 @@ export class MenuItemRequestDto {
 
   @ApiPropertyOptional()
   categories?: any[];
+
+  @ApiPropertyOptional({ type: [String] })
+  predefined_notes?: string[];
 }
 
 export class MenuItemUpdateDto {
@@ -121,6 +127,9 @@ export class MenuItemUpdateDto {
 
   @ApiPropertyOptional()
   categories?: any[];
+
+  @ApiPropertyOptional({ type: [String] })
+  predefined_notes?: string[];
 }
 
 export class MenuItemDataDto {
