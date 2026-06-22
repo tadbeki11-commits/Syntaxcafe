@@ -327,6 +327,11 @@ export const useWaiterCreateOrder = () => {
             price: menuItem.price,
             main_category: menuItem.main_category || "barista",
             quantity: 1,
+            predefined_notes: Array.isArray(menuItem.predefined_notes)
+              ? menuItem.predefined_notes
+              : Array.isArray(menuItem?.meta?.predefined_notes)
+                ? menuItem.meta.predefined_notes
+                : [],
           },
         ]);
       }

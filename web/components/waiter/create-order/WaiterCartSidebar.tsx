@@ -13,6 +13,27 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+// Item notes combine free text with quick-select preset chips. Presets are
+// stored as comma-separated parts inside the same note string, so a chip is
+// "active" when its value is already one of those parts.
+const splitNoteParts = (note: string | undefined): string[] =>
+  String(note || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+const noteHasPart = (note: string | undefined, part: string): boolean =>
+  splitNoteParts(note).some((p) => p.toLowerCase() === part.toLowerCase());
+
+const togglePart = (note: string | undefined, part: string): string => {
+  const parts = splitNoteParts(note);
+  const exists = parts.some((p) => p.toLowerCase() === part.toLowerCase());
+  const next = exists
+    ? parts.filter((p) => p.toLowerCase() !== part.toLowerCase())
+    : [...parts, part];
+  return next.join(", ");
+};
+
 interface WaiterCartSidebarProps {
   orderItems: any[];
   selectedTable: string;
@@ -165,16 +186,46 @@ export const WaiterCartSidebar: React.FC<WaiterCartSidebarProps> = ({
                 </div>
 
                 {onUpdateItemNote && (
-                  <input
-                    type="text"
-                    value={item.note || ""}
-                    onChange={(e) =>
-                      onUpdateItemNote(item.menu_item_id, e.target.value)
-                    }
-                    maxLength={200}
-                    placeholder="Item note (e.g. no ice, well done)…"
-                    className="w-full rounded-xl border border-border/50 bg-background px-2.5 py-1.5 text-[11px] text-foreground outline-none placeholder:text-muted-foreground/55 focus:border-primary/40"
-                  />
+                  <div className="space-y-2">
+                    {Array.isArray(item.predefined_notes) &&
+                      item.predefined_notes.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {item.predefined_notes.map((presetNote: string) => {
+                            const active = noteHasPart(item.note, presetNote);
+                            return (
+                              <button
+                                key={presetNote}
+                                type="button"
+                                onClick={() =>
+                                  onUpdateItemNote(
+                                    item.menu_item_id,
+                                    togglePart(item.note, presetNote),
+                                  )
+                                }
+                                className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                                  active
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border/50 bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                }`}
+                              >
+                                {active ? "✓ " : ""}
+                                {presetNote}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    <input
+                      type="text"
+                      value={item.note || ""}
+                      onChange={(e) =>
+                        onUpdateItemNote(item.menu_item_id, e.target.value)
+                      }
+                      maxLength={200}
+                      placeholder="Item note (e.g. no ice, well done)…"
+                      className="w-full rounded-xl border border-border/50 bg-background px-2.5 py-1.5 text-[11px] text-foreground outline-none placeholder:text-muted-foreground/55 focus:border-primary/40"
+                    />
+                  </div>
                 )}
               </div>
             ))}

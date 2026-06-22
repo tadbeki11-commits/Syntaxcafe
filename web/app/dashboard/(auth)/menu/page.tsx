@@ -34,6 +34,8 @@ type Item = {
   main_category: string | null;
   type: string | null;
   is_available: boolean;
+  // Quick-select notes waiters/cashiers can attach to this item on an order.
+  predefined_notes?: string[];
 };
 // A "main category" row — i.e. a printing/kitchen department.
 type Department = { id: string; name: string; slug: string };
@@ -51,6 +53,7 @@ export default function MenuPage() {
   const [recipeItem, setRecipeItem] = useState<Item | null>(null);
   const [deptName, setDeptName] = useState("");
   const [catName, setCatName] = useState("");
+  const [noteInput, setNoteInput] = useState("");
 
   function load() {
     setLoading(true);
@@ -76,8 +79,31 @@ export default function MenuPage() {
       main_category: departments[0]?.slug ?? "",
       type: "cafe",
       is_available: true,
+      predefined_notes: [],
     });
+    setNoteInput("");
     setOpen(true);
+  }
+
+  function addPredefinedNote() {
+    if (!editing) return;
+    const value = noteInput.trim().slice(0, 100);
+    if (!value) return;
+    const current = editing.predefined_notes ?? [];
+    if (current.some((n) => n.toLowerCase() === value.toLowerCase())) {
+      setNoteInput("");
+      return;
+    }
+    setEditing({ ...editing, predefined_notes: [...current, value] });
+    setNoteInput("");
+  }
+
+  function removePredefinedNote(note: string) {
+    if (!editing) return;
+    setEditing({
+      ...editing,
+      predefined_notes: (editing.predefined_notes ?? []).filter((n) => n !== note),
+    });
   }
 
   async function save() {
@@ -90,6 +116,7 @@ export default function MenuPage() {
       main_category: editing.main_category || null,
       type: editing.type || "cafe",
       is_available: editing.is_available,
+      predefined_notes: editing.predefined_notes ?? [],
     };
     try {
       if (editing.id) await Menu.update(editing.id, body);
@@ -269,7 +296,8 @@ export default function MenuPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => {
-                    setEditing(it);
+                    setEditing({ ...it, predefined_notes: it.predefined_notes ?? [] });
+                    setNoteInput("");
                     setOpen(true);
                   }}>
                   <PencilIcon className="size-4" />
@@ -410,6 +438,47 @@ export default function MenuPage() {
                 </select>
                 <p className="text-xs text-muted-foreground">
                   Manage the list in the Categories tab.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Predefined notes</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={noteInput}
+                    onChange={(e) => setNoteInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addPredefinedNote();
+                      }
+                    }}
+                    maxLength={100}
+                    placeholder="e.g. No sugar, Extra hot"
+                  />
+                  <Button type="button" variant="outline" onClick={addPredefinedNote}>
+                    Add
+                  </Button>
+                </div>
+                {(editing.predefined_notes?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {editing.predefined_notes!.map((note) => (
+                      <span
+                        key={note}
+                        className="bg-muted inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium">
+                        {note}
+                        <button
+                          type="button"
+                          onClick={() => removePredefinedNote(note)}
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label={`Remove ${note}`}>
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  Waiters and cashiers can quick-select these when adding this item to an order.
                 </p>
               </div>
               <div className="flex items-center gap-3">
