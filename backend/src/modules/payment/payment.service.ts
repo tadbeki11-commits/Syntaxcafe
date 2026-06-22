@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { and, asc, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../../db/drizzle";
 import { order_items } from "../../db/tables/order-items.table";
@@ -150,17 +150,6 @@ export class PaymentService {
         throw new Error("Payment not found");
       }
 
-      const [existingSaleMovement] = await tx
-        .select({ id: stockMovements.id })
-        .from(stockMovements)
-        .where(
-          and(
-            eq(stockMovements.order_id, payment.order_id),
-            eq(stockMovements.movement_type, "sale"),
-          ),
-        )
-        .limit(1);
-
       await tx
         .update(orders)
         .set({
@@ -172,42 +161,195 @@ export class PaymentService {
           and(eq(orders.id, payment.order_id), eq(orders.branch_id, branchId)),
         );
 
-      const orderLines = await tx
-        .select({
-          id: order_items.id,
-          menu_item_id: order_items.menu_item_id,
-          quantity: order_items.quantity,
-          main_category: order_items.main_category,
-          item_type: order_items.item_type,
-        })
-        .from(order_items)
-        .where(eq(order_items.order_id, payment.order_id));
-
-      if (existingSaleMovement) {
-        return payment;
-      }
-
-      // Deduct stock as a side effect of payment, but never block the payment on
-      // it — the order has already been served, so a shortfall just lets stock go
-      // negative (a warning to restock), mirroring the offline-sync create path.
-      try {
-        await this.orderInventoryService.reconcileOrderItems({
-          tx,
-          orderId: payment.order_id,
-          previousItems: [],
-          nextItems: orderLines,
-          createdBy: processedBy || null,
-          allowLowStock: true,
-        });
-      } catch (error) {
-        console.warn(
-          `[confirmPayment] Inventory reconciliation failed for order ${payment.order_id}; payment is still recorded.`,
-          (error as Error)?.message,
-        );
-      }
+      await this.deductOrderStock(tx, payment.order_id, processedBy);
 
       return payment;
     });
+  }
+
+  /**
+   * Deduct stock for every line of an order, once. Used when an order becomes
+   * fully paid (either by a single full-order confirm or once the last
+   * department's share is settled). Guarded by the existing "sale" stock movement
+   * so re-runs are no-ops, and never blocks the payment on a shortfall — the food
+   * has already been served, so a deficit just lets stock go negative as a
+   * restock signal, mirroring the offline-sync create path.
+   */
+  private async deductOrderStock(
+    tx: any,
+    orderId: string,
+    processedBy?: any,
+  ): Promise<void> {
+    const [existingSaleMovement] = await tx
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.order_id, orderId),
+          eq(stockMovements.movement_type, "sale"),
+        ),
+      )
+      .limit(1);
+
+    if (existingSaleMovement) return;
+
+    const orderLines = await tx
+      .select({
+        id: order_items.id,
+        menu_item_id: order_items.menu_item_id,
+        quantity: order_items.quantity,
+        main_category: order_items.main_category,
+        item_type: order_items.item_type,
+      })
+      .from(order_items)
+      .where(eq(order_items.order_id, orderId));
+
+    try {
+      await this.orderInventoryService.reconcileOrderItems({
+        tx,
+        orderId,
+        previousItems: [],
+        nextItems: orderLines,
+        createdBy: processedBy || null,
+        allowLowStock: true,
+      });
+    } catch (error) {
+      console.warn(
+        `[deductOrderStock] Inventory reconciliation failed for order ${orderId}; payment is still recorded.`,
+        (error as Error)?.message,
+      );
+    }
+  }
+
+  /**
+   * Settle one department's share of an order. A department here is the
+   * `main_category` carried on each order item (kitchen / bar / cafe …). An
+   * order that spans several departments can be paid by several department
+   * cashiers, each confirming only their slice; the order flips to fully paid
+   * (and stock is deducted, once) only when every department present has been
+   * settled. Until then it sits at `partially_paid` and stays in the cashier
+   * queue for the remaining departments.
+   */
+  async settleDepartment(body: {
+    order_id: string;
+    department: string;
+    payment_method?: string;
+    processed_by?: string;
+  }) {
+    const branchId = requireBranchId();
+    const orderId = body.order_id;
+    const department = String(body.department || "").trim().toLowerCase();
+    if (!orderId || !department) {
+      throw new BadRequestException("order_id and department are required");
+    }
+    const method = body.payment_method || "cash";
+
+    const result = await db.transaction(async (tx: any) => {
+      const lines = await tx
+        .select({
+          subtotal: order_items.subtotal,
+          main_category: order_items.main_category,
+        })
+        .from(order_items)
+        .where(eq(order_items.order_id, orderId));
+
+      if (!lines.length) {
+        throw new BadRequestException("Order has no items");
+      }
+
+      const deptOf = (line: any) =>
+        String(line?.main_category || "").trim().toLowerCase() || "other";
+
+      const deptLines = lines.filter((l: any) => deptOf(l) === department);
+      const deptSubtotal = deptLines.reduce(
+        (sum: number, l: any) => sum + (Number(l.subtotal) || 0),
+        0,
+      );
+      if (deptSubtotal <= 0) {
+        throw new BadRequestException(
+          `No payable items for department "${department}"`,
+        );
+      }
+
+      // Which departments are already settled? A department-scoped paid payment
+      // marks one department; a legacy full payment covers the whole order.
+      const existingPaid = await tx
+        .select({ meta: payments.meta })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.order_id, orderId),
+            eq(payments.branch_id, branchId),
+            eq(payments.status, "paid"),
+          ),
+        );
+
+      const settled = new Set<string>();
+      let hasFullPayment = false;
+      for (const p of existingPaid) {
+        const meta = (p.meta ?? {}) as any;
+        if (meta?.scope === "department") {
+          const d = String(meta?.department || "").trim().toLowerCase();
+          if (d) settled.add(d);
+        } else {
+          hasFullPayment = true;
+        }
+      }
+      if (hasFullPayment || settled.has(department)) {
+        throw new BadRequestException(
+          `Department "${department}" is already settled`,
+        );
+      }
+
+      const [created] = await tx
+        .insert(payments)
+        .values({
+          ...tenantInsert(),
+          order_id: orderId,
+          amount: deptSubtotal,
+          amount_cents: deptSubtotal,
+          payment_method: method,
+          method,
+          status: "paid",
+          processed_by: body.processed_by || null,
+          paid_at: new Date(),
+          meta: {
+            scope: "department",
+            department,
+            item_count: deptLines.length,
+          },
+        })
+        .returning();
+
+      settled.add(department);
+
+      const present = new Set<string>(lines.map(deptOf));
+      const fullyPaid = Array.from(present).every((d) => settled.has(d));
+
+      await tx
+        .update(orders)
+        .set({
+          ...(fullyPaid ? { status: "paid" } : {}),
+          payment_status: fullyPaid ? "paid" : "partially_paid",
+          updated_at: new Date(),
+        })
+        .where(and(eq(orders.id, orderId), eq(orders.branch_id, branchId)));
+
+      if (fullyPaid) {
+        await this.deductOrderStock(tx, orderId, body.processed_by);
+      }
+
+      return {
+        payment: created,
+        fully_paid: fullyPaid,
+        settled_departments: Array.from(settled),
+      };
+    });
+
+    if (result.payment) {
+      await emitCreated(db, "payment", "PAYMENT_CREATED", result.payment as any);
+    }
+    return result;
   }
 
   async getPendingPayments() {

@@ -310,6 +310,29 @@ export class OrderController {
     return { status: "success", data: { orders, count: orders.length } };
   }
 
+  @ApiOperation({
+    summary:
+      "Active orders awaiting payment, with per-department dues for the cashier portal",
+  })
+  @ApiQuery({
+    name: "departments",
+    required: false,
+    description: "Comma-separated departments to scope the queue to",
+  })
+  @ApiOkResponse({ type: OrdersResponseDto })
+  @Get("cashier-queue")
+  async getCashierQueue(@Query() query: any) {
+    const departments = String(query.departments || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const orders = await this.orderService.getCashierQueue({
+      departments,
+      employee_id: query.employee_id || undefined,
+    });
+    return { status: "success", data: { orders, count: orders.length } };
+  }
+
   @ApiOperation({ summary: "Update the items for an order" })
   @ApiParam({ name: "id", required: true })
   @ApiBody({ type: OrderItemsUpdateDto })

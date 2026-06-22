@@ -1008,6 +1008,104 @@ export class OrderService {
     return this.findAll(filters);
   }
 
+  /**
+   * Active orders awaiting payment, enriched for the web cashier portal with a
+   * per-department breakdown so a department-attached cashier can settle only
+   * their share. A "department" is the `main_category` carried on each order
+   * item. When `departments` is provided, only orders that still have an
+   * unsettled due in one of those departments are returned, and the item/dues
+   * lists are trimmed to those departments so other departments' lines and
+   * totals never leak to a scoped cashier.
+   */
+  async getCashierQueue(filters: { departments?: string[]; employee_id?: string }) {
+    const branchId = requireBranchId();
+    const wanted = (filters.departments ?? [])
+      .map((d) => String(d || "").trim().toLowerCase())
+      .filter(Boolean);
+
+    const conditions = [
+      eq(orders.branch_id, branchId),
+      sql`coalesce(${orders.payment_status}, '') <> 'paid'`,
+      sql`coalesce(${orders.status}, '') not in ('paid', 'cancelled')`,
+    ] as any[];
+    if (filters.employee_id) {
+      conditions.push(eq(orders.employee_id, filters.employee_id));
+    }
+
+    const rows = await db
+      .select({ order: orders, employee: users })
+      .from(orders)
+      .leftJoin(users, eq(orders.employee_id, users.id))
+      .where(and(...conditions))
+      .orderBy(desc(orders.created_at));
+
+    const orderIds = rows.map((r) => r.order.id);
+    const itemsByOrder = await this.loadItemsForOrders(orderIds);
+
+    // Departments already settled per order (paid department-scoped payments).
+    const settledByOrder = new Map<string, Set<string>>();
+    if (orderIds.length > 0) {
+      const payRows = await db
+        .select({ order_id: payments.order_id, meta: payments.meta })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.branch_id, branchId),
+            inArray(payments.order_id, orderIds),
+            eq(payments.status, "paid"),
+          ),
+        );
+      for (const p of payRows) {
+        const meta = (p.meta ?? {}) as any;
+        if (meta?.scope !== "department") continue;
+        const dept = String(meta?.department || "").trim().toLowerCase();
+        if (!dept) continue;
+        const set = settledByOrder.get(p.order_id) ?? new Set<string>();
+        set.add(dept);
+        settledByOrder.set(p.order_id, set);
+      }
+    }
+
+    const deptOf = (it: any) =>
+      String(it?.main_category || "").trim().toLowerCase() || "other";
+
+    const result: any[] = [];
+    for (const row of rows) {
+      const items = itemsByOrder.get(row.order.id) ?? [];
+      const settled = settledByOrder.get(row.order.id) ?? new Set<string>();
+
+      const dueMap = new Map<
+        string,
+        { department: string; subtotal: number; settled: boolean }
+      >();
+      for (const it of items) {
+        const dept = deptOf(it);
+        const cur =
+          dueMap.get(dept) ??
+          { department: dept, subtotal: 0, settled: settled.has(dept) };
+        cur.subtotal += Number(it?.subtotal ?? 0) || 0;
+        dueMap.set(dept, cur);
+      }
+      let dues = Array.from(dueMap.values());
+
+      let visibleItems = items;
+      if (wanted.length > 0) {
+        dues = dues.filter((d) => wanted.includes(d.department));
+        // Skip orders with nothing left for this cashier's departments.
+        if (!dues.some((d) => !d.settled)) continue;
+        visibleItems = items.filter((it) => wanted.includes(deptOf(it)));
+      }
+
+      result.push({
+        ...this.toOrderResponse(row.order, row.employee, visibleItems),
+        settled_departments: Array.from(settled),
+        department_dues: dues,
+      });
+    }
+
+    return result;
+  }
+
   async updateOrderItems(id: string, items: any[], updatedBy?: any) {
     const allowLowStock = await this.isLowStockAllowed();
     const branchId = requireBranchId();

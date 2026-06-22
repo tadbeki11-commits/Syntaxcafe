@@ -9,6 +9,7 @@ import { ResourceManager, type Column } from "@/components/resource-manager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { StaffActivity } from "@/components/staff/staff-activity";
+import { CashierDepartmentsAction } from "@/components/staff/cashier-departments-action";
 import { Users } from "@/lib/resources";
 import { CONFIGURABLE_ROLES } from "@/lib/permissions";
 
@@ -84,19 +85,27 @@ function StaffAccounts() {
       create={Users.create}
       update={Users.update}
       rowActions={(row, reload) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={async () => {
-            try {
-              await Users.toggle(row.id);
-              await reload();
-            } catch (e: any) {
-              toast.error(e.message);
-            }
-          }}>
-          {row.is_active ? "Deactivate" : "Activate"}
-        </Button>
+        <>
+          {row.role === "cashier" ? (
+            <CashierDepartmentsAction
+              userId={row.id}
+              userName={row.full_name || row.name || row.username || "Cashier"}
+            />
+          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              try {
+                await Users.toggle(row.id);
+                await reload();
+              } catch (e: any) {
+                toast.error(e.message);
+              }
+            }}>
+            {row.is_active ? "Deactivate" : "Activate"}
+          </Button>
+        </>
       )}
     />
   );

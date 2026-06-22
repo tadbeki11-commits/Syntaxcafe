@@ -421,6 +421,15 @@ export class SettingsService {
     return { is_set: !!cancelPassword };
   }
 
+  // Verify a typed cancel-order password against the branch's stored hash. Used
+  // by clients (e.g. the web cashier portal) that can't validate locally the way
+  // the desktop POS does against its mirrored hash.
+  async verifySystemCancelPassword(password: string): Promise<boolean> {
+    const cancelPassword = await this.getSystemSetting("cancel_password");
+    if (!cancelPassword) return false;
+    return compare(password, cancelPassword);
+  }
+
   async updateSystemCancelPassword(password: string): Promise<{ is_set: boolean }> {
     if (!password || password.length < 6) {
       throw new Error("Cancel password must be at least 6 characters.");

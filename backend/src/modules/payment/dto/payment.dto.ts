@@ -17,6 +17,20 @@ export class PaymentRequestDto {
   description?: string;
 }
 
+export class DepartmentSettleRequestDto {
+  @ApiProperty()
+  order_id!: string;
+
+  @ApiProperty({ description: "Department (order item main_category) to settle" })
+  department!: string;
+
+  @ApiPropertyOptional()
+  payment_method?: string;
+
+  @ApiPropertyOptional()
+  processed_by?: string;
+}
+
 export class PaymentStatusUpdateDto {
   @ApiProperty()
   status!: string;

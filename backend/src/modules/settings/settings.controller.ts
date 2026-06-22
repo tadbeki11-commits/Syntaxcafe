@@ -413,6 +413,22 @@ export class SettingsController {
     return { status: "success", data };
   }
 
+  @ApiOperation({ summary: "Verify a typed branch cancel-order password" })
+  @ApiBody({ type: CancelPasswordRequestDto })
+  @Post("system/cancel-password/verify")
+  async verifySystemCancelPassword(
+    @Headers("x-app-client") appClient: string,
+    @Body() body: CancelPasswordRequestDto,
+  ) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    const valid = await this.settingsService.verifySystemCancelPassword(
+      body.cancel_password,
+    );
+    return { status: "success", data: { valid } };
+  }
+
   @ApiOperation({ summary: "Set the branch cancel-order password (owner)" })
   @ApiBody({ type: CancelPasswordRequestDto })
   @Put("system/cancel-password")

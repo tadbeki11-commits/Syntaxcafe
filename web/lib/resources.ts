@@ -59,12 +59,17 @@ export const Tables = {
 
 export const Users = {
   list: () => apiFetch("/users").then((d) => d.data.users ?? d.data ?? []),
+  get: (id: string) => apiFetch(`/users/${id}`).then((d) => d.data.user),
   create: (b: any) => apiFetch("/users", j(b)),
   // Bulk create/update staff. The backend upserts by id, scopes tenancy from
   // the device/owner token, and hashes a default password for new accounts.
   bulkSync: (users: any[]) => apiFetch("/users/sync", j({ users })),
   update: (id: string, b: any) => apiFetch(`/users/${id}`, put(b)),
   toggle: (id: string) => apiFetch(`/users/${id}/toggle-status`, patch({})),
+  // Attach a cashier to one or more departments (order item main_category
+  // slugs). Drives the web cashier portal's split-payment scope.
+  setCashierDepartments: (id: string, departments: string[]) =>
+    apiFetch(`/users/${id}/cashier-departments`, put({ departments })),
 };
 
 export const Recipes = {

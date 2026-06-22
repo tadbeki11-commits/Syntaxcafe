@@ -208,6 +208,7 @@ export class UsersService {
         last_name: users.last_name,
         phone: users.phone,
         is_active: users.is_active,
+        meta: users.meta,
       })
       .from(users)
       .where(
@@ -224,6 +225,45 @@ export class UsersService {
       )
       .limit(1);
     return user || null;
+  }
+
+  /**
+   * Set the departments a cashier is attached to. Stored on `meta` so no schema
+   * change is needed; merged with any existing meta. The web cashier portal reads
+   * this back from pin-login to scope its order queue and split payments.
+   */
+  async setCashierDepartments(userId: string, departments: string[]) {
+    const branchId = requireBranchId();
+    const clean = Array.from(
+      new Set(
+        (Array.isArray(departments) ? departments : [])
+          .map((d) => String(d || "").trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+
+    const [existing] = await db
+      .select({ meta: users.meta })
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.branch_id, branchId)))
+      .limit(1);
+    if (!existing) return null;
+
+    const meta = {
+      ...((existing.meta as any) ?? {}),
+      cashier_departments: clean,
+    };
+
+    const [updated] = await db
+      .update(users)
+      .set({ meta, updated_at: new Date() })
+      .where(and(eq(users.id, userId), eq(users.branch_id, branchId)))
+      .returning();
+
+    if (updated) {
+      await emitUpdated(db, "user", "USER_UPDATED", updated as any);
+    }
+    return { id: userId, cashier_departments: clean };
   }
 
   async verifyPin(user: any, pin: string) {

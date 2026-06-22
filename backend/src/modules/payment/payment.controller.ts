@@ -9,6 +9,7 @@ import {
 } from "@nestjs/swagger";
 import { PaymentService } from "./payment.service";
 import {
+  DepartmentSettleRequestDto,
   PaymentQrResponseDto,
   PaymentRequestDto,
   PaymentResponseDto,
@@ -176,6 +177,23 @@ export class PaymentController {
       status: "success",
       message: "Payment confirmed successfully",
       data: { payment: confirmed },
+    };
+  }
+
+  @ApiOperation({
+    summary: "Settle one department's share of an order (split payment)",
+  })
+  @ApiBody({ type: DepartmentSettleRequestDto })
+  @ApiOkResponse({ type: PaymentResponseDto })
+  @Post("settle-department")
+  async settleDepartment(@Body() body: DepartmentSettleRequestDto) {
+    const result = await this.paymentService.settleDepartment(body);
+    return {
+      status: "success",
+      message: result.fully_paid
+        ? "Order fully settled"
+        : "Department share settled",
+      data: result,
     };
   }
 }

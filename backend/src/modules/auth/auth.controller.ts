@@ -88,6 +88,11 @@ export class AuthController {
         username: user.username,
         role: user.role,
         full_name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+        // Departments a cashier is attached to (empty = sees all). Lets the web
+        // cashier portal scope its queue and settle only its share.
+        departments: Array.isArray((user.meta as any)?.cashier_departments)
+          ? (user.meta as any).cashier_departments
+          : [],
       },
       token,
       server_time: this.getServerTime(),
@@ -114,6 +119,11 @@ export class AuthController {
         username: user.username,
         role: user.role,
         full_name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
+        // Departments a cashier is attached to (empty = sees all). Lets the web
+        // cashier portal scope its queue and settle only its share.
+        departments: Array.isArray((user.meta as any)?.cashier_departments)
+          ? (user.meta as any).cashier_departments
+          : [],
       },
       server_time: this.getServerTime(),
     };

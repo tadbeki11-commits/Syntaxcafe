@@ -165,6 +165,11 @@ export class UsersController {
           last_name: user.last_name,
           phone: user.phone,
           is_active: user.is_active,
+          cashier_departments: Array.isArray(
+            (user.meta as any)?.cashier_departments,
+          )
+            ? (user.meta as any).cashier_departments
+            : [],
           created_at: user.created_at,
           updated_at: user.updated_at,
         },
@@ -267,5 +272,23 @@ export class UsersController {
     } catch (error: any) {
       throw new BadRequestException(error.message || "Failed to change PIN");
     }
+  }
+
+  // ─── Cashier department assignment ────────────────────────────────────────
+
+  @ApiOperation({
+    summary: "Set the departments a cashier is attached to (split-payment scope)",
+  })
+  @ApiParam({ name: "id" })
+  @Put(":id/cashier-departments")
+  async setCashierDepartments(@Param("id") id: string, @Body() body: any) {
+    const departments = Array.isArray(body?.departments) ? body.departments : [];
+    const result = await this.usersService.setCashierDepartments(id, departments);
+    if (!result) throw new NotFoundException("User not found");
+    return {
+      status: "success",
+      message: "Cashier departments updated successfully",
+      data: result,
+    };
   }
 }
