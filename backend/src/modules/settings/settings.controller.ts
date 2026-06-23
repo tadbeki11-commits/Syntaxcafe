@@ -3,14 +3,12 @@ import {
   Controller,
   Get,
   Param,
-  Patch,
   Post,
   Put,
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
   Headers,
-  NotFoundException,
   Delete,
 } from "@nestjs/common";
 import {
@@ -86,10 +84,7 @@ export class SettingsController {
     if (appClient !== "tauri-pos-app") {
       throw new ForbiddenException("Access denied.");
     }
-    const method = await this.settingsService.updatePaymentMethod(
-      id,
-      body,
-    );
+    const method = await this.settingsService.updatePaymentMethod(id, body);
     return { status: "success", data: { payment_method: method } };
   }
 
@@ -104,9 +99,7 @@ export class SettingsController {
     if (appClient !== "tauri-pos-app") {
       throw new ForbiddenException("Access denied.");
     }
-    const method = await this.settingsService.deletePaymentMethod(
-      id,
-    );
+    const method = await this.settingsService.deletePaymentMethod(id);
     return { status: "success", data: { payment_method: method } };
   }
 
@@ -203,7 +196,8 @@ export class SettingsController {
       throw new ForbiddenException("Access denied.");
     }
     if (!userIdHeader) throw new UnauthorizedException("User ID required");
-    const settings = await this.settingsService.getCurrentUserSettings(userIdHeader);
+    const settings =
+      await this.settingsService.getCurrentUserSettings(userIdHeader);
     return { status: "success", data: settings };
   }
 
@@ -432,9 +426,7 @@ export class SettingsController {
     summary: "Get whether a branch cancel-order password is set",
   })
   @Get("system/cancel-password")
-  async getCancelPasswordStatus(
-    @Headers("x-app-client") appClient: string,
-  ) {
+  async getCancelPasswordStatus(@Headers("x-app-client") appClient: string) {
     if (appClient !== "tauri-pos-app") {
       throw new ForbiddenException("Access denied.");
     }

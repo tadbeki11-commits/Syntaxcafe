@@ -194,6 +194,13 @@ export default function CashierEmployeesPage() {
   const [cancelPwd, setCancelPwd] = useState("");
   const [verifyingCancel, setVerifyingCancel] = useState(false);
 
+  // Settle-all (batch) state.
+  const [settleAllOpen, setSettleAllOpen] = useState(false);
+  const [settlingAll, setSettlingAll] = useState(false);
+  const [settleProgress, setSettleProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
+
   // Department-aware helpers (only narrow when the cashier is attached).
   const inDept = useCallback(
     (slug: string) => !isAttached || departments.includes(slug),
@@ -416,7 +423,91 @@ export default function CashierEmployeesPage() {
     [],
   );
 
+  // Every outstanding settlement for the visible queue: one task per unpaid
+  // department due (attached cashier) or one per whole order (unattached).
+  const pendingSettleTasks = useMemo(() => {
+    const tasks: { kind: "department" | "whole"; order: any; due?: any }[] = [];
+    for (const order of visibleQueue) {
+      if (isAttached) {
+        for (const due of order.department_dues ?? []) {
+          if (!due.settled) tasks.push({ kind: "department", order, due });
+        }
+      } else {
+        tasks.push({ kind: "whole", order });
+      }
+    }
+    return tasks;
+  }, [visibleQueue, isAttached]);
+
+  const pendingSettleTotal = useMemo(
+    () =>
+      pendingSettleTasks.reduce(
+        (s, t) =>
+          s +
+          (t.kind === "department"
+            ? Number(t.due?.subtotal) || 0
+            : Number(t.order?.total_amount) || 0),
+        0,
+      ),
+    [pendingSettleTasks],
+  );
+
   // ── Actions ────────────────────────────────────────────────────────────────
+  const doSettleAll = useCallback(async () => {
+    const tasks = pendingSettleTasks;
+    if (tasks.length === 0 || settlingAll) return;
+    setSettlingAll(true);
+    setSettleProgress({ done: 0, total: tasks.length });
+    let ok = 0;
+    let fail = 0;
+    // Sequential — avoids hammering the backend and racing the queue refresh.
+    for (let i = 0; i < tasks.length; i++) {
+      const t = tasks[i];
+      try {
+        if (t.kind === "department") {
+          await cashierServices.payments.settleDepartment({
+            order_id: t.order.id,
+            department: t.due.department,
+            payment_method: confirmMethod,
+            processed_by: user?.id,
+          });
+        } else {
+          const createRes: any = await cashierServices.payments.create({
+            order_id: t.order.id,
+            amount: t.order.total_amount,
+            payment_method: confirmMethod,
+            status: "paid",
+            processed_by: user?.id,
+          });
+          const createdId =
+            createRes?.data?.data?.payment?.id ?? createRes?.data?.payment?.id ?? null;
+          if (createdId) {
+            await cashierServices.payments.confirm(createdId, { processed_by: user?.id });
+          }
+        }
+        ok += 1;
+      } catch {
+        fail += 1;
+      } finally {
+        setSettleProgress({ done: i + 1, total: tasks.length });
+      }
+    }
+    setSettlingAll(false);
+    setSettleAllOpen(false);
+    setSettleProgress(null);
+    if (fail === 0) toast.success(`Settled ${ok} payment${ok === 1 ? "" : "s"}`);
+    else if (ok === 0) toast.error(`Failed to settle ${fail} payment${fail === 1 ? "" : "s"}`);
+    else toast.warning(`Settled ${ok}, ${fail} failed`);
+    if (selectedId) fetchEmployeeData(selectedId).catch(() => {});
+  }, [
+    pendingSettleTasks,
+    settlingAll,
+    confirmMethod,
+    user?.id,
+    selectedId,
+    fetchEmployeeData,
+  ]);
+
   const doConfirm = useCallback(async () => {
     if (!confirmTarget) return;
     const order = confirmTarget.order;
@@ -733,6 +824,25 @@ export default function CashierEmployeesPage() {
               />
             </div>
 
+            {pendingSettleTasks.length > 1 ? (
+              <Button
+                size="sm"
+                className="w-full h-10 bg-success hover:bg-success/90 text-white font-bold"
+                disabled={settlingAll}
+                onClick={() => {
+                  setConfirmMethod("cash");
+                  setSettleAllOpen(true);
+                }}
+              >
+                {settlingAll ? (
+                  <RefreshCw className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                Settle all {pendingSettleTasks.length} • {formatCurrency(pendingSettleTotal)}
+              </Button>
+            ) : null}
+
             {loadingDetail && visibleQueue.length === 0 ? (
               [...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)
             ) : visibleQueue.length === 0 ? (
@@ -968,6 +1078,78 @@ export default function CashierEmployeesPage() {
             <Button onClick={doConfirm}>
               <CheckCircle2 className="size-4" />
               Confirm payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settle-all modal */}
+      <Dialog
+        open={settleAllOpen}
+        onOpenChange={(o) => {
+          if (!o && !settlingAll) setSettleAllOpen(false);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Settle all pending payments</DialogTitle>
+            <DialogDescription>
+              Confirm {pendingSettleTasks.length} pending payment
+              {pendingSettleTasks.length === 1 ? "" : "s"} for{" "}
+              {selectedEmployee?.full_name || "this waiter"}
+              {isAttached ? " (your department's share)" : ""}. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="flex items-center justify-between rounded-xl border bg-muted/30 px-4 py-3">
+              <span className="text-sm font-semibold text-muted-foreground">Total amount</span>
+              <span className="text-xl font-extrabold text-foreground">
+                {formatCurrency(pendingSettleTotal)}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Payment method</Label>
+              <select
+                value={confirmMethod}
+                onChange={(e) => setConfirmMethod(e.target.value)}
+                disabled={settlingAll}
+                className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground">
+                Applied to every payment in this batch.
+              </p>
+            </div>
+            {settleProgress ? (
+              <p className="text-center text-xs font-semibold text-muted-foreground">
+                Settling {settleProgress.done} / {settleProgress.total}…
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSettleAllOpen(false)}
+              disabled={settlingAll}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-success hover:bg-success/90 text-white"
+              onClick={doSettleAll}
+              disabled={settlingAll || pendingSettleTasks.length === 0}
+            >
+              {settlingAll ? (
+                <RefreshCw className="size-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-4" />
+              )}
+              {settlingAll ? "Settling…" : `Confirm ${pendingSettleTasks.length} payments`}
             </Button>
           </DialogFooter>
         </DialogContent>

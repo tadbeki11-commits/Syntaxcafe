@@ -11,6 +11,7 @@ import { EmployeeStatsGrid } from './components/CashierEmployees/EmployeeStatsGr
 import { ActiveInvoicesTable } from './components/CashierEmployees/ActiveInvoicesTable';
 import { CheckoutTimeline } from './components/CashierEmployees/CheckoutTimeline';
 import ConfirmCashPaymentModal from '@/pages/Dashboards/CashierDashboard/modals/ConfirmCashPaymentModal';
+import SettleAllPaymentsModal from '@/pages/Dashboards/CashierDashboard/modals/SettleAllPaymentsModal';
 import CancelOrderModal from '@/pages/Dashboards/CashierDashboard/modals/CancelOrderModal';
 
 const RANGE_LABELS: Record<string, string> = {
@@ -50,6 +51,13 @@ const CashierEmployees = () => {
     openProcessPaymentConfirm,
     handleProcessPaymentNo,
     handleProcessPaymentYes,
+    pendingSettleTotal,
+    showSettleAllModal,
+    settlingAll,
+    settleAllProgress,
+    openSettleAllConfirm,
+    handleSettleAllNo,
+    handleSettleAll,
     openCancelConfirm,
     handleCancelNo,
     handleCancelYes,
@@ -151,6 +159,9 @@ const CashierEmployees = () => {
             openProcessPaymentConfirm={openProcessPaymentConfirm}
             openCancelConfirm={openCancelConfirm}
             formatCurrency={formatCurrency}
+            pendingSettleTotal={pendingSettleTotal}
+            settlingAll={settlingAll}
+            openSettleAllConfirm={openSettleAllConfirm}
           />
 
           {/* Right: Recent Orders timeline tracker */}
@@ -172,6 +183,20 @@ const CashierEmployees = () => {
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           onConfirm={handleProcessPaymentYes}
+          formatCurrency={formatCurrency}
+        />
+
+        <SettleAllPaymentsModal
+          open={showSettleAllModal}
+          onOpenChange={(open) => { if (!open) handleSettleAllNo(); }}
+          count={ordersForPaymentSorted.length}
+          total={pendingSettleTotal}
+          employeeName={selectedEmployee?.full_name}
+          isProcessing={settlingAll}
+          progress={settleAllProgress}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          onConfirm={handleSettleAll}
           formatCurrency={formatCurrency}
         />
 

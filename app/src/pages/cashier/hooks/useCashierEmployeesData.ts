@@ -46,6 +46,14 @@ export const useCashierEmployeesData = () => {
   // Selected payment method for the shared ConfirmCashPaymentModal.
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
+  // Settle-all (batch) state.
+  const [showSettleAllModal, setShowSettleAllModal] = useState(false);
+  const [settlingAll, setSettlingAll] = useState(false);
+  const [settleAllProgress, setSettleAllProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+
   // Admin cancel-order password gate (mirrors the cashier dashboard).
   const [requireCancelPassword, setRequireCancelPassword] = useState(false);
   const [adminHashedPassword, setAdminHashedPassword] = useState<string | null>(
@@ -460,6 +468,99 @@ export const useCashierEmployeesData = () => {
     await handleProcessPayment(order, paymentMethod);
   };
 
+  // Combined amount of every invoice currently waiting for payment.
+  const pendingSettleTotal = useMemo(
+    () =>
+      ordersForPaymentSorted.reduce(
+        (sum, o) => sum + (parseFloat(o.total_amount) || 0),
+        0,
+      ),
+    [ordersForPaymentSorted],
+  );
+
+  const openSettleAllConfirm = () => {
+    if (ordersForPaymentSorted.length === 0 || settlingAll) return;
+    setShowSettleAllModal(true);
+  };
+
+  const handleSettleAllNo = () => {
+    if (settlingAll) return;
+    setShowSettleAllModal(false);
+  };
+
+  // Confirm every pending invoice for the selected waiter, one after another.
+  const handleSettleAll = useCallback(async () => {
+    if (settlingAll) return;
+    // Snapshot so the list can shrink underneath us as each one clears.
+    const orders = ordersForPaymentSorted.filter(
+      (o) => !processingOrders.has(o.id),
+    );
+    if (orders.length === 0) return;
+
+    const method = paymentMethod || "cash";
+    setSettlingAll(true);
+    setSettleAllProgress({ done: 0, total: orders.length });
+    let ok = 0;
+    let fail = 0;
+
+    // Sequential — avoids hammering the backend and racing the auto-refresh.
+    for (let i = 0; i < orders.length; i++) {
+      const order = orders[i];
+      try {
+        setOrdersForPayment((prev) => prev.filter((o) => o.id !== order.id));
+
+        const createResp = await api.payments.create({
+          order_id: order.id,
+          amount: order.total_amount,
+          payment_method: method,
+          status: method === "cash" ? "paid" : "pending",
+          processed_by: user.id,
+        });
+        const createdPayment = (createResp as any)?.data?.data?.payment;
+        if (createdPayment?.id) {
+          await api.payments.confirm(createdPayment.id, {
+            processed_by: user.id,
+          });
+        }
+        ok += 1;
+      } catch (e: any) {
+        // A pre-existing payment isn't a real failure for a bulk settle.
+        if (
+          e?.response?.status === 400 &&
+          e?.response?.data?.message?.includes("already exists")
+        ) {
+          ok += 1;
+        } else {
+          console.error("Settle-all error:", e);
+          fail += 1;
+        }
+      } finally {
+        setSettleAllProgress({ done: i + 1, total: orders.length });
+      }
+    }
+
+    setSettlingAll(false);
+    setShowSettleAllModal(false);
+    setSettleAllProgress(null);
+
+    if (fail === 0) toast.success(`Settled ${ok} payment${ok === 1 ? "" : "s"}`);
+    else if (ok === 0)
+      toast.error(`Failed to settle ${fail} payment${fail === 1 ? "" : "s"}`);
+    else toast(`Settled ${ok}, ${fail} failed`);
+
+    if (selectedEmployeeId) {
+      await fetchEmployeeData(selectedEmployeeId).catch(() => {});
+    }
+  }, [
+    settlingAll,
+    ordersForPaymentSorted,
+    processingOrders,
+    paymentMethod,
+    user.id,
+    selectedEmployeeId,
+    fetchEmployeeData,
+  ]);
+
   const openCancelConfirm = (order: any) => {
     if (!order) return;
     setConfirmOrder(order);
@@ -572,6 +673,13 @@ export const useCashierEmployeesData = () => {
     handleProcessPaymentNo,
     handleProcessPaymentYes,
     handleProcessPayment,
+    pendingSettleTotal,
+    showSettleAllModal,
+    settlingAll,
+    settleAllProgress,
+    openSettleAllConfirm,
+    handleSettleAllNo,
+    handleSettleAll,
     openCancelConfirm,
     handleCancelNo,
     handleCancelYes,

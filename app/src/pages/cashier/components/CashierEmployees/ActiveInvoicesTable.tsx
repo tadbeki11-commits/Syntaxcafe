@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Search } from 'lucide-react';
+import { CheckCircle2, RefreshCw, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface ActiveInvoicesTableProps {
@@ -17,6 +17,9 @@ interface ActiveInvoicesTableProps {
   openProcessPaymentConfirm: (order: any) => void;
   openCancelConfirm: (order: any) => void;
   formatCurrency: (val: any) => string;
+  pendingSettleTotal: number;
+  settlingAll: boolean;
+  openSettleAllConfirm: () => void;
 }
 
 export const ActiveInvoicesTable: React.FC<ActiveInvoicesTableProps> = ({
@@ -28,7 +31,10 @@ export const ActiveInvoicesTable: React.FC<ActiveInvoicesTableProps> = ({
   processingOrders,
   openProcessPaymentConfirm,
   openCancelConfirm,
-  formatCurrency
+  formatCurrency,
+  pendingSettleTotal,
+  settlingAll,
+  openSettleAllConfirm
 }) => {
   return (
     <Card className="flex flex-col overflow-hidden">
@@ -58,6 +64,22 @@ export const ActiveInvoicesTable: React.FC<ActiveInvoicesTableProps> = ({
           </Badge>
         </div>
       </CardHeader>
+      {ordersForPaymentSorted.length > 1 && (
+        <div className="border-b px-4 py-3">
+          <Button
+            className="w-full gap-1.5"
+            onClick={openSettleAllConfirm}
+            disabled={settlingAll}
+          >
+            {settlingAll ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            Settle all {ordersForPaymentSorted.length} • {formatCurrency(pendingSettleTotal)}
+          </Button>
+        </div>
+      )}
       <CardContent className="flex-1 overflow-x-auto p-0">
         <Table>
           <TableHeader>
