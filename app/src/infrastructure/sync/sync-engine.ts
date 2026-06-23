@@ -1,6 +1,7 @@
 import api from "@/application";
 import toast from "react-hot-toast";
 import { syncTasks, type SyncTask, type SyncTaskResult } from "./tasks";
+import { getSessionUser } from "@/shared/utils/sessionUser";
 
 export type SyncStatusCallback = (status: {
   online: boolean;
@@ -54,9 +55,48 @@ class SimpleSyncEngine {
   private readonly listeners = new Set<SyncStatusCallback>();
   private readonly progressListeners = new Set<SyncProgressCallback>();
   private progress: SyncProgress = { active: false, completed: 0, total: 0 };
+  private autoSyncTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.setupListeners();
+  }
+
+  /**
+   * Start polling the backend on an interval so the app stays current without
+   * anyone pressing "Sync". Each tick re-checks connectivity (which flushes
+   * offline work on the offline→online edge) and, while online and signed in,
+   * pushes any unsynced orders/expenses and pulls the latest order states — so a
+   * change made elsewhere (e.g. a web cashier cancelling an order) lands here on
+   * its own. The realtime socket handles the instant path; this is the safety
+   * net that guarantees eventual convergence and offline catch-up. Idempotent.
+   */
+  startAutoSync(intervalMs = 20_000): void {
+    if (this.autoSyncTimer || typeof window === "undefined") return;
+    this.autoSyncTimer = setInterval(() => {
+      void this.autoSyncTick();
+    }, intervalMs);
+  }
+
+  stopAutoSync(): void {
+    if (this.autoSyncTimer) {
+      clearInterval(this.autoSyncTimer);
+      this.autoSyncTimer = null;
+    }
+  }
+
+  private async autoSyncTick(): Promise<void> {
+    // Nothing to sync until someone is signed in (avoid 401 spam pre-login).
+    if (!getSessionUser()) return;
+    if (this.syncing) return;
+    try {
+      // sync() verifies connectivity first and self-guards when offline, so a
+      // tick while disconnected is a cheap no-op (and keeps the online badge
+      // fresh). The realtime socket carries the instant path; this guarantees
+      // eventual convergence and flushes anything queued offline.
+      await this.sync(RECONNECT_SYNC_TASKS, { silent: true });
+    } catch (error) {
+      console.warn("[sync] Auto-sync tick failed", error);
+    }
   }
 
   subscribe(callback: SyncStatusCallback): () => void {
@@ -123,7 +163,10 @@ class SimpleSyncEngine {
     return this.syncing;
   }
 
-  async sync(targetTasks?: readonly string[]): Promise<boolean> {
+  async sync(
+    targetTasks?: readonly string[],
+    opts?: { silent?: boolean },
+  ): Promise<boolean> {
     // Claim the sync lock synchronously so rapid double-clicks can't both slip
     // through before the (awaited) connection check sets `syncing`.
     if (this.syncing) {
@@ -161,7 +204,7 @@ class SimpleSyncEngine {
       }
 
       const pushed = results.reduce((sum, result) => sum + result.pushed, 0);
-      if (pushed > 0) {
+      if (pushed > 0 && !opts?.silent) {
         toast.success(`Synced ${pushed} change${pushed === 1 ? "" : "s"}.`, {
           id: "sync-success",
         });
@@ -170,7 +213,7 @@ class SimpleSyncEngine {
       return true;
     } catch (error) {
       console.error("[sync] Failed to complete sync cycle", error);
-      toast.error("Sync failed. Please try again.");
+      if (!opts?.silent) toast.error("Sync failed. Please try again.");
       return false;
     } finally {
       this.syncing = false;

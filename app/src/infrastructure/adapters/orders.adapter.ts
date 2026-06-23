@@ -301,17 +301,57 @@ const mapServerOrderToLocal = (remote: any, cached?: any) => ({
  * created on other devices — e.g. the web waiter app — show up in the local
  * cashier list, which reads exclusively from the local DB.
  */
+// A cancellation/void is terminal and authoritative wherever it originates (e.g.
+// the web cashier). When the server reports one of these states it must override
+// the local copy even if that copy has unsynced edits — otherwise a stale local
+// "paid" row would resurrect the order on the next push/pull.
+const TERMINAL_VOID_STATUSES = new Set([
+  "cancelled",
+  "canceled",
+  "voided",
+  "deleted",
+  "refunded",
+]);
+
 export const persistServerOrders = async (remoteOrders: any[]) => {
   if (!Array.isArray(remoteOrders) || remoteOrders.length === 0) return 0;
   const localOrders = await readRows(localDbTables.orders);
+  let localPayments: any[] | null = null;
   let count = 0;
   for (const remote of remoteOrders) {
     if (!remote?.id) continue;
     const cached = localOrders.find((c: any) => c?.id === remote.id);
-    // Never clobber a locally-created order that hasn't been pushed yet.
-    if (cached && Number(cached.synced ?? 0) === 0) continue;
+    const remoteVoided = TERMINAL_VOID_STATUSES.has(
+      String(remote?.status || "").toLowerCase(),
+    );
+    // Never clobber a locally-created order that hasn't been pushed yet — UNLESS
+    // the server says it's cancelled/voided, which always wins and stops the
+    // local copy from being re-pushed (mapServerOrderToLocal marks it synced).
+    if (cached && Number(cached.synced ?? 0) === 0 && !remoteVoided) continue;
     await upsertOrder(mapServerOrderToLocal(remote, cached));
     count += 1;
+
+    // Mirror the desktop's own cancel workflow: a voided order's local payments
+    // are voided too, so a stale paid/pending record can't re-assert "paid" on
+    // the next sync and the ledger shows the order as deleted.
+    if (remoteVoided) {
+      if (localPayments === null) {
+        localPayments = await readRows(localDbTables.payments);
+      }
+      for (const p of localPayments) {
+        if (
+          p?.order_id === remote.id &&
+          String(p?.status || "").toLowerCase() !== "deleted"
+        ) {
+          await upsertRow(localDbTables.payments, {
+            ...p,
+            status: "deleted",
+            synced: 1,
+          });
+          p.status = "deleted";
+        }
+      }
+    }
   }
   return count;
 };

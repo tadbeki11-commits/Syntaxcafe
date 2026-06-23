@@ -7,17 +7,51 @@ import { payments } from "../../db/tables/payments.table";
 import { stockMovements } from "../../db/tables/stock-movements.table";
 import { users } from "../../db/tables/users.table";
 import { OrderInventoryService } from "../order/order-inventory.service";
+import { OrderService } from "../order/order.service";
+import { OrdersGateway } from "../order/orders.gateway";
 import { emitCreated, emitUpdated } from "../sync/sync-emit.util";
 import { requireBranchId, tenantInsert } from "../../common/tenant/tenant-context";
 const QRCode: any = require("qrcode");
 
 @Injectable()
 export class PaymentService {
-  constructor(private readonly orderInventoryService: OrderInventoryService) {}
+  constructor(
+    private readonly orderInventoryService: OrderInventoryService,
+    private readonly orderService: OrderService,
+    private readonly ordersGateway: OrdersGateway,
+  ) {}
+
+  /**
+   * Best-effort realtime push of an order's latest state to every client
+   * watching its branch (see OrdersGateway). Called after a payment changes an
+   * order so a POS — which reads orders from its own local DB — reflects the
+   * paid/partially-paid status instantly. Never throws: a failed push must not
+   * fail the payment that already committed.
+   */
+  private async pushOrderUpdate(orderId: string | null | undefined) {
+    if (!orderId) return;
+    try {
+      const order = await this.orderService.findById(orderId);
+      if (order) {
+        this.ordersGateway.notifyOrderUpdated((order as any).branch_id, order);
+      }
+    } catch (err) {
+      console.warn(
+        `[PaymentService] Realtime order push failed for order ${orderId}`,
+        (err as Error)?.message,
+      );
+    }
+  }
 
   async create(paymentData: any) {
-    const { order_id, amount, payment_method, processed_by, description } =
+    const { order_id, amount, payment_method, processed_by, description, status } =
       paymentData;
+
+    // A normal payment is created "pending" and turns "paid" on confirm. The one
+    // exception is a void/cancel ledger marker, which the cashier portal records
+    // with status "deleted" — honor that so the order reads as voided (not
+    // pending/paid) on the POS and back-office.
+    const resolvedStatus = status === "deleted" ? "deleted" : "pending";
 
     const [created] = await db
       .insert(payments)
@@ -28,7 +62,7 @@ export class PaymentService {
         amount_cents: amount,
         payment_method,
         method: payment_method,
-        status: "pending",
+        status: resolvedStatus,
         processed_by,
         description: description || null,
       })
@@ -58,6 +92,7 @@ export class PaymentService {
     return {
       ...row.payment,
       customer_id: row.order?.customer_id,
+      order_number: row.order?.order_number,
       order_type: row.order?.type,
       processed_by_name: this.formatEmployeeName(row.user),
     };
@@ -134,7 +169,41 @@ export class PaymentService {
   async confirmPayment(id: string, processedBy?: any) {
     const branchId = requireBranchId();
 
-    return db.transaction(async (tx: any) => {
+    const payment = await db.transaction(async (tx: any) => {
+      const [existing] = await tx
+        .select({ order_id: payments.order_id })
+        .from(payments)
+        .where(and(eq(payments.id, id), eq(payments.branch_id, branchId)))
+        .limit(1);
+
+      if (!existing) {
+        throw new Error("Payment not found");
+      }
+
+      // A cancellation/void is terminal. If the order was voided (e.g. by the
+      // web cashier) a late or conflicting confirm must not resurrect it — record
+      // the payment as voided and leave the order cancelled.
+      const [orderRow] = await tx
+        .select({ status: orders.status })
+        .from(orders)
+        .where(
+          and(eq(orders.id, existing.order_id), eq(orders.branch_id, branchId)),
+        )
+        .limit(1);
+      const orderStatus = String(orderRow?.status || "").toLowerCase();
+      if (["cancelled", "voided", "refunded"].includes(orderStatus)) {
+        const [voided] = await tx
+          .update(payments)
+          .set({
+            status: "deleted",
+            processed_by: processedBy,
+            updated_at: new Date(),
+          })
+          .where(and(eq(payments.id, id), eq(payments.branch_id, branchId)))
+          .returning();
+        return voided;
+      }
+
       const [payment] = await tx
         .update(payments)
         .set({
@@ -145,10 +214,6 @@ export class PaymentService {
         })
         .where(and(eq(payments.id, id), eq(payments.branch_id, branchId)))
         .returning();
-
-      if (!payment) {
-        throw new Error("Payment not found");
-      }
 
       await tx
         .update(orders)
@@ -165,6 +230,11 @@ export class PaymentService {
 
       return payment;
     });
+
+    // Notify any POS watching this branch that the order state changed.
+    await this.pushOrderUpdate(payment?.order_id);
+
+    return payment;
   }
 
   /**
@@ -349,6 +419,11 @@ export class PaymentService {
     if (result.payment) {
       await emitCreated(db, "payment", "PAYMENT_CREATED", result.payment as any);
     }
+
+    // Notify any POS watching this branch: the order's payment status changed
+    // (now fully paid, or partially paid with this department settled).
+    await this.pushOrderUpdate(orderId);
+
     return result;
   }
 
@@ -373,6 +448,7 @@ export class PaymentService {
     return rows.map((row: any) => ({
       ...row.payment,
       customer_id: row.order.customer_id,
+      order_number: row.order.order_number,
       order_type: row.order.type,
       table_number: row.order.table_number,
       processed_by_name: this.formatEmployeeName(row.user),
@@ -473,6 +549,7 @@ export class PaymentService {
     const list = rows.map((row: any) => ({
       ...row.payment,
       customer_id: row.order.customer_id,
+      order_number: row.order.order_number,
       order_type: row.order.type,
       table_number: row.order.table_number,
       processed_by_name: this.formatEmployeeName(row.user),

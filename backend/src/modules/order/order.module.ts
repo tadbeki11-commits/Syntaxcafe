@@ -13,6 +13,6 @@ import { OrdersGateway } from "./orders.gateway";
     OrdersGateway,
   ],
   controllers: [OrderController],
-  exports: [OrderService, OrderInventoryService, ZReportService],
+  exports: [OrderService, OrderInventoryService, ZReportService, OrdersGateway],
 })
 export class OrderModule {}

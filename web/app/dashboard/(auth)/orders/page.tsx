@@ -28,7 +28,7 @@ import { DataTable, type Column } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { Orders, Payments, Settings } from "@/lib/resources";
 import { getUser } from "@/lib/auth";
-import { birr, shortDate } from "@/lib/format";
+import { birr, shortDate, displayStatus, statusBadgeVariant } from "@/lib/format";
 import { formatOrderNumber } from "@/lib/utils";
 
 type OrderItem = {
@@ -117,6 +117,19 @@ export default function OrdersPage() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Deep-link target: /dashboard/orders?focus=<orderId> opens that order's
+  // dialog directly (used by the order-number links on the payments pages).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (!focus) return;
+    Orders.get(focus)
+      .then((o) => {
+        if (o) setViewing(o);
+      })
+      .catch(() => {});
+  }, []);
 
   function openPay(o: Order) {
     setPaying(o);
@@ -216,8 +229,8 @@ export default function OrdersPage() {
       key: "status",
       label: "Status",
       render: (o) => (
-        <Badge variant="muted" className="capitalize">
-          {o.status}
+        <Badge variant={statusBadgeVariant(o.status)} className="capitalize">
+          {displayStatus(o.status)}
         </Badge>
       ),
     },
@@ -226,8 +239,11 @@ export default function OrdersPage() {
       label: "Payment",
       searchValue: (o) => o.payment_status ?? "unpaid",
       render: (o) => (
-        <Badge variant={isPaid(o) ? "success" : "muted"} className="capitalize">
-          {o.payment_status ?? "unpaid"}
+        <Badge
+          variant={statusBadgeVariant(o.payment_status ?? o.status)}
+          className="capitalize"
+        >
+          {displayStatus(o.payment_status ?? o.status)}
         </Badge>
       ),
     },

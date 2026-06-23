@@ -279,16 +279,36 @@ export class OrderService {
       const existingPriority = statusPriority[existingStatus] ?? -1;
 
       if (incomingPriority > existingPriority) {
+        // A cancellation/void is terminal: also clear paid state so the
+        // back-office/POS never keep showing it as "paid" (they key off
+        // payment_status), matching the online cancel path.
+        const isVoid =
+          incomingStatus === "cancelled" || incomingStatus === "voided";
         await tx
           .update(orders)
           .set({
             status: incomingStatus,
-            payment_status: payment_status || undefined,
+            payment_status: isVoid
+              ? "cancelled"
+              : payment_status || undefined,
             updated_at: new Date(),
           })
           .where(
             and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())),
           );
+        if (isVoid) {
+          // Void this order's payments too, matching the online cancel path, so
+          // no "paid" payment lingers for a cancelled order.
+          await tx
+            .update(payments)
+            .set({ status: "deleted", updated_at: new Date() })
+            .where(
+              and(
+                eq(payments.order_id, id),
+                eq(payments.branch_id, requireBranchId()),
+              ),
+            );
+        }
         console.log(
           `[BulkSync] Updated existing order ${id} status: "${existingStatus}" → "${incomingStatus}"`,
         );
@@ -501,6 +521,30 @@ export class OrderService {
       });
 
     if (status === "paid" || !status) {
+      // A cancellation is terminal. If this order was voided (e.g. by the web
+      // cashier) while an offline POS still held it as paid, the late-syncing
+      // "paid" payment must NOT resurrect the order. Keep it cancelled, void this
+      // stray payment so it doesn't count as revenue, and skip the stock sale.
+      const [orderRow] = await tx
+        .select({ status: orders.status })
+        .from(orders)
+        .where(
+          and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())),
+        )
+        .limit(1);
+      const orderStatus = String(orderRow?.status || "").toLowerCase();
+
+      if (["cancelled", "voided", "refunded"].includes(orderStatus)) {
+        await tx
+          .update(payments)
+          .set({ status: "deleted", updated_at: new Date() })
+          .where(eq(payments.id, id));
+        console.log(
+          `[BulkSync] Order ${order_id} is ${orderStatus}; not flipping to paid from synced payment ${id} (payment voided).`,
+        );
+        return;
+      }
+
       const [existingSaleMovement] = await tx
         .select({ id: stockMovements.id })
         .from(stockMovements)
@@ -833,16 +877,24 @@ export class OrderService {
 
   async updateStatus(id: string, status: string, updatedBy?: any) {
     const branchId = requireBranchId();
-    return db.transaction(async (tx: any) => {
+    const isCancel = String(status || "").toLowerCase() === "cancelled";
+
+    const updated = await db.transaction(async (tx: any) => {
       const [existingOrder] = await tx
         .select()
         .from(orders)
         .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)))
         .limit(1);
 
+      // Cancelling voids the order: also clear any paid/partially-paid state so
+      // the back-office and POS don't keep showing it as "paid" (they key off
+      // payment_status), and so it leaves every cashier queue.
+      const setFields: any = { status, updated_at: new Date() };
+      if (isCancel) setFields.payment_status = "cancelled";
+
       const [updated] = await tx
         .update(orders)
-        .set({ status, updated_at: new Date() })
+        .set(setFields)
         .where(and(eq(orders.id, id), eq(orders.branch_id, branchId)))
         .returning();
 
@@ -853,7 +905,7 @@ export class OrderService {
           String(existingOrder?.status || "").toLowerCase() === "paid";
 
         if (
-          status === "cancelled" &&
+          isCancel &&
           existingOrder?.status !== "cancelled" &&
           wasPaid
         ) {
@@ -866,6 +918,23 @@ export class OrderService {
             createdBy: updatedBy || null,
           });
         }
+
+        // Void every payment on a cancelled order so it stops counting as paid /
+        // as revenue anywhere (payments page, recent-payments panel, reports).
+        // Without this the original "paid" payment lingers and the POS — which
+        // reads payments from the backend — keeps showing the order as paid.
+        if (isCancel) {
+          await tx
+            .update(payments)
+            .set({ status: "deleted", updated_at: new Date() })
+            .where(
+              and(
+                eq(payments.order_id, id),
+                eq(payments.branch_id, branchId),
+              ),
+            );
+        }
+
         await this.logStatusChange(id, status, updatedBy);
         const full = await this.findById(id);
         if (full) {
@@ -875,6 +944,24 @@ export class OrderService {
 
       return updated;
     });
+
+    // Realtime push so a POS — which reads orders from its own local DB — reflects
+    // the cancellation/status change instantly instead of waiting for a sync pull.
+    if (updated) {
+      try {
+        const full = await this.findById(id);
+        if (full) {
+          this.ordersGateway.notifyOrderUpdated((full as any).branch_id, full);
+        }
+      } catch (err) {
+        console.warn(
+          `[OrderService] Realtime order push failed for order ${id}`,
+          (err as Error)?.message,
+        );
+      }
+    }
+
+    return updated;
   }
 
   async getStatusHistory(id: string) {

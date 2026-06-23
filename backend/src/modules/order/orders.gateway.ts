@@ -69,6 +69,17 @@ export class OrdersGateway implements OnGatewayConnection {
     this.server.to(this.room(branchId)).emit("new_order", { order });
   }
 
+  /**
+   * Push an updated order to every client watching its branch. Used when an
+   * order changes server-side after creation — e.g. a web cashier confirms or
+   * settles its payment — so a POS reading from its local DB reflects the new
+   * status instantly instead of waiting for the next pull.
+   */
+  notifyOrderUpdated(branchId: string | null | undefined, order: unknown) {
+    if (!branchId || !this.server) return;
+    this.server.to(this.room(branchId)).emit("order_updated", { order });
+  }
+
   private room(branchId: string) {
     return `branch:${branchId}`;
   }

@@ -1,4 +1,4 @@
-import { uuidToDisplayId, formatOrderNumber, getOrderSource } from "@/lib/utils";
+import { uuidToDisplayId, formatOrderNumber, getOrderSource, displayStatus, statusBadgeVariant } from "@/lib/utils";
 import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -112,14 +112,21 @@ export const OrdersList: React.FC<OrdersListProps> = ({
                   {parseFloat(order.total_amount).toLocaleString()} <span className="text-xs text-warning font-normal">Birr</span>
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    className={`text-[10px] font-bold px-2 py-0.5 ${isPaid
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
-                      : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-50'
-                      }`}
-                  >
-                    {isPaid ? 'Paid' : 'Unpaid'}
-                  </Badge>
+                  {(() => {
+                    // Unified vocabulary: deleted (cancelled/voided) → paid
+                    // (confirmed) → pending (in process).
+                    const state =
+                      displayStatus(order.status) === 'deleted'
+                        ? 'deleted'
+                        : isPaid
+                          ? 'paid'
+                          : 'pending';
+                    return (
+                      <Badge variant={statusBadgeVariant(state)} className="text-[10px] font-bold px-2 py-0.5 capitalize">
+                        {state}
+                      </Badge>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" onClick={() => setSelectedOrder(order)} className="h-8 w-8 hover:bg-accent hover:text-accent-foreground">

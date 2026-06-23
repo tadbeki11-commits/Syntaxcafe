@@ -1,4 +1,4 @@
-import { uuidToDisplayId } from "@/lib/utils";
+import { uuidToDisplayId, displayStatus, statusBadgeVariant } from "@/lib/utils";
 import React from 'react';
 import { CreditCard, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import EmptyState from '@/components/common/EmptyState';
 import { PaymentRecord } from '../types';
-import { STATUS_VARIANT } from '../constants';
 
 interface PaymentsTableProps {
   loading: boolean;
@@ -33,7 +32,7 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Payment ID</TableHead>
-                <TableHead>Order ID</TableHead>
+                <TableHead>Order</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="hidden sm:table-cell">Method</TableHead>
                 <TableHead>Status</TableHead>
@@ -46,7 +45,19 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
                 filteredPayments.map(p => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">#{uuidToDisplayId(p.id)}</TableCell>
-                    <TableCell className="text-muted-foreground">#{p.order_id}</TableCell>
+                    <TableCell>
+                      {p.order_id ? (
+                        <button
+                          type="button"
+                          onClick={() => openView(p)}
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          #{(p as any).order_number ?? uuidToDisplayId(p.order_id)}
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right font-bold">
                       {parseFloat(String(p.amount || 0)).toLocaleString()} Birr
                     </TableCell>
@@ -60,7 +71,7 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={STATUS_VARIANT[p.status] || 'secondary'}>{p.status}</Badge>
+                      <Badge variant={statusBadgeVariant(p.status)}>{displayStatus(p.status)}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                       {(() => {

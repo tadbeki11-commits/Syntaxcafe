@@ -62,9 +62,42 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
   }, [user?.id, user?.role, user?.full_name, user?.username]);
 
   // Refresh the locally cached admin cancellation hash.
+  // The cancel password is configured by the owner on the web side and stored
+  // as a branch-level system setting on the backend. When online we pull the
+  // latest hash and persist it into the local systemSettings table so cashiers
+  // can still validate cancellations offline.
   const refreshAdminHashedPassword = useCallback(async () => {
     try {
       const db = await getLocalDb();
+
+      if (isOnline()) {
+        try {
+          const response: any = await api.settings.getCurrentUserSettings();
+          const settings = response?.data?.data ?? response?.data ?? {};
+          const remoteHash = settings?.cancel_password ?? null;
+          if (remoteHash) {
+            const existing = await db
+              .select()
+              .from(localDbTables.systemSettings)
+              .where(eq(localDbTables.systemSettings.key, "cancel_password"));
+            if (existing.length > 0) {
+              await db
+                .update(localDbTables.systemSettings)
+                .set({ value: remoteHash, updated_at: new Date().toISOString() })
+                .where(eq(localDbTables.systemSettings.key, "cancel_password"));
+            } else {
+              await db.insert(localDbTables.systemSettings).values({
+                key: "cancel_password",
+                value: remoteHash,
+                updated_at: new Date().toISOString(),
+              });
+            }
+          }
+        } catch {
+          // Fall back to whatever is cached locally below.
+        }
+      }
+
       const settingRows = await db
         .select()
         .from(localDbTables.systemSettings)

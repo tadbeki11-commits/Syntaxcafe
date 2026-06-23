@@ -761,7 +761,8 @@ export default function CashierEmployeesPage() {
                     </div>
 
                     {isAttached ? (
-                      dues.length === 0 ? (
+                      <>
+                      {dues.length === 0 ? (
                         <p className="py-2 text-center text-[11px] text-muted-foreground">
                           Nothing to settle for your department.
                         </p>
@@ -801,7 +802,18 @@ export default function CashierEmployeesPage() {
                             </div>
                           );
                         })
-                      )
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full h-9 border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 font-bold"
+                        disabled={processing.has(order.id)}
+                        onClick={() => setCancelOrder(order)}
+                      >
+                        <XCircle className="size-4" />
+                        Cancel order
+                      </Button>
+                      </>
                     ) : (
                       <>
                         <ItemLines items={order.items ?? []} />

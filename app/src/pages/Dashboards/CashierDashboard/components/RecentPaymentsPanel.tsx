@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { displayStatus, statusBadgeVariant } from '@/lib/utils';
 
 interface RecentPaymentsPanelProps {
   payments: any[];
@@ -90,11 +91,20 @@ export const RecentPaymentsPanel: React.FC<RecentPaymentsPanelProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge
-                  variant={payment.status === 'paid' ? 'success' : payment.status === 'pending' ? 'warning' : 'destructive'}
+                  variant={statusBadgeVariant(payment.status)}
                   className="text-[8px] uppercase py-0 px-1.5"
                 >
-                  {payment.status}
+                  {displayStatus(payment.status)}
                 </Badge>
+                {payment.order_number != null && (
+                  <button
+                    type="button"
+                    onClick={() => toggleRecentPaymentDetails(payment)}
+                    className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-extrabold text-primary hover:bg-primary/20"
+                  >
+                    #{payment.order_number}
+                  </button>
+                )}
               </div>
 
               {(() => {

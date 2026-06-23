@@ -336,6 +336,29 @@ export const useCashierPrinting = ({ refreshDashboardData, enabled = true }: Pri
     };
   }, [pollUnprintedOrders, refreshDashboardData, enabled]);
 
+  // Real-time order updates (WebSocket). When a web cashier confirms or settles
+  // an order's payment, the backend pushes the updated order here. The cashier
+  // list reads from the local DB, so persist the new paid/partially-paid state
+  // before refreshing — otherwise the refresh re-reads a stale local row and the
+  // order keeps showing as unpaid until the next pull.
+  useEffect(() => {
+    if (!enabled) return;
+    const unsubscribe = orderSocket.subscribeOrderUpdated(async (order) => {
+      try {
+        if (order) {
+          await persistServerOrders([order]);
+        }
+        refreshDashboardData();
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [refreshDashboardData, enabled]);
+
   // Diagnostic Printer testing utility
   const testQzPrint = async () => {
     try {

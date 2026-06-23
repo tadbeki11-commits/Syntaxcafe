@@ -43,6 +43,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import StatsCard from "@/components/waiter/StatsCard";
+import { displayStatus } from "@/lib/format";
 import { useCashierAuth } from "@/components/cashier/auth-context";
 import { cashierServices } from "@/lib/cashier/api";
 
@@ -232,6 +233,7 @@ export default function CashierQueuePage() {
         date_to: day,
         limit: 100,
       });
+      console.log("loadPayments", res);
       const payload = res?.data ?? res;
       const list = payload?.data?.payments ?? payload?.payments ?? [];
       const filtered = (Array.isArray(list) ? list : []).filter((p: any) => {
@@ -239,6 +241,7 @@ export default function CashierQueuePage() {
         const dept = String(p?.meta?.department || "").trim().toLowerCase();
         return p?.meta?.scope === "department" && departments.includes(dept);
       });
+      console.log("filtered payments", filtered);
       setPayments(filtered);
     } catch {
       setPayments([]);
@@ -602,7 +605,8 @@ export default function CashierQueuePage() {
                     </div>
 
                     {isAttached ? (
-                      dues.length === 0 ? (
+                      <>
+                      {dues.length === 0 ? (
                         <p className="py-2 text-center text-xs text-muted-foreground">
                           Nothing to settle for your department.
                         </p>
@@ -640,7 +644,18 @@ export default function CashierQueuePage() {
                             </div>
                           );
                         })
-                      )
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full h-9 border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 font-bold"
+                        disabled={processing.has(`cancel:${order.id}`)}
+                        onClick={() => setCancelTarget(order)}
+                      >
+                        <XCircle className="size-4" />
+                        Cancel order
+                      </Button>
+                      </>
                     ) : (
                       <>
                         <ItemLines items={order.items ?? []} />
@@ -693,18 +708,29 @@ export default function CashierQueuePage() {
                 return (
                   <div key={p.id} className="border rounded-2xl p-4 bg-muted/10 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <Badge
-                        variant={
-                          status === "paid"
-                            ? "success"
-                            : status === "deleted"
-                              ? "destructive"
-                              : "warning"
-                        }
-                        className="text-[9px] uppercase"
-                      >
-                        {status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            status === "paid"
+                              ? "success"
+                              : status === "deleted"
+                                ? "destructive"
+                                : "warning"
+                          }
+                          className="text-[9px] uppercase"
+                        >
+                          {displayStatus(p.status)}
+                        </Badge>
+                        {p.order_number != null ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(p.id)}
+                            className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-extrabold text-primary hover:bg-primary/20"
+                          >
+                            #{p.order_number}
+                          </button>
+                        ) : null}
+                      </div>
                       <span className="text-sm font-extrabold text-foreground">
                         {formatCurrency(p.amount)}
                       </span>

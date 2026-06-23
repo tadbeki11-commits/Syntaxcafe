@@ -41,6 +41,28 @@ export function formatOrderNumber(
   return `#${order?.id}`;
 }
 
+// Unified display vocabulary for order + payment status across the app, matching
+// the web: deleted (cancelled/voided), paid (confirmed/completed), pending
+// (anything still in process). Keeps the stored value intact — display only.
+export type DisplayStatus = "deleted" | "pending" | "paid";
+
+export function displayStatus(status?: string | null): DisplayStatus {
+  const s = String(status ?? "").trim().toLowerCase();
+  if (["cancelled", "canceled", "voided", "deleted", "refunded"].includes(s))
+    return "deleted";
+  if (["paid", "completed"].includes(s)) return "paid";
+  return "pending";
+}
+
+export type DisplayStatusVariant = "success" | "warning" | "destructive";
+
+export function statusBadgeVariant(status?: string | null): DisplayStatusVariant {
+  const d = displayStatus(status);
+  if (d === "paid") return "success";
+  if (d === "deleted") return "destructive";
+  return "warning";
+}
+
 export type OrderSource = "cashier" | "waiter";
 
 /**

@@ -17,10 +17,12 @@ import { DataTable, type Column } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { StatCards, type StatCard } from "@/components/stat-cards";
 import { Payments } from "@/lib/resources";
-import { birr, shortDate } from "@/lib/format";
+import { birr, shortDate, displayStatus, statusBadgeVariant } from "@/lib/format";
 
 type Payment = {
   id: string;
+  order_id: string | null;
+  order_number: number | null;
   amount: number | null;
   payment_method: string | null;
   status: string | null;
@@ -34,9 +36,24 @@ const paymentDate = (r: Payment) => r.paid_at || r.created_at;
 
 const columns: Column<Payment>[] = [
   { key: "id", label: "Payment", render: (r) => <span className="font-mono text-xs">{r.id.slice(0, 8)}</span> },
+  {
+    key: "order_number",
+    label: "Order",
+    render: (r) =>
+      r.order_id ? (
+        <Link
+          href={`/dashboard/orders?focus=${r.order_id}`}
+          className="font-semibold text-primary hover:underline"
+        >
+          #{r.order_number ?? "—"}
+        </Link>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
   { key: "amount", label: "Amount", render: (r) => birr(r.amount) },
   { key: "payment_method", label: "Method", render: (r) => <span className="capitalize">{r.payment_method ?? "—"}</span> },
-  { key: "status", label: "Status", render: (r) => <Badge variant={r.status === "paid" ? "success" : "muted"} className="capitalize">{r.status ?? "—"}</Badge> },
+  { key: "status", label: "Status", render: (r) => <Badge variant={statusBadgeVariant(r.status)} className="capitalize">{displayStatus(r.status)}</Badge> },
   { key: "paid_at", label: "Date", render: (r) => shortDate(paymentDate(r)) },
 ];
 

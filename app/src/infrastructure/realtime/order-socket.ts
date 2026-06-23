@@ -16,7 +16,8 @@ import { getDeviceToken, getDeviceEnrollment } from "@/shared/utils/deviceToken"
 import { getSessionUser } from "@/shared/utils/sessionUser";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
 
-type NewOrderHandler = (order: any) => void;
+type OrderHandler = (order: any) => void;
+type NewOrderHandler = OrderHandler;
 
 /** Derive the server origin (no /api prefix, no path) for the socket URL. */
 const deriveOrigin = (base: string): string => {
@@ -33,6 +34,7 @@ class OrderSocketManager {
   private socket: Socket | null = null;
   private started = false;
   private readonly handlers = new Set<NewOrderHandler>();
+  private readonly updateHandlers = new Set<OrderHandler>();
 
   /** Begin tracking online state so the socket connects/disconnects with it. */
   private ensureStarted() {
@@ -86,15 +88,25 @@ class OrderSocketManager {
       reconnectionDelayMax: 5000,
     });
 
-    socket.on("new_order", (payload: any) => {
-      const order = payload?.order ?? payload;
-      this.handlers.forEach((handler) => {
+    const dispatch = (handlers: Set<OrderHandler>, order: any) => {
+      handlers.forEach((handler) => {
         try {
           handler(order);
         } catch {
           /* a misbehaving subscriber shouldn't break the others */
         }
       });
+    };
+
+    socket.on("new_order", (payload: any) => {
+      dispatch(this.handlers, payload?.order ?? payload);
+    });
+
+    // An existing order changed server-side — e.g. a web cashier confirmed or
+    // settled its payment. Carries the full updated order so subscribers can
+    // persist it locally and reflect the new status instantly.
+    socket.on("order_updated", (payload: any) => {
+      dispatch(this.updateHandlers, payload?.order ?? payload);
     });
 
     this.socket = socket;
@@ -115,6 +127,19 @@ class OrderSocketManager {
     if (syncEngine.isAppOnline()) this.connect();
     return () => {
       this.handlers.delete(handler);
+    };
+  }
+
+  /**
+   * Subscribe to updates of existing orders (e.g. a payment confirmed/settled on
+   * the web cashier) for this device's branch. Returns an unsubscribe function.
+   */
+  subscribeOrderUpdated(handler: OrderHandler): () => void {
+    this.updateHandlers.add(handler);
+    this.ensureStarted();
+    if (syncEngine.isAppOnline()) this.connect();
+    return () => {
+      this.updateHandlers.delete(handler);
     };
   }
 
