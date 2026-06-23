@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useMemo, useState } from "react";
-import { Search, X, MapPin, ChevronDown } from "lucide-react";
+import { Search, X, MapPin, ChevronDown, PackageX } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,6 +29,12 @@ interface OrderFiltersPanelProps {
   totalSubItemsCount: number;
   showSubCategories: boolean;
   forceTableSelection?: boolean;
+  // Out-of-stock filter (only rendered when the owner toggle is on and at least
+  // one item is out of stock).
+  showStockFilter?: boolean;
+  stockFilterActive?: boolean;
+  onToggleStockFilter?: () => void;
+  outOfStockCount?: number;
 }
 
 const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
@@ -47,6 +53,10 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
   subCategories,
   totalSubItemsCount,
   showSubCategories,
+  showStockFilter = false,
+  stockFilterActive = false,
+  onToggleStockFilter,
+  outOfStockCount = 0,
 }) => {
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
   const [mainCategoryMenuOpen, setMainCategoryMenuOpen] = useState(false);
@@ -424,12 +434,39 @@ const OrderFiltersPanel: React.FC<OrderFiltersPanelProps> = ({
                 </DropdownMenu>
               ) : null}
 
+              {/* Out-of-stock quick filter */}
+              {showStockFilter ? (
+                <button
+                  type="button"
+                  onClick={onToggleStockFilter}
+                  aria-pressed={stockFilterActive}
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-all duration-200 active:scale-95 shrink-0 ${
+                    stockFilterActive
+                      ? "border-transparent bg-red-500 text-white shadow-md shadow-red-500/30"
+                      : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+                  }`}
+                >
+                  <PackageX className="h-3.5 w-3.5" />
+                  Out of stock
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                      stockFilterActive
+                        ? "bg-white/20 text-white"
+                        : "bg-red-100 text-red-600"
+                    }`}
+                  >
+                    {outOfStockCount}
+                  </span>
+                </button>
+              ) : null}
+
               {/* Reset filters */}
               <button
                 type="button"
                 onClick={() => {
                   handleSelectMainCategory("all");
                   if (showSubCategories) handleSelectSubCategory("all");
+                  if (stockFilterActive) onToggleStockFilter?.();
                 }}
                 className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-background px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/30 active:scale-95 shrink-0"
               >

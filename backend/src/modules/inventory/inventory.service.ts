@@ -1340,4 +1340,140 @@ export class InventoryService {
       shortfalls,
     };
   }
+
+  /**
+   * Compute inventory-derived availability for every menu item that has an active
+   * recipe. For each item we work out how many can still be made from current
+   * stock (the limiting ingredient wins) and bucket it into a status the order
+   * page can badge. Items without an active recipe are untracked and omitted —
+   * the caller treats a missing entry as "available".
+   *
+   * Returns: [{ menu_item_id, makeable, status: "out" | "low" | "in_stock" }]
+   */
+  async menuAvailability(lowThreshold = 5) {
+    const branchId = requireBranchId();
+
+    const recipeRows = await db
+      .select()
+      .from(recipes)
+      .where(and(eq(recipes.is_active, true), eq(recipes.branch_id, branchId)));
+
+    if (recipeRows.length === 0) return [];
+
+    const locationsList = await db
+      .select()
+      .from(stockLocations)
+      .where(eq(stockLocations.branch_id, branchId));
+    const defaultLoc =
+      locationsList.find((l) => l.is_default) || locationsList[0];
+
+    const resolveLocationId = (recipe: any, menuItem: any) => {
+      if (
+        recipe.deduct_strategy === "fixed_location" &&
+        recipe.deduct_from_location_id
+      ) {
+        return recipe.deduct_from_location_id;
+      }
+      if (
+        recipe.deduct_strategy === "by_menu_category" &&
+        menuItem?.main_category
+      ) {
+        const matched = locationsList.find(
+          (l) => l.linked_main_category_slug === menuItem.main_category,
+        );
+        if (matched) return matched.id;
+      }
+      return defaultLoc?.id;
+    };
+
+    const menuItemIds = recipeRows.map((r) => r.menu_item_id);
+    const menuRows = menuItemIds.length
+      ? await db
+          .select({ id: menuItems.id, main_category: menuItems.main_category })
+          .from(menuItems)
+          .where(
+            and(
+              inArray(menuItems.id, menuItemIds),
+              eq(menuItems.branch_id, branchId),
+            ),
+          )
+      : [];
+    const menuById = new Map(menuRows.map((m) => [m.id, m]));
+
+    const recipeIds = recipeRows.map((r) => r.id);
+    const ingredientRows = recipeIds.length
+      ? await db
+          .select()
+          .from(recipeIngredients)
+          .where(
+            and(
+              inArray(recipeIngredients.recipe_id, recipeIds),
+              eq(recipeIngredients.branch_id, branchId),
+            ),
+          )
+      : [];
+    const ingredientsByRecipe = new Map<string, any[]>();
+    for (const ing of ingredientRows) {
+      const list = ingredientsByRecipe.get(ing.recipe_id) || [];
+      list.push(ing);
+      ingredientsByRecipe.set(ing.recipe_id, list);
+    }
+
+    // One pass over branch stock → map keyed by `${itemId}_${locationId}`.
+    const stockRows = await db
+      .select({
+        inventory_item_id: inventoryStock.inventory_item_id,
+        location_id: inventoryStock.location_id,
+        quantity: inventoryStock.quantity,
+      })
+      .from(inventoryStock)
+      .where(eq(inventoryStock.branch_id, branchId));
+    const stockByKey = new Map<string, number>();
+    for (const row of stockRows) {
+      stockByKey.set(
+        `${row.inventory_item_id}_${row.location_id}`,
+        numberOrZero(row.quantity),
+      );
+    }
+
+    const results: Array<{
+      menu_item_id: string;
+      makeable: number;
+      status: "out" | "low" | "in_stock";
+    }> = [];
+
+    for (const recipe of recipeRows) {
+      const menuItem = menuById.get(recipe.menu_item_id);
+      const locId = resolveLocationId(recipe, menuItem);
+      const ingredients = ingredientsByRecipe.get(recipe.id) || [];
+
+      // No location resolved or no ingredients → can't track; skip (= available).
+      if (!locId || ingredients.length === 0) continue;
+
+      const yieldQty = Math.max(1, Number(recipe.yield_quantity) || 1);
+      let makeable = Infinity;
+      for (const ingredient of ingredients) {
+        const wasteFactor = Number(ingredient.waste_factor || "1.000") || 1;
+        const requiredPerUnit =
+          (Number(ingredient.quantity) * wasteFactor) / yieldQty;
+        if (requiredPerUnit <= 0) continue;
+        const available = stockByKey.get(
+          `${ingredient.inventory_item_id}_${locId}`,
+        );
+        makeable = Math.min(
+          makeable,
+          Math.floor((available ?? 0) / requiredPerUnit),
+        );
+      }
+
+      if (!Number.isFinite(makeable)) continue;
+
+      const status: "out" | "low" | "in_stock" =
+        makeable <= 0 ? "out" : makeable <= lowThreshold ? "low" : "in_stock";
+
+      results.push({ menu_item_id: recipe.menu_item_id, makeable, status });
+    }
+
+    return results;
+  }
 }

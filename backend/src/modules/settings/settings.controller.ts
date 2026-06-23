@@ -293,6 +293,35 @@ export class SettingsController {
     return { status: "success", data };
   }
 
+  @ApiOperation({ summary: "Get menu-availability system settings" })
+  @Get("system/menu-availability")
+  async getMenuAvailabilitySettings(
+    @Headers("x-app-client") appClient: string,
+  ) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    const data = await this.settingsService.getMenuAvailabilitySettings();
+    return { status: "success", data };
+  }
+
+  @ApiOperation({ summary: "Update menu-availability system settings (admin)" })
+  @Put("system/menu-availability")
+  async updateMenuAvailabilitySettings(
+    @Headers("x-app-client") appClient: string,
+    @Body() body: { show_menu_inventory_availability: boolean },
+  ) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    const data = await this.settingsService.updateMenuAvailabilitySettings({
+      show_menu_inventory_availability: Boolean(
+        body.show_menu_inventory_availability,
+      ),
+    });
+    return { status: "success", data };
+  }
+
   @ApiOperation({ summary: "Get organization-related system settings" })
   @Get("system/organizations")
   async getOrganizationSettings(@Headers("x-app-client") appClient: string) {

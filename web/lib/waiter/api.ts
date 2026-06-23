@@ -128,6 +128,47 @@ export const waiterServices = {
         return { force_table_selection: false };
       }
     },
+    // Owner toggle (Order Rules page) that gates whether this waiter screen shows
+    // inventory-derived stock hints. Defaults off if the call fails.
+    getMenuAvailabilitySettings: async (): Promise<{
+      show_menu_inventory_availability: boolean;
+    }> => {
+      try {
+        const res = await waiterApi.get<any>(
+          "/settings/system/menu-availability",
+        );
+        const body = res.data ?? {};
+        return {
+          show_menu_inventory_availability: Boolean(
+            body?.data?.show_menu_inventory_availability ??
+              body?.show_menu_inventory_availability,
+          ),
+        };
+      } catch {
+        return { show_menu_inventory_availability: false };
+      }
+    },
+  },
+  inventory: {
+    // Per-menu-item availability derived from recipes + current stock. Only items
+    // with an active recipe are returned; everything else is untracked (treated
+    // as available). Returns [] on failure so the menu still renders.
+    getMenuAvailability: async (): Promise<
+      Array<{
+        menu_item_id: string;
+        makeable: number;
+        status: "out" | "low" | "in_stock";
+      }>
+    > => {
+      try {
+        const res = await waiterApi.get<any>("/inventory/menu-availability");
+        const body = res.data ?? {};
+        const items = body?.data?.items ?? body?.items ?? [];
+        return Array.isArray(items) ? items : [];
+      } catch {
+        return [];
+      }
+    },
   },
   orders: {
     getAll: (params?: Record<string, any>) => waiterApi.get("/orders", params),

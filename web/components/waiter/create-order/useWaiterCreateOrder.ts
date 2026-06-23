@@ -22,6 +22,12 @@ export const useWaiterCreateOrder = () => {
   const [notes, setNotes] = useState("");
   const [allTables, setAllTables] = useState<any[]>([]);
   const [forceTableSelection, setForceTableSelection] = useState(false);
+  const [showAvailability, setShowAvailability] = useState(false);
+  const [availabilityByItem, setAvailabilityByItem] = useState<
+    Record<string, { status: "out" | "low" | "in_stock"; makeable: number }>
+  >({});
+  // "out" shows only out-of-stock items; "all" applies no stock filter.
+  const [stockFilter, setStockFilter] = useState<"all" | "out">("all");
   const [isMobileSummaryOpen, setIsMobileSummaryOpen] = useState(false);
   const submitLockRef = useRef(false);
 
@@ -82,11 +88,12 @@ export const useWaiterCreateOrder = () => {
     try {
       setLoading(true);
 
-      const [menuResult, tablesResult, settingsResult] =
+      const [menuResult, tablesResult, settingsResult, menuAvailSettingResult] =
         await Promise.allSettled([
           api.menu.getCafeMenu(),
           api.tables.getAll(),
           api.settings.getTableSelectionSettings(),
+          api.settings.getMenuAvailabilitySettings(),
         ]);
 
       let resolvedMenuItems: any[] = [];
@@ -133,6 +140,34 @@ export const useWaiterCreateOrder = () => {
         setForceTableSelection(
           Boolean((settingsResult.value as any)?.force_table_selection),
         );
+      }
+
+      // Inventory-derived stock hints are gated by an owner toggle. Only fetch
+      // (and only badge) when it's on; otherwise leave the map empty.
+      const availabilityEnabled =
+        menuAvailSettingResult.status === "fulfilled" &&
+        Boolean(
+          (menuAvailSettingResult.value as any)?.show_menu_inventory_availability,
+        );
+      setShowAvailability(availabilityEnabled);
+
+      if (availabilityEnabled) {
+        const availabilityList = await api.inventory.getMenuAvailability();
+        const map: Record<
+          string,
+          { status: "out" | "low" | "in_stock"; makeable: number }
+        > = {};
+        for (const entry of availabilityList) {
+          if (!entry?.menu_item_id) continue;
+          map[String(entry.menu_item_id)] = {
+            status: entry.status,
+            makeable: Number(entry.makeable) || 0,
+          };
+        }
+        setAvailabilityByItem(map);
+      } else {
+        setAvailabilityByItem({});
+        setStockFilter("all");
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -236,15 +271,22 @@ export const useWaiterCreateOrder = () => {
 
     const searchableItems = mainFiltered.filter(matchesSearch);
 
-    if (selectedCategory === "all") {
-      setFilteredItems(searchableItems);
-    } else {
-      setFilteredItems(
-        searchableItems.filter(
-          (item) => (item.category || item.sub_category) === selectedCategory,
-        ),
-      );
-    }
+    const categoryFiltered =
+      selectedCategory === "all"
+        ? searchableItems
+        : searchableItems.filter(
+            (item) => (item.category || item.sub_category) === selectedCategory,
+          );
+
+    // "Out of stock only" view: keep just the items the inventory check flagged.
+    const stockFiltered =
+      stockFilter === "out"
+        ? categoryFiltered.filter(
+            (item) => availabilityByItem[String(item.id)]?.status === "out",
+          )
+        : categoryFiltered;
+
+    setFilteredItems(stockFiltered);
   }, [
     selectedCategory,
     selectedMainCategory,
@@ -254,6 +296,8 @@ export const useWaiterCreateOrder = () => {
     itemHasCategory,
     normalizeMainCategory,
     isFastingCategory,
+    stockFilter,
+    availabilityByItem,
   ]);
 
   useEffect(() => {
@@ -571,6 +615,14 @@ export const useWaiterCreateOrder = () => {
     ).length;
   }, [itemHasCategory, menuItems, selectedMainCategory, normalizeMainCategory]);
 
+  const outOfStockCount = useMemo(
+    () =>
+      menuItems.filter(
+        (item) => availabilityByItem[String(item.id)]?.status === "out",
+      ).length,
+    [menuItems, availabilityByItem],
+  );
+
   return {
     loading,
     menuItems,
@@ -605,5 +657,10 @@ export const useWaiterCreateOrder = () => {
     handleLogout,
     formatCurrency,
     forceTableSelection,
+    showAvailability,
+    availabilityByItem,
+    stockFilter,
+    setStockFilter,
+    outOfStockCount,
   };
 };

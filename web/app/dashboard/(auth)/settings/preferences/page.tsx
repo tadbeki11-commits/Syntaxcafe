@@ -53,6 +53,20 @@ const RULES: Rule[] = [
       Settings.updateInventory({ allow_low_stock_orders: enabled }),
   },
   {
+    key: "show_menu_inventory_availability",
+    title: "Show inventory availability to waiters",
+    description:
+      "When on, the waiter order screen flags each menu item as out of stock or running low based on current ingredient inventory. Turn off to hide stock hints from waiters.",
+    load: () =>
+      Settings.menuAvailability().then(
+        (d) => d.show_menu_inventory_availability,
+      ),
+    save: (enabled) =>
+      Settings.updateMenuAvailability({
+        show_menu_inventory_availability: enabled,
+      }),
+  },
+  {
     key: "allow_cashier_manage_org_orders",
     title: "Cashiers can manage organization orders",
     description:

@@ -47,6 +47,11 @@ export default function CreateOrderPage() {
     handleLogout,
     formatCurrency,
     forceTableSelection,
+    showAvailability,
+    availabilityByItem,
+    stockFilter,
+    setStockFilter,
+    outOfStockCount,
   } = useWaiterCreateOrder();
 
   if (loading) return <LoadingSpinner text="Loading menu register..." />;
@@ -88,6 +93,12 @@ export default function CreateOrderPage() {
             totalSubItemsCount={mainFilteredCount}
             showSubCategories={isFastingCategory(selectedMainCategory)}
             forceTableSelection={forceTableSelection}
+            showStockFilter={showAvailability && outOfStockCount > 0}
+            stockFilterActive={stockFilter === "out"}
+            onToggleStockFilter={() =>
+              setStockFilter(stockFilter === "out" ? "all" : "out")
+            }
+            outOfStockCount={outOfStockCount}
           />
 
           <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-border/80 bg-background/90 shadow-sm shadow-amber-100/30">
@@ -143,6 +154,11 @@ export default function CreateOrderPage() {
                       key={item.id}
                       item={item}
                       onAddToCart={addToOrder}
+                      availability={
+                        showAvailability
+                          ? availabilityByItem[String(item.id)]
+                          : undefined
+                      }
                     />
                   ))}
                 </>

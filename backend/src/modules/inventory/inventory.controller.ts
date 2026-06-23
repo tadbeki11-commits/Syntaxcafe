@@ -64,6 +64,15 @@ export class InventoryController {
     };
   }
 
+  @ApiOperation({
+    summary: "Per-menu-item availability derived from current stock + recipes",
+  })
+  @Get("menu-availability")
+  async menuAvailability() {
+    const items = await this.inventoryService.menuAvailability();
+    return { status: "success", data: { items } };
+  }
+
   @Get(":id")
   async getOne(@Param("id") id: string) {
     const item = await this.inventoryService.findOne(id);

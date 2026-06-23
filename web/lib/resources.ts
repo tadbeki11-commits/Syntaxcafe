@@ -191,6 +191,10 @@ export const Settings = {
   inventory: () => apiFetch("/settings/system/inventory").then((d) => d.data),
   updateInventory: (b: { allow_low_stock_orders: boolean }) =>
     apiFetch("/settings/system/inventory", put(b)).then((d) => d.data),
+  menuAvailability: () =>
+    apiFetch("/settings/system/menu-availability").then((d) => d.data),
+  updateMenuAvailability: (b: { show_menu_inventory_availability: boolean }) =>
+    apiFetch("/settings/system/menu-availability", put(b)).then((d) => d.data),
   organizations: () =>
     apiFetch("/settings/system/organizations").then((d) => d.data),
   updateOrganizations: (b: { allow_cashier_manage_org_orders: boolean }) =>

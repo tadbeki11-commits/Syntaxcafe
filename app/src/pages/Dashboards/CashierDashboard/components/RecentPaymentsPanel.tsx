@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { displayStatus, statusBadgeVariant } from '@/lib/utils';
+import { displayStatus, statusBadgeVariant, uuidToDisplayId } from '@/lib/utils';
 
 interface RecentPaymentsPanelProps {
   payments: any[];
@@ -96,15 +96,25 @@ export const RecentPaymentsPanel: React.FC<RecentPaymentsPanelProps> = ({
                 >
                   {displayStatus(payment.status)}
                 </Badge>
-                {payment.order_number != null && (
-                  <button
-                    type="button"
-                    onClick={() => toggleRecentPaymentDetails(payment)}
-                    className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-extrabold text-primary hover:bg-primary/20"
-                  >
-                    #{payment.order_number}
-                  </button>
-                )}
+                {(() => {
+                  // Local payments don't carry order_number (offline-first), so
+                  // resolve it from the linked order; fall back to a short id.
+                  const orderId = resolvePaymentOrderId(payment);
+                  const order = orderId != null ? getOrderFromIndex(orderId) : null;
+                  const num = payment.order_number ?? order?.order_number;
+                  if (num == null && orderId == null) return null;
+                  const label =
+                    num != null ? `#${num}` : `#${uuidToDisplayId(String(orderId))}`;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => toggleRecentPaymentDetails(payment)}
+                      className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-extrabold text-primary hover:bg-primary/20"
+                    >
+                      {label}
+                    </button>
+                  );
+                })()}
               </div>
 
               {(() => {

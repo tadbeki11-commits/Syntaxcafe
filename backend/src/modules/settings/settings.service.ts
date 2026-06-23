@@ -342,6 +342,16 @@ export class SettingsService {
     return { allow_low_stock_orders: data.allow_low_stock_orders };
   }
 
+  async getMenuAvailabilitySettings(): Promise<{ show_menu_inventory_availability: boolean }> {
+    const raw = await this.getSystemSetting("show_menu_inventory_availability");
+    return { show_menu_inventory_availability: raw === "true" };
+  }
+
+  async updateMenuAvailabilitySettings(data: { show_menu_inventory_availability: boolean }): Promise<{ show_menu_inventory_availability: boolean }> {
+    await this.setSystemSetting("show_menu_inventory_availability", data.show_menu_inventory_availability ? "true" : "false");
+    return { show_menu_inventory_availability: data.show_menu_inventory_availability };
+  }
+
   async getOrganizationSettings(): Promise<{ allow_cashier_manage_org_orders: boolean }> {
     const raw = await this.getSystemSetting("allow_cashier_manage_org_orders");
     return { allow_cashier_manage_org_orders: raw === "true" };

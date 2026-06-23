@@ -86,9 +86,18 @@ export const paymentsAdapter = {
               updated = true;
             }
           }
-          const finalPayments = updated
+          const baseFinal = updated
             ? await readPayments()
             : freshLocalPayments;
+          // Local payment rows don't store order_number; carry it through from
+          // the backend response so payment views can show/link it.
+          const orderNumberById = new Map(
+            remotePayments.map((p: any) => [p.id, p.order_number]),
+          );
+          const finalPayments = baseFinal.map((p: any) => ({
+            ...p,
+            order_number: p.order_number ?? orderNumberById.get(p.id) ?? null,
+          }));
 
           return {
             data: { status: "success", data: { payments: finalPayments } },
