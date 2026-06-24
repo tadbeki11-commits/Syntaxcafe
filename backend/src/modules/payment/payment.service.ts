@@ -53,6 +53,33 @@ export class PaymentService {
     // pending/paid) on the POS and back-office.
     const resolvedStatus = status === "deleted" ? "deleted" : "pending";
 
+    // Idempotency guard against duplicate full-order payments. A double-click,
+    // a client retry of a request that actually succeeded, or two cashier
+    // surfaces confirming the same order would otherwise each insert a fresh row
+    // and double-charge the order. Department-split payments are exempt: those
+    // legitimately produce several rows per order (one per department) and are
+    // recorded via settleDepartment, which has its own per-department guard.
+    if (order_id && resolvedStatus !== "deleted") {
+      const [existing] = await db
+        .select({ id: payments.id, status: payments.status })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.order_id, order_id),
+            eq(payments.branch_id, requireBranchId()),
+            sql`coalesce(${payments.status}, '') in ('pending', 'paid')`,
+            sql`coalesce(${payments.meta} ->> 'scope', '') <> 'department'`,
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // Return the row that already covers this order instead of creating a
+        // duplicate. Callers treat this as success (idempotent create).
+        return existing;
+      }
+    }
+
     const [created] = await db
       .insert(payments)
       .values({

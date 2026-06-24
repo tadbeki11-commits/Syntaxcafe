@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeftIcon, MinusIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -37,6 +37,9 @@ export default function NewOrderPage() {
   const [tableNumber, setTableNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [placing, setPlacing] = useState(false);
+  // Synchronous lock so a double-click can't fire two order creations before
+  // `placing` re-renders the button to disabled.
+  const submitLockRef = useRef(false);
   const [search, setSearch] = useState("");
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
@@ -106,6 +109,8 @@ export default function NewOrderPage() {
       toast.error("Add at least one item.");
       return;
     }
+    if (submitLockRef.current || placing) return;
+    submitLockRef.current = true;
     setPlacing(true);
     try {
       await Orders.create({
@@ -128,6 +133,7 @@ export default function NewOrderPage() {
     } catch (e: any) {
       toast.error(e.message);
     } finally {
+      submitLockRef.current = false;
       setPlacing(false);
     }
   }

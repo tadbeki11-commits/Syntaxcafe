@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Minus, Plus, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -51,6 +51,9 @@ export const CreateOrgOrder: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [overrideTotal, setOverrideTotal] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Synchronous lock so a double-click can't fire two order creations before
+  // `submitting` re-renders the button to disabled.
+  const submitLockRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -163,6 +166,8 @@ export const CreateOrgOrder: React.FC = () => {
       return;
     }
     if (!id) return;
+    if (submitLockRef.current || submitting) return;
+    submitLockRef.current = true;
     try {
       setSubmitting(true);
       const orderData: any = {
@@ -199,6 +204,7 @@ export const CreateOrgOrder: React.FC = () => {
         'Failed to create order. Check inventory or try again.';
       toast.error(message);
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   };

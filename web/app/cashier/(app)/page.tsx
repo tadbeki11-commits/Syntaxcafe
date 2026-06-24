@@ -146,6 +146,9 @@ export default function CashierQueuePage() {
 
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
   const [confirmMethod, setConfirmMethod] = useState("cash");
+  // True from the instant a confirm is submitted until it settles — blocks a
+  // second click from firing a duplicate payment within the same render tick.
+  const submittingRef = useRef(false);
   const [cancelTarget, setCancelTarget] = useState<QueueOrder | null>(null);
   const [cancelPwdRequired, setCancelPwdRequired] = useState(false);
   const [cancelPwd, setCancelPwd] = useState("");
@@ -288,12 +291,21 @@ export default function CashierQueuePage() {
 
   const doConfirm = useCallback(async () => {
     if (!confirmTarget) return;
+    // Synchronous re-entrancy guard. `processing` is React state, so two clicks
+    // fired in the same tick both read it as empty and would each submit a
+    // payment (a real source of duplicate rows). A ref flips immediately, so the
+    // second click is dropped before any request goes out.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     const order = confirmTarget.order;
     const key =
       confirmTarget.kind === "department"
         ? `${order.id}:${confirmTarget.due.department}`
         : order.id;
-    if (processing.has(key)) return;
+    if (processing.has(key)) {
+      submittingRef.current = false;
+      return;
+    }
     setProcessing((prev) => new Set(prev).add(key));
     setConfirmTarget(null);
     try {
@@ -347,6 +359,7 @@ export default function CashierQueuePage() {
     } catch (err: any) {
       toast.error(err?.message || "Failed to confirm payment");
     } finally {
+      submittingRef.current = false;
       setProcessing((prev) => {
         const next = new Set(prev);
         next.delete(key);
@@ -837,7 +850,17 @@ export default function CashierQueuePage() {
             <Button variant="outline" onClick={() => setConfirmTarget(null)}>
               Cancel
             </Button>
-            <Button onClick={doConfirm}>
+            <Button
+              onClick={doConfirm}
+              disabled={
+                !confirmTarget ||
+                processing.has(
+                  confirmTarget.kind === "department"
+                    ? `${confirmTarget.order.id}:${confirmTarget.due.department}`
+                    : confirmTarget.order.id,
+                )
+              }
+            >
               <CheckCircle2 className="size-4" />
               Confirm payment
             </Button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '@/application';
 import toast from 'react-hot-toast';
 import { Plus } from 'lucide-react';
@@ -31,6 +31,9 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   const [tableNumber, setTableNumber] = useState('');
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [creating, setCreating] = useState(false);
+  // Synchronous lock so a double-click can't fire two order creations before
+  // `creating` re-renders the button to disabled.
+  const submitLockRef = useRef(false);
   const [forceTableSelection, setForceTableSelection] = useState(false);
 
   useEffect(() => {
@@ -80,6 +83,9 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       return;
     }
 
+    if (submitLockRef.current || creating) return;
+    submitLockRef.current = true;
+
     try {
       setCreating(true);
 
@@ -116,6 +122,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       }
       toast.error(error.response?.data?.message || 'Failed to create order');
     } finally {
+      submitLockRef.current = false;
       setCreating(false);
     }
   };

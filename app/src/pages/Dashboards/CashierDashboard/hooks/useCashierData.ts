@@ -681,6 +681,18 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
   const processPaymentWithMethod = async () => {
     if (!selectedOrder) return;
 
+    // Re-entrancy guard: a double-click on "Process payment" would otherwise
+    // fire api.payments.create twice and leave duplicate payments on the order.
+    // The ref flips synchronously so a second click in the same tick is dropped
+    // before any request goes out (mirrors handleConfirmProcessPaymentYes).
+    if (
+      processingOrders.has(selectedOrder.id) ||
+      processingOrdersRef.current.has(selectedOrder.id)
+    )
+      return;
+    processingOrdersRef.current.add(selectedOrder.id);
+    setProcessingOrders((prev: any) => new Set(prev).add(selectedOrder.id));
+
     try {
       const paymentData = {
         order_id: selectedOrder.id,
@@ -710,6 +722,13 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
     } catch (error) {
       console.error("Error processing payment:", error);
       toast.error("Failed to process payment. Please try again.");
+    } finally {
+      processingOrdersRef.current.delete(selectedOrder.id);
+      setProcessingOrders((prev: any) => {
+        const next = new Set(prev);
+        next.delete(selectedOrder.id);
+        return next;
+      });
     }
   };
 
