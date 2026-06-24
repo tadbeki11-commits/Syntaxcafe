@@ -83,7 +83,10 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
             if (existing.length > 0) {
               await db
                 .update(localDbTables.systemSettings)
-                .set({ value: remoteHash, updated_at: new Date().toISOString() })
+                .set({
+                  value: remoteHash,
+                  updated_at: new Date().toISOString(),
+                })
                 .where(eq(localDbTables.systemSettings.key, "cancel_password"));
             } else {
               await db.insert(localDbTables.systemSettings).values({
@@ -150,55 +153,64 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
     return () => unsubscribe();
   }, []);
 
-  const refreshDashboardData = useCallback(async () => {
-    try {
-      const [pendingResult, paymentsResult, ordersForPaymentResult] =
-        (await Promise.allSettled([
-          api.payments.getPending(),
-          api.payments.getAll(),
-          api.orders.getOrdersForPayment(),
-        ])) as any[];
+  const refreshDashboardData = useCallback(
+    async (opts?: { localOnly?: boolean }) => {
+      const localOnly = opts?.localOnly === true;
+      try {
+        const [pendingResult, paymentsResult, ordersForPaymentResult] =
+          (await Promise.allSettled([
+            api.payments.getPending(),
+            // Only the payments history reconcile hits the network; orders/pending
+            // already read from local SQLite. localOnly keeps the whole refresh
+            // off the wire so it stays instant.
+            api.payments.getAll(undefined, { localOnly }),
+            api.orders.getOrdersForPayment(),
+          ])) as any[];
 
-      setDashboardData((prev: any) => {
-        const pendingPaymentsRaw =
-          pendingResult?.status === "fulfilled"
-            ? (pendingResult.value?.data?.data?.payments ??
-              pendingResult.value?.data?.payments ??
-              [])
-            : prev.pendingPayments;
+        setDashboardData((prev: any) => {
+          const pendingPaymentsRaw =
+            pendingResult?.status === "fulfilled"
+              ? (pendingResult.value?.data?.data?.payments ??
+                pendingResult.value?.data?.payments ??
+                [])
+              : prev.pendingPayments;
 
-        const paymentsAllRaw =
-          paymentsResult?.status === "fulfilled"
-            ? (paymentsResult.value?.data?.data?.payments ??
-              paymentsResult.value?.data?.payments ??
-              [])
-            : prev.paymentsAll;
+          const paymentsAllRaw =
+            paymentsResult?.status === "fulfilled"
+              ? (paymentsResult.value?.data?.data?.payments ??
+                paymentsResult.value?.data?.payments ??
+                [])
+              : prev.paymentsAll;
 
-        const ordersForPaymentRaw =
-          ordersForPaymentResult?.status === "fulfilled"
-            ? (ordersForPaymentResult.value?.data?.data?.orders ??
-              ordersForPaymentResult.value?.data?.orders ??
-              [])
-            : prev.ordersForPayment;
+          const ordersForPaymentRaw =
+            ordersForPaymentResult?.status === "fulfilled"
+              ? (ordersForPaymentResult.value?.data?.data?.orders ??
+                ordersForPaymentResult.value?.data?.orders ??
+                [])
+              : prev.ordersForPayment;
 
-        const paymentsAll = Array.isArray(paymentsAllRaw) ? paymentsAllRaw : [];
+          const paymentsAll = Array.isArray(paymentsAllRaw)
+            ? paymentsAllRaw
+            : [];
 
-        return {
-          ...prev,
-          pendingPayments: Array.isArray(pendingPaymentsRaw)
-            ? pendingPaymentsRaw
-            : [],
-          recentPayments: paymentsAll.slice(0, 10),
-          ordersForPayment: Array.isArray(ordersForPaymentRaw)
-            ? ordersForPaymentRaw
-            : [],
-          paymentsAll,
-        };
-      });
-    } catch (err) {
-      // Silently ignore
-    }
-  }, []);
+          return {
+            ...prev,
+            pendingPayments: Array.isArray(pendingPaymentsRaw)
+              ? pendingPaymentsRaw
+              : [],
+            recentPayments: paymentsAll.slice(0, 10),
+            ordersForPayment: Array.isArray(ordersForPaymentRaw)
+              ? ordersForPaymentRaw
+              : [],
+            paymentsAll,
+          };
+        });
+      } catch (err) {
+        // Silently ignore
+      }
+    },
+    [],
+  );
 
   const handleManualSync = async () => {
     if (syncStatus.syncing) return;
@@ -371,17 +383,27 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
     address: "",
   });
 
-  // Fetch dashboard data on mount
+  // Fetch dashboard data on mount.
+  // Render from local SQLite first so the screen is usable immediately, then
+  // reconcile with the backend in the background. Previously the skeleton was
+  // gated on the full remote payment-history pull, which could take many
+  // seconds on tills with a large history (only-skeleton-shows symptom).
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       setLoading(true);
       try {
-        await refreshDashboardData();
+        await refreshDashboardData({ localOnly: true });
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
+      // Background reconcile — does not block the UI.
+      void refreshDashboardData();
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id, refreshDashboardData]);
 
   // Refresh once background hydration / reconnect / manual sync completes.
@@ -389,13 +411,24 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
     refreshDashboardData();
   });
 
-  // Auto-refresh pending payments every 5 s  (sync inertia across dashboards)
+  // Auto-refresh on two cadences so the on-screen lists stay live without
+  // hammering the backend:
+  //  • every 5 s — cheap local-only refresh (reads SQLite, no network).
+  //  • every 30 s — full remote reconcile (pulls the recent payment window).
+  // Previously the full reconcile ran every 5 s, re-pulling and re-upserting
+  // the payment history on every tick.
   useEffect(() => {
-    const refreshInterval = setInterval(() => {
+    const lightInterval = setInterval(() => {
+      refreshDashboardData({ localOnly: true });
+    }, 50000);
+    const fullInterval = setInterval(() => {
       refreshDashboardData();
-    }, 5000);
+    }, 3000000);
 
-    return () => clearInterval(refreshInterval);
+    return () => {
+      clearInterval(lightInterval);
+      clearInterval(fullInterval);
+    };
   }, [refreshDashboardData]);
 
   const handleConfirmProcessPaymentYes = async (

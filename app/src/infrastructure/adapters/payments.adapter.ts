@@ -33,20 +33,113 @@ const upsertOrder = async (order: any) => {
   return upsertRow(localDbTables.orders, order);
 };
 
+// How far back the dashboard reconciles payments from the backend on each
+// refresh. Without a bound, GET /payments/history returns the branch's entire
+// payment history (every refresh re-pulls and re-upserts all of it), which is
+// what makes the cashier dashboard crawl on long-running tills. Local SQLite
+// still retains older rows from prior syncs, so client-side stats over older
+// ranges keep working — we just stop re-fetching the unchanging tail.
+const PAYMENTS_HISTORY_WINDOW_DAYS = 60;
+
+const isoDaysAgo = (days: number) =>
+  new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+// Fields that decide whether a remote payment row differs from what we already
+// have locally. Re-upserting an unchanged row is pure overhead (a SQLite write
+// per row, every refresh) — skipping them removes the per-load write storm.
+const PAYMENT_COMPARE_FIELDS = [
+  "order_id",
+  "amount",
+  "payment_method",
+  "status",
+  "description",
+  "paid_at",
+  "updated_at",
+];
+
+const paymentRowChanged = (existing: any, incoming: any): boolean => {
+  if (!existing) return true;
+  // A local row not yet marked synced must be reconciled to the server copy.
+  if (Number(existing.synced ?? 0) !== 1) return true;
+  for (const field of PAYMENT_COMPARE_FIELDS) {
+    if (String(existing[field] ?? "") !== String(incoming[field] ?? "")) {
+      return true;
+    }
+  }
+  return false;
+};
+
+// Offline cash payments are written as pending; once we can see them they are
+// settled, so promote them to paid. Only the (usually zero) matching rows get
+// written. Returns true if anything changed so the caller can re-read.
+const promoteCashPendingToPaid = async (rows: any[]): Promise<boolean> => {
+  let updated = false;
+  for (const p of rows) {
+    if (p.payment_method === "cash" && p.status === "pending") {
+      await upsertPayment({ ...p, status: "paid", synced: 0 });
+      p.status = "paid";
+      updated = true;
+    }
+  }
+  return updated;
+};
+
+const buildPaymentsResponse = (payments: any[]) =>
+  ({
+    data: { status: "success", data: { payments } },
+    status: 200,
+    statusText: "OK",
+    headers: {},
+    config: {} as any,
+  }) as any;
+
+// Read-only local payments response — no network, no reconcile loop beyond the
+// cheap cash/pending promotion. Used for the fast initial render and the
+// lightweight on-screen refresh tick.
+const localPaymentsResponse = async () => {
+  const localPayments = await readPayments();
+  const updated = await promoteCashPendingToPaid(localPayments);
+  const finalPayments = updated ? await readPayments() : localPayments;
+  return buildPaymentsResponse(finalPayments);
+};
+
 export const paymentsAdapter = {
-  getAll: async (params?: any) => {
-    // If online, fetch fresh data from backend
+  getAll: async (params?: any, opts?: { localOnly?: boolean }) => {
+    // Fast path: render straight from local SQLite without touching the network
+    // or reconciling the full history. Keeps the dashboard responsive.
+    if (opts?.localOnly) {
+      return localPaymentsResponse();
+    }
+
+    // If online, reconcile a bounded recent window from the backend.
     if (isOnline()) {
       try {
-        // Backend exposes GET /payments/history; empty filters return all payments
-        const response = await api.get("/payments/history", { params });
+        // Bound the pull to a recent window unless the caller asked for a
+        // specific slice. Passing only date_from returns every payment in the
+        // window (unpaginated) instead of the whole table.
+        const query: any = { ...(params || {}) };
+        if (
+          query.date_from == null &&
+          query.date_to == null &&
+          query.limit == null &&
+          query.page == null
+        ) {
+          query.date_from = isoDaysAgo(PAYMENTS_HISTORY_WINDOW_DAYS);
+        }
+
+        const response = await api.get("/payments/history", { params: query });
         const remotePayments =
           response.data?.data?.payments ?? response.data?.payments ?? [];
 
         if (Array.isArray(remotePayments) && remotePayments.length > 0) {
-          const localPayments = await readPayments();
-          const syncedPayments = remotePayments.map((p: any) => {
-            return {
+          const existingLocal = await readPayments();
+          const existingById = new Map<string, any>(
+            existingLocal.map((p: any) => [String(p.id), p]),
+          );
+
+          let upsertCount = 0;
+          for (const p of remotePayments) {
+            const incoming = {
               id: p.id,
               order_id: p.order_id,
               amount: p.amount,
@@ -58,34 +151,27 @@ export const paymentsAdapter = {
               created_at: p.created_at,
               updated_at: p.updated_at,
             };
-          });
-
-          console.log(
-            "[Payments Sync] Upserting",
-            syncedPayments.length,
-            "payments",
-          );
-          for (const payment of syncedPayments) {
+            // Only write rows that are new or actually changed.
+            if (!paymentRowChanged(existingById.get(String(p.id)), incoming)) {
+              continue;
+            }
             try {
-              await upsertPayment(payment);
+              await upsertPayment(incoming);
+              upsertCount += 1;
             } catch (upsertErr) {
-              console.error("Failed to upsert payment:", payment, upsertErr);
+              console.error("Failed to upsert payment:", incoming, upsertErr);
               throw upsertErr;
             }
           }
 
-          // Read fresh local payments which now includes the upserted remote payments
-          // plus any local unsynced payments
-          const freshLocalPayments = await readPayments();
-          let updated = false;
-          for (const p of freshLocalPayments) {
-            if (p.payment_method === "cash" && p.status === "pending") {
-              const next = { ...p, status: "paid", synced: 0 };
-              await upsertPayment(next);
-              p.status = "paid";
-              updated = true;
-            }
+          if (upsertCount > 0) {
+            console.log("[Payments Sync] Upserted", upsertCount, "payments");
           }
+
+          // Read fresh local payments which now includes the upserted remote
+          // payments plus any local unsynced payments.
+          const freshLocalPayments = await readPayments();
+          const updated = await promoteCashPendingToPaid(freshLocalPayments);
           const baseFinal = updated
             ? await readPayments()
             : freshLocalPayments;
@@ -99,13 +185,7 @@ export const paymentsAdapter = {
             order_number: p.order_number ?? orderNumberById.get(p.id) ?? null,
           }));
 
-          return {
-            data: { status: "success", data: { payments: finalPayments } },
-            status: 200,
-            statusText: "OK",
-            headers: {},
-            config: {} as any,
-          } as any;
+          return buildPaymentsResponse(finalPayments);
         }
       } catch (err) {
         console.error("[Payments Sync] Failed to fetch from backend:", err);
@@ -115,33 +195,10 @@ export const paymentsAdapter = {
 
     // Fallback to local data
     try {
-      const localPayments = await readPayments();
-      let updated = false;
-      for (const p of localPayments) {
-        if (p.payment_method === "cash" && p.status === "pending") {
-          const next = { ...p, status: "paid", synced: 0 };
-          await upsertPayment(next);
-          p.status = "paid";
-          updated = true;
-        }
-      }
-      const finalPayments = updated ? await readPayments() : localPayments;
-      return {
-        data: { status: "success", data: { payments: finalPayments } },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      } as any;
+      return await localPaymentsResponse();
     } catch (err) {
       const localPayments = await readPayments();
-      return {
-        data: { status: "success", data: { payments: localPayments } },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      } as any;
+      return buildPaymentsResponse(localPayments);
     }
   },
   getById: async (id: string) => {
