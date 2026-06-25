@@ -61,6 +61,7 @@ export function useAppUpdater(): UseAppUpdater {
       setStatus("checking");
       try {
         const found = await checkForUpdate();
+
         if (found) {
           setUpdate(found);
           setStatus("available");

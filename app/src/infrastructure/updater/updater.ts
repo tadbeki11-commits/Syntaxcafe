@@ -1,6 +1,10 @@
-import { check, type Update, type DownloadEvent } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
-import { getVersion } from '@tauri-apps/api/app';
+import {
+  check,
+  type Update,
+  type DownloadEvent,
+} from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { getVersion } from "@tauri-apps/api/app";
 
 /**
  * Thin wrapper around the Tauri updater plugin. All update flow logic for the
@@ -31,16 +35,16 @@ export interface AvailableUpdate {
 
 /** True only inside the Tauri shell — the updater is a no-op in the browser. */
 export function isDesktopRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
 /** Returns the currently running app version (from tauri.conf.json). */
 export async function getCurrentVersion(): Promise<string> {
-  if (!isDesktopRuntime()) return 'dev';
+  if (!isDesktopRuntime()) return "dev";
   try {
     return await getVersion();
   } catch {
-    return 'unknown';
+    return "unknown";
   }
 }
 
@@ -51,7 +55,10 @@ export async function getCurrentVersion(): Promise<string> {
 export async function checkForUpdate(): Promise<AvailableUpdate | null> {
   if (!isDesktopRuntime()) return null;
 
+  console.log("Checking for update…");
+
   const update = await check();
+  console.log("checkForUpdate", update);
   if (!update) return null;
 
   return {
@@ -77,16 +84,16 @@ export async function downloadAndInstall(
 
   await update.handle.downloadAndInstall((event: DownloadEvent) => {
     switch (event.event) {
-      case 'Started':
+      case "Started":
         total = event.data.contentLength ?? null;
         downloaded = 0;
         onProgress?.({ total, downloaded });
         break;
-      case 'Progress':
+      case "Progress":
         downloaded += event.data.chunkLength;
         onProgress?.({ total, downloaded });
         break;
-      case 'Finished':
+      case "Finished":
         onProgress?.({ total, downloaded: total ?? downloaded });
         break;
     }
