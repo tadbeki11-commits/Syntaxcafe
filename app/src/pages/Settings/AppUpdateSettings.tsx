@@ -4,11 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppUpdater } from '@/hooks/useAppUpdater';
 
-/**
- * Admin-facing "Check for updates" screen. Auto-checks on startup happen
- * globally (UpdateManager); this page lets an operator force a check and watch
- * the download/install when they choose to.
- */
+
 export default function AppUpdateSettings() {
   const { status, currentVersion, update, percent, error, isDesktop, check, install } =
     useAppUpdater();

@@ -99,14 +99,24 @@ jobs:
         working-directory: app
         run: npm install
 
+      # Strip any stray CR/LF/whitespace from the signing key secret — a trailing
+      # newline (easy to introduce when pasting the secret) makes the signer fail
+      # with "failed to decode base64 secret key: Invalid symbol 10".
+      - name: Normalize signing key
+        shell: bash
+        run: |
+          KEY="$(printf '%s' "${TAURI_SIGNING_PRIVATE_KEY_RAW}" | tr -d '[:space:]')"
+          echo "TAURI_SIGNING_PRIVATE_KEY=${KEY}" >> "$GITHUB_ENV"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_RAW: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
       - name: Build, sign and upload (Tauri)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          # Signs the update artifacts and generates latest.json.
-          # The key was generated without a password, so no password env is set.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # TAURI_SIGNING_PRIVATE_KEY is provided by the "Normalize signing key"
+          # step above (via $GITHUB_ENV). The key has no password.
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           projectPath: ./app

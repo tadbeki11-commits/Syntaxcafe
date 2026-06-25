@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AvailableUpdate,
   type UpdateProgress,
@@ -7,16 +7,16 @@ import {
   getCurrentVersion,
   isDesktopRuntime,
   relaunchApp,
-} from '@/infrastructure/updater/updater';
+} from "@/infrastructure/updater/updater";
 
 export type UpdateStatus =
-  | 'idle'
-  | 'checking'
-  | 'available'
-  | 'downloading'
-  | 'ready'
-  | 'uptodate'
-  | 'error';
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "ready"
+  | "uptodate"
+  | "error";
 
 export interface UseAppUpdater {
   status: UpdateStatus;
@@ -40,8 +40,8 @@ export interface UseAppUpdater {
  * instance for the manual "Check for updates" button.
  */
 export function useAppUpdater(): UseAppUpdater {
-  const [status, setStatus] = useState<UpdateStatus>('idle');
-  const [currentVersion, setCurrentVersion] = useState('');
+  const [status, setStatus] = useState<UpdateStatus>("idle");
+  const [currentVersion, setCurrentVersion] = useState("");
   const [update, setUpdate] = useState<AvailableUpdate | null>(null);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,21 +58,21 @@ export function useAppUpdater(): UseAppUpdater {
       if (!isDesktop || busy.current) return null;
       busy.current = true;
       setError(null);
-      setStatus('checking');
+      setStatus("checking");
       try {
         const found = await checkForUpdate();
         if (found) {
           setUpdate(found);
-          setStatus('available');
+          setStatus("available");
         } else {
           setUpdate(null);
-          setStatus(silent ? 'idle' : 'uptodate');
+          setStatus(silent ? "idle" : "uptodate");
         }
         return found;
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         // A failed background check shouldn't nag the user with an error UI.
-        setStatus(silent ? 'idle' : 'error');
+        setStatus(silent ? "idle" : "error");
         return null;
       } finally {
         busy.current = false;
@@ -85,23 +85,23 @@ export function useAppUpdater(): UseAppUpdater {
     if (!update || busy.current) return;
     busy.current = true;
     setError(null);
-    setStatus('downloading');
+    setStatus("downloading");
     setProgress({ total: null, downloaded: 0 });
     try {
       await downloadAndInstall(update, setProgress);
-      setStatus('ready');
+      setStatus("ready");
       // On Windows the process exits inside install; relaunch covers the rest.
       await relaunchApp();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      setStatus('error');
+      setStatus("error");
     } finally {
       busy.current = false;
     }
   }, [update]);
 
   const dismiss = useCallback(() => {
-    setStatus('idle');
+    setStatus("idle");
     setError(null);
   }, []);
 
