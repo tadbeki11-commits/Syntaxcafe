@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '@/application';
-import { Menu, X, ChevronLeft, ChevronRight, LayoutDashboard, Users, ShoppingBag, ClipboardList, CreditCard, BarChart3, LogOut, User, Coffee, DollarSign, Package, Receipt, UserCog, Utensils, Wrench, ArrowLeftRight, MapPin, Building2, Printer } from 'lucide-react';
+import { Menu, X, ChevronLeft, ChevronRight, LayoutDashboard, Users, ShoppingBag, ClipboardList, CreditCard, BarChart3, LogOut, User, Coffee, DollarSign, Package, Receipt, UserCog, Utensils, Wrench, ArrowLeftRight, MapPin, Building2, Printer, RefreshCw } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -56,6 +56,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { name: 'Cashier Expenses', href: '/dashboard/cashier/expenses', icon: DollarSign, roles: ['cashier'], group: 'Finance' },
   {name: 'Settings', href: '/dashboard/settings/data-management', icon: Wrench, roles: ['admin'], group: 'Settings' },
   { name: 'Printer Settings', href: '/dashboard/settings/printer-settings', icon: Printer, roles: ['admin'], group: 'Settings' },
+  { name: 'App Updates', href: '/dashboard/settings/updates', icon: RefreshCw, roles: ['admin', 'cashier'], group: 'Settings' },
 
 ];
 

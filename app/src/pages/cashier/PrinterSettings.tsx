@@ -502,60 +502,7 @@ const PrinterSettings: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="mt-3 max-w-xs" onClick={(e) => e.stopPropagation()}>
-                      <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                        Departments
-                      </Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="mt-1 h-9 w-full justify-between text-xs font-medium"
-                          >
-                            <span className="truncate">
-                              {assignedDepartmentOptions.length > 0
-                                ? assignedDepartmentOptions.slice(0, 2).map((dept) => dept.name).join(', ') + (assignedDepartmentOptions.length > 2 ? '...' : '')
-                                : 'Assign departments'}
-                            </span>
-                            <ChevronsUpDown className="w-3.5 h-3.5 ml-1.5 shrink-0 opacity-60" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="w-64 p-2">
-                          {availableDepartments.length > 0 ? (
-                            <div className="max-h-64 overflow-y-auto space-y-0.5">
-                              {availableDepartments.map((dept) => {
-                                const checked = printerAssignments[dept.slug] === printer.name;
-                                const assignedElsewhere =
-                                  !checked && Boolean(printerAssignments[dept.slug]);
-                                return (
-                                  <label
-                                    key={dept.slug}
-                                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-accent cursor-pointer"
-                                  >
-                                    <Checkbox
-                                      checked={checked}
-                                      onCheckedChange={(value) =>
-                                        handleToggleDepartment(printer.name, dept.slug, value === true)
-                                      }
-                                    />
-                                    <span className="flex-1 truncate">{dept.name}</span>
-                                    {assignedElsewhere && (
-                                      <span className="text-[9px] text-muted-foreground italic">
-                                        moves here
-                                      </span>
-                                    )}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                              No departments found in the database
-                            </p>
-                          )}
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                  
                   </div>
 
                   {/* Actions */}
@@ -575,12 +522,6 @@ const PrinterSettings: React.FC = () => {
                       {isTesting ? 'Printing…' : 'Test'}
                     </Button>
 
-                    <Badge variant="outline" className="h-8 px-2.5 text-[11px] font-bold border-dashed">
-                      <Printer className="w-3 h-3 mr-1" />
-                      {hasAssignment
-                        ? `Prints ${assignedDepartmentOptions.slice(0, 2).map((dept) => dept.name).join(', ') + (assignedDepartmentOptions.length > 2 ? '...' : '')}`
-                        : 'Not assigned'}
-                    </Badge>
                   </div>
                 </div>
               </div>
@@ -596,7 +537,6 @@ const PrinterSettings: React.FC = () => {
             <span className="font-semibold text-foreground">How it works:</span>{' '}
             Printers are discovered via CUPS (<code className="bg-muted px-1 rounded">lpstat</code>).
             Assign a printer to a department, then orders with that department will print only on that printer.
-            If a department is unassigned, the system falls back to the configured active printer, then the <code className="bg-muted px-1 rounded">VITE_PRINTER_NAME</code> environment variable.
           </p>
         </CardContent>
       </Card>
@@ -766,54 +706,6 @@ const PrinterSettings: React.FC = () => {
               </div>
             );
           })}
-        </CardContent>
-      </Card>
-
-      {/* ── Order Print Copies ── */}
-      <Card className="shadow-sm border-border/60">
-        <CardHeader className="pb-3 pt-5 px-5">
-          <CardTitle className="text-base font-bold">Order Print Copies</CardTitle>
-          <CardDescription className="text-xs">
-            Number of physical copies to print each time an order is completed or payment received
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-5 pb-5">
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <Label htmlFor="print_copies" className="text-xs font-semibold text-muted-foreground">Copies per order</Label>
-              <Input
-                id="print_copies"
-                type="number"
-                min={1}
-                max={10}
-                value={printCopies}
-                onChange={(e) => {
-                  const val = Math.max(1, Math.min(10, parseInt(e.target.value || '1', 10)));
-                  setPrintCopies(val);
-                  localStorage.setItem(PRINT_COPIES_STORAGE_KEY, String(val));
-                }}
-                className="mt-1 h-9"
-              />
-            </div>
-            <Button
-              variant="default"
-              size="sm"
-              className="h-9 text-xs font-bold mt-4"
-              onClick={async () => {
-                try {
-                  await api.settings.updatePrintCopies(printCopies);
-                  toast.success(`Print copies set to ${printCopies}`);
-                } catch {
-                  toast.error('Failed to save to server. Changes saved locally.');
-                }
-              }}
-            >
-              Save
-            </Button>
-          </div>
-          <p className="text-[10px] text-muted-foreground font-medium mt-1">
-            Each time the system prints an order ticket, it will produce exactly this many copies.
-          </p>
         </CardContent>
       </Card>
     </div>

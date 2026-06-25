@@ -43,6 +43,8 @@ const columns: Column<Business>[] = [
   {
     key: "branch_count",
     label: "Branches",
+    sortable: true,
+    sortValue: (b) => b.branch_count,
     render: (b) => (
       <>
         {b.branch_count}
@@ -52,15 +54,25 @@ const columns: Column<Business>[] = [
       </>
     ),
   },
-  { key: "user_count", label: "Users", render: (b) => b.user_count },
+  {
+    key: "user_count",
+    label: "Users",
+    sortable: true,
+    sortValue: (b) => b.user_count,
+    render: (b) => b.user_count,
+  },
   {
     key: "order_count",
     label: "Orders",
+    sortable: true,
+    sortValue: (b) => b.order_count,
     render: (b) => b.order_count.toLocaleString(),
   },
   {
     key: "revenue",
     label: "Revenue",
+    sortable: true,
+    sortValue: (b) => b.revenue,
     render: (b) => <span className="font-medium">{birr(b.revenue)}</span>,
   },
   {

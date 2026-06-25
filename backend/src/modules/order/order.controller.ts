@@ -93,6 +93,8 @@ export class OrderController {
       "search",
       "page",
       "limit",
+      "sort_by",
+      "sort_dir",
     ].forEach((k) => {
       if (query[k]) filters[k] = query[k];
     });

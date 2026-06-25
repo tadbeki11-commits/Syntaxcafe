@@ -505,6 +505,8 @@ export default function InventoryPage() {
     {
       key: "quantity",
       label: "In stock (here)",
+      sortable: true,
+      sortValue: (r) => (selectedLoc ? qtyAt(r, selectedLoc.id) : 0),
       render: (r) => {
         const qty = selectedLoc ? qtyAt(r, selectedLoc.id) : 0;
         const min = Number(r.min_quantity || 0);
@@ -521,7 +523,13 @@ export default function InventoryPage() {
         );
       },
     },
-    { key: "min_quantity", label: "Min", render: (r) => r.min_quantity ?? 0 },
+    {
+      key: "min_quantity",
+      label: "Min",
+      sortable: true,
+      sortValue: (r) => r.min_quantity ?? 0,
+      render: (r) => r.min_quantity ?? 0,
+    },
   ];
 
   // ── derived values for the adjust dialog ──

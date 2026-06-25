@@ -20,6 +20,5 @@ export interface PendingOrderRecord {
 export interface PaymentStats {
   pendingCount: number;
   todayRevenue: string;
-  qrCount: number;
   completedCount: number;
 }

@@ -53,8 +53,16 @@ export class PaymentController {
   @ApiQuery({ name: "date_from", required: false })
   @ApiQuery({ name: "date_to", required: false })
   @ApiQuery({ name: "search", required: false })
-  @ApiQuery({ name: "page", required: false, description: "1-based page number" })
-  @ApiQuery({ name: "limit", required: false, description: "Page size (max 100)" })
+  @ApiQuery({
+    name: "page",
+    required: false,
+    description: "1-based page number",
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description: "Page size (max 100)",
+  })
   @ApiOkResponse({ type: PaymentsResponseDto })
   @Get("history")
   async getPaymentHistory(@Query() query: any) {
@@ -68,42 +76,13 @@ export class PaymentController {
       "search",
       "page",
       "limit",
+      "sort_by",
+      "sort_dir",
     ].forEach((k) => {
       if (query[k]) filters[k] = query[k];
     });
     const result = await this.paymentService.getPaymentHistory(filters);
     return { status: "success", data: result };
-  }
-
-  @ApiOperation({ summary: "Create a payment and generate a QR code" })
-  @ApiBody({ type: PaymentRequestDto })
-  @ApiOkResponse({ type: PaymentResponseDto })
-  @Post("with-qr")
-  async createPaymentWithQR(@Body() body: PaymentRequestDto) {
-    const p = await this.paymentService.createWithQR(body);
-    return {
-      status: "success",
-      message: "Payment created with QR code successfully",
-      data: { payment: p, qr_code: p.qr_code },
-    };
-  }
-
-  @ApiOperation({ summary: "Resolve a payment by QR payload" })
-  @ApiBody({ type: QRDataRequestDto })
-  @ApiOkResponse({ type: PaymentQrResponseDto })
-  @Post("by-qr")
-  async getPaymentByQR(@Body() body: QRDataRequestDto) {
-    if (!body.qr_data)
-      return { status: "error", message: "QR data is required" };
-    let parsed;
-    try {
-      parsed = JSON.parse(body.qr_data);
-    } catch (e) {
-      return { status: "error", message: "Invalid QR data format" };
-    }
-    const payment = await this.paymentService.getByQR(parsed);
-    if (!payment) return { status: "error", message: "Payment not found" };
-    return { status: "success", data: { payment, qr_data: parsed } };
   }
 
   @ApiOperation({ summary: "Get all payments for an order" })
@@ -123,19 +102,6 @@ export class PaymentController {
     const payment = await this.paymentService.findById(id);
     if (!payment) return { status: "error", message: "Payment not found" };
     return { status: "success", data: { payment } };
-  }
-
-  @ApiOperation({ summary: "Generate a QR code for a payment" })
-  @ApiParam({ name: "id", required: true })
-  @ApiOkResponse({ type: PaymentResponseDto })
-  @Post(":id/generate-qr")
-  async generateQRCode(@Param("id") id: string) {
-    const payment = await this.paymentService.generateQRCode(id);
-    return {
-      status: "success",
-      message: "QR code generated successfully",
-      data: { payment, qr_code: payment.qr_code },
-    };
   }
 
   @ApiOperation({ summary: "Update payment status" })

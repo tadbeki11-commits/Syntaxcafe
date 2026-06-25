@@ -66,6 +66,12 @@ export const Users = {
   bulkSync: (users: any[]) => apiFetch("/users/sync", j({ users })),
   update: (id: string, b: any) => apiFetch(`/users/${id}`, put(b)),
   toggle: (id: string) => apiFetch(`/users/${id}/toggle-status`, patch({})),
+  // Owner-driven access management: reset a staff login (password OR 4-digit PIN,
+  // no current secret needed) and change their role.
+  resetPassword: (id: string, b: { password?: string; pin?: string }) =>
+    apiFetch(`/users/${id}/reset-password`, j(b)),
+  changeRole: (id: string, role: string) =>
+    apiFetch(`/users/${id}/role`, patch({ role })),
   // Attach a cashier to one or more departments (order item main_category
   // slugs). Drives the web cashier portal's split-payment scope.
   setCashierDepartments: (id: string, departments: string[]) =>

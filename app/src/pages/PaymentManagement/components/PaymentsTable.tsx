@@ -1,6 +1,6 @@
 import { uuidToDisplayId, displayStatus, statusBadgeVariant } from "@/lib/utils";
 import React from 'react';
-import { CreditCard, Eye } from 'lucide-react';
+import { CreditCard, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -13,13 +13,25 @@ interface PaymentsTableProps {
   loading: boolean;
   filteredPayments: PaymentRecord[];
   openView: (payment: PaymentRecord) => void;
+  page: number;
+  setPage: (page: number) => void;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
 }
 
 export const PaymentsTable: React.FC<PaymentsTableProps> = ({
   loading,
   filteredPayments,
-  openView
+  openView,
+  page,
+  setPage,
+  pageSize,
+  totalCount,
+  totalPages
 }) => {
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, totalCount);
   return (
     <Card>
       <CardContent className="p-0">
@@ -31,7 +43,6 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Payment ID</TableHead>
                 <TableHead>Order</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="hidden sm:table-cell">Method</TableHead>
@@ -44,7 +55,6 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
               {filteredPayments.length > 0 ? (
                 filteredPayments.map(p => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium">#{uuidToDisplayId(p.id)}</TableCell>
                     <TableCell>
                       {p.order_id ? (
                         <button
@@ -108,6 +118,38 @@ export const PaymentsTable: React.FC<PaymentsTableProps> = ({
               )}
             </TableBody>
           </Table>
+        )}
+        {!loading && totalCount > 0 && (
+          <div className="flex items-center justify-between gap-2 border-t px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              Showing {rangeStart}-{rangeEnd} of {totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={page <= 1}
+                onClick={() => setPage(Math.max(1, page - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Prev
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={page >= totalPages}
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

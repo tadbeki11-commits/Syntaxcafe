@@ -386,8 +386,6 @@ export const useCashierCreateOrder = () => {
       .toFixed(2);
   }, [orderItems]);
 
-  // const beverageCategories = useMemo( () => [], [],);
-
   const handleSubmitOrder = useCallback(async () => {
     if (submitLockRef.current) return;
     if (creatingOrder) return;

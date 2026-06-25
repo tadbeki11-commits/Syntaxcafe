@@ -201,6 +201,103 @@ export const paymentsAdapter = {
       return buildPaymentsResponse(localPayments);
     }
   },
+  // Backend-paginated payment history for the management table. Returns a single
+  // server page (rows + total count) instead of the whole local table. When
+  // online the page comes straight from GET /payments/history (also cached into
+  // local SQLite for offline continuity); when offline we filter/sort/slice the
+  // local rows to mirror the same shape.
+  getHistory: async (params?: any) => {
+    const page = Math.max(Number(params?.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(params?.limit) || 25, 1), 100);
+
+    const buildPage = (rows: any[], count: number, stats: any = null) =>
+      ({
+        data: {
+          status: "success",
+          data: { payments: rows, count, page, limit, stats },
+        },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any,
+      }) as any;
+
+    if (isOnline()) {
+      try {
+        const query: any = { ...(params || {}), page, limit };
+        const response = await api.get("/payments/history", { params: query });
+        const payload = response.data?.data ?? response.data ?? {};
+        const remotePayments: any[] = payload.payments ?? [];
+
+        // Best-effort cache into local SQLite so the same rows stay available
+        // offline. Only write rows that are new or actually changed.
+        try {
+          const existingLocal = await readPayments();
+          const existingById = new Map<string, any>(
+            existingLocal.map((p: any) => [String(p.id), p]),
+          );
+          for (const p of remotePayments) {
+            const incoming = {
+              id: p.id,
+              order_id: p.order_id,
+              amount: p.amount,
+              payment_method: p.payment_method,
+              status: p.status,
+              description: p.description || "",
+              paid_at: p.paid_at,
+              synced: 1,
+              created_at: p.created_at,
+              updated_at: p.updated_at,
+            };
+            if (paymentRowChanged(existingById.get(String(p.id)), incoming)) {
+              await upsertPayment(incoming);
+            }
+          }
+        } catch (cacheErr) {
+          console.error("[Payments History] local cache failed:", cacheErr);
+        }
+
+        return buildPage(
+          remotePayments,
+          Number(payload.count ?? remotePayments.length),
+          payload.stats ?? null,
+        );
+      } catch (err) {
+        console.error("[Payments History] fetch failed, using local:", err);
+        // fall through to local slicing
+      }
+    }
+
+    // Offline / fallback: filter, sort and slice local rows to the same shape.
+    const all = await readPayments();
+    await promoteCashPendingToPaid(all);
+    const fresh = await readPayments();
+
+    const status = params?.status;
+    const method = params?.payment_method;
+    const search = String(params?.search ?? "").trim().toLowerCase();
+
+    const filtered = fresh.filter((p: any) => {
+      if (status && p.status !== status) return false;
+      if (method && p.payment_method !== method) return false;
+      if (search) {
+        const hay =
+          `${p.id} ${p.order_id} ${p.payment_method ?? ""} ${p.status ?? ""}`.toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    });
+
+    filtered.sort((a: any, b: any) => {
+      const ta = new Date(a.paid_at || a.created_at || 0).getTime();
+      const tb = new Date(b.paid_at || b.created_at || 0).getTime();
+      return tb - ta;
+    });
+
+    const count = filtered.length;
+    const start = (page - 1) * limit;
+    return buildPage(filtered.slice(start, start + limit), count);
+  },
   getById: async (id: string) => {
     if (!isOnline()) {
       const payment = await findPayment(id);

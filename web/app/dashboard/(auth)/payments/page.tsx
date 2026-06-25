@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DataTable, type Column } from "@/components/data-table";
+import { DataTable, type Column, type SortState } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { StatCards, type StatCard } from "@/components/stat-cards";
 import { Payments } from "@/lib/resources";
@@ -51,7 +51,7 @@ const columns: Column<Payment>[] = [
         <span className="text-muted-foreground">—</span>
       ),
   },
-  { key: "amount", label: "Amount", render: (r) => birr(r.amount) },
+  { key: "amount", label: "Amount", sortable: true, render: (r) => birr(r.amount) },
   { key: "payment_method", label: "Method", render: (r) => <span className="capitalize">{r.payment_method ?? "—"}</span> },
   { key: "status", label: "Status", render: (r) => <Badge variant={statusBadgeVariant(r.status)} className="capitalize">{displayStatus(r.status)}</Badge> },
   { key: "paid_at", label: "Date", render: (r) => shortDate(paymentDate(r)) },
@@ -71,6 +71,7 @@ export default function PaymentsPage() {
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState<string | undefined>();
   const [dateTo, setDateTo] = useState<string | undefined>();
+  const [sort, setSort] = useState<SortState | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -87,6 +88,10 @@ export default function PaymentsPage() {
     if (status) params.status = status;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (sort) {
+      params.sort_by = sort.key;
+      params.sort_dir = sort.dir;
+    }
     return Payments.page<Payment>(params)
       .then((res) => {
         setRows(res.rows);
@@ -95,7 +100,7 @@ export default function PaymentsPage() {
       })
       .catch((e: any) => toast.error(e.message))
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, dateFrom, dateTo]);
+  }, [page, debouncedSearch, status, dateFrom, dateTo, sort]);
 
   useEffect(() => {
     reload();
@@ -155,6 +160,10 @@ export default function PaymentsPage() {
             setPage(0);
             setDateFrom(range.from);
             setDateTo(range.to);
+          },
+          onSortChange: (s) => {
+            setPage(0);
+            setSort(s);
           },
         }}
         filters={[

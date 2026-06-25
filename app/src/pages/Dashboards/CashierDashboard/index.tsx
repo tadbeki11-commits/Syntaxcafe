@@ -78,7 +78,7 @@ const CashierDashboard = () => {
     updateProfile,
     confirmCashPayment,
     requireCancelPassword,
-    adminHashedPassword,
+    hashedCancelPassword,
   } = useCashierData({
     user,
     printOrderImmediately,
@@ -339,7 +339,7 @@ const CashierDashboard = () => {
         confirmOrderProcessing={processingOrders.has(confirmOrder?.id)}
         onConfirmCancelOrder={() => handleConfirmProcessPaymentNo(confirmOrder)}
         requireCancelPassword={requireCancelPassword}
-        adminCancelHashedPassword={adminHashedPassword}
+        adminCancelHashedPassword={hashedCancelPassword}
         onCancelPasswordChange={(val) => {
           try { (globalThis as any).__cancelOrderPwdTyped = val; } catch { }
         }}

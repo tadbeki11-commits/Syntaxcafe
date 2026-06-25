@@ -10,7 +10,10 @@ import { OrderInventoryService } from "../order/order-inventory.service";
 import { OrderService } from "../order/order.service";
 import { OrdersGateway } from "../order/orders.gateway";
 import { emitCreated, emitUpdated } from "../sync/sync-emit.util";
-import { requireBranchId, tenantInsert } from "../../common/tenant/tenant-context";
+import {
+  requireBranchId,
+  tenantInsert,
+} from "../../common/tenant/tenant-context";
 const QRCode: any = require("qrcode");
 
 @Injectable()
@@ -44,8 +47,14 @@ export class PaymentService {
   }
 
   async create(paymentData: any) {
-    const { order_id, amount, payment_method, processed_by, description, status } =
-      paymentData;
+    const {
+      order_id,
+      amount,
+      payment_method,
+      processed_by,
+      description,
+      status,
+    } = paymentData;
 
     // A normal payment is created "pending" and turns "paid" on confirm. The one
     // exception is a void/cancel ledger marker, which the cashier portal records
@@ -111,7 +120,9 @@ export class PaymentService {
       .from(payments)
       .leftJoin(orders, eq(payments.order_id, orders.id))
       .leftJoin(users, eq(payments.processed_by, users.id))
-      .where(and(eq(payments.id, id), eq(payments.branch_id, requireBranchId())))
+      .where(
+        and(eq(payments.id, id), eq(payments.branch_id, requireBranchId())),
+      )
       .limit(1);
 
     if (!row) return undefined;
@@ -147,45 +158,13 @@ export class PaymentService {
     }));
   }
 
-  async generateQRCode(id: string) {
-    const payment = await this.findById(id);
-    if (!payment) {
-      throw new Error("Payment not found");
-    }
-
-    const qrData = {
-      payment_id: payment.id,
-      order_id: payment.order_id,
-      amount: payment.amount,
-      customer_id: payment.customer_id,
-      timestamp: new Date().toISOString(),
-    };
-
-    const qrCodeDataURL = await QRCode.toDataURL(JSON.stringify(qrData), {
-      errorCorrectionLevel: "M",
-      type: "image/png",
-      quality: 0.92,
-      margin: 1,
-      color: {
-        dark: "#000000",
-        light: "#FFFFFF",
-      },
-    });
-
-    const [updated] = await db
-      .update(payments)
-      .set({ qr_code: qrCodeDataURL, updated_at: new Date() })
-      .where(and(eq(payments.id, id), eq(payments.branch_id, requireBranchId())))
-      .returning();
-
-    return updated;
-  }
-
   async updateStatus(id: string, status: string, processedBy?: any) {
     const [updated] = await db
       .update(payments)
       .set({ status, processed_by: processedBy, updated_at: new Date() })
-      .where(and(eq(payments.id, id), eq(payments.branch_id, requireBranchId())))
+      .where(
+        and(eq(payments.id, id), eq(payments.branch_id, requireBranchId())),
+      )
       .returning();
     if (updated) {
       await emitUpdated(db, "payment", "PAYMENT_UPDATED", updated as any);
@@ -335,7 +314,9 @@ export class PaymentService {
   }) {
     const branchId = requireBranchId();
     const orderId = body.order_id;
-    const department = String(body.department || "").trim().toLowerCase();
+    const department = String(body.department || "")
+      .trim()
+      .toLowerCase();
     if (!orderId || !department) {
       throw new BadRequestException("order_id and department are required");
     }
@@ -355,7 +336,9 @@ export class PaymentService {
       }
 
       const deptOf = (line: any) =>
-        String(line?.main_category || "").trim().toLowerCase() || "other";
+        String(line?.main_category || "")
+          .trim()
+          .toLowerCase() || "other";
 
       const deptLines = lines.filter((l: any) => deptOf(l) === department);
       const deptSubtotal = deptLines.reduce(
@@ -386,7 +369,9 @@ export class PaymentService {
       for (const p of existingPaid) {
         const meta = (p.meta ?? {}) as any;
         if (meta?.scope === "department") {
-          const d = String(meta?.department || "").trim().toLowerCase();
+          const d = String(meta?.department || "")
+            .trim()
+            .toLowerCase();
           if (d) settled.add(d);
         } else {
           hasFullPayment = true;
@@ -444,7 +429,12 @@ export class PaymentService {
     });
 
     if (result.payment) {
-      await emitCreated(db, "payment", "PAYMENT_CREATED", result.payment as any);
+      await emitCreated(
+        db,
+        "payment",
+        "PAYMENT_CREATED",
+        result.payment as any,
+      );
     }
 
     // Notify any POS watching this branch: the order's payment status changed
@@ -495,12 +485,6 @@ export class PaymentService {
    * whole window so the stat cards stay correct without loading every payment.
    */
   async getPaymentHistory(filters: any) {
-    // Use paid_at (when the money was actually taken) rather than created_at.
-    // For payments synced from an offline client, created_at defaults to the
-    // moment the row reached the server, so an order paid offline yesterday but
-    // synced today would otherwise be bucketed under today. paid_at carries the
-    // real payment time across sync; coalesce to created_at for any legacy rows
-    // that predate paid_at being populated.
     const paidTimestamp = sql`coalesce(${payments.paid_at}, ${payments.created_at})`;
 
     // Pagination and the default 30-day window are opt-in: a caller that passes
@@ -531,7 +515,9 @@ export class PaymentService {
     if (filters.processed_by)
       conditions.push(eq(payments.processed_by, filters.processed_by));
 
-    const search = String(filters.search ?? "").trim().toLowerCase();
+    const search = String(filters.search ?? "")
+      .trim()
+      .toLowerCase();
     if (search) {
       const like = `%${search}%`;
       conditions.push(sql`(
@@ -557,6 +543,18 @@ export class PaymentService {
     const limit = Math.min(Math.max(Number(filters.limit) || 25, 1), 100);
     const page = Math.max(Number(filters.page) || 1, 1);
 
+    // Whitelist of columns the client may sort by; anything else falls back to
+    // the default newest-first ordering.
+    const SORTABLE: Record<string, any> = {
+      amount: payments.amount,
+      paid_at: paidTimestamp,
+    };
+    const sortCol = SORTABLE[filters.sort_by as string];
+    const dir = filters.sort_dir === "asc" ? asc : desc;
+    const orderBy = sortCol
+      ? [dir(sortCol), desc(paidTimestamp)]
+      : [desc(paidTimestamp)];
+
     const baseQuery = db
       .select({
         payment: payments,
@@ -567,7 +565,7 @@ export class PaymentService {
       .innerJoin(orders, eq(payments.order_id, orders.id))
       .leftJoin(users, eq(payments.processed_by, users.id))
       .where(where)
-      .orderBy(desc(paidTimestamp));
+      .orderBy(...orderBy);
 
     const rows = paginate
       ? await baseQuery.limit(limit).offset((page - 1) * limit)
@@ -591,9 +589,7 @@ export class PaymentService {
       page: paginate ? page : 1,
       limit: paginate ? limit : Number(agg?.total ?? 0),
       window:
-        from && to
-          ? { from: from.toISOString(), to: to.toISOString() }
-          : null,
+        from && to ? { from: from.toISOString(), to: to.toISOString() } : null,
       stats: {
         total_payments: Number(agg?.total ?? 0),
         collected,
@@ -602,16 +598,6 @@ export class PaymentService {
         avg: paidCount > 0 ? collected / paidCount : 0,
       },
     };
-  }
-
-  async createWithQR(body: any) {
-    const payment = await this.create(body);
-    return this.generateQRCode(payment.id);
-  }
-
-  async getByQR(qrData: any) {
-    const parsed = qrData;
-    return this.findById(parsed.payment_id);
   }
 
   private formatEmployeeName(employee: any) {

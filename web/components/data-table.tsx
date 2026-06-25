@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsUpDownIcon,
+  SearchIcon,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +30,13 @@ export type Column<T> = {
   className?: string;
   /** Override the text used when matching this column against the search query. */
   searchValue?: (row: T) => string;
+  /** Make this column sortable by clicking its header. */
+  sortable?: boolean;
+  /** Value used when sorting this column. Defaults to row[key]. */
+  sortValue?: (row: T) => number | string | Date | null | undefined;
 };
+
+export type SortState = { key: string; dir: "asc" | "desc" };
 
 export type DataTableFilter<T> = {
   key: string;
@@ -55,11 +68,44 @@ export type ServerMode = {
   onSearchChange?: (query: string) => void;
   onFilterChange?: (key: string, value: string) => void;
   onRangeChange?: (key: string, range: { from?: string; to?: string }) => void;
+  /** Opt into server-side sorting. Called with null when sorting is cleared. */
+  onSortChange?: (sort: SortState | null) => void;
 };
 
 function textOf<T>(row: T, col: Column<T> | undefined, key: string): string {
   if (col?.searchValue) return col.searchValue(row);
   return String((row as Record<string, unknown>)[key] ?? "");
+}
+
+function sortValueOf<T>(
+  row: T,
+  col: Column<T> | undefined,
+  key: string,
+): number | string | Date | null | undefined {
+  if (col?.sortValue) return col.sortValue(row);
+  return (row as Record<string, unknown>)[key] as
+    | number
+    | string
+    | Date
+    | null
+    | undefined;
+}
+
+/** Compare two sort values: numbers numerically, dates by time, otherwise as
+ * natural-ordered strings. Null/undefined always sort last. */
+function compareValues(
+  a: number | string | Date | null | undefined,
+  b: number | string | Date | null | undefined,
+): number {
+  const aEmpty = a == null || a === "";
+  const bEmpty = b == null || b === "";
+  if (aEmpty && bEmpty) return 0;
+  if (aEmpty) return 1;
+  if (bEmpty) return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  if (a instanceof Date || b instanceof Date)
+    return new Date(a).getTime() - new Date(b).getTime();
+  return String(a).localeCompare(String(b), undefined, { numeric: true });
 }
 
 function fmtDate(d: Date): string {
@@ -148,6 +194,7 @@ export function DataTable<T>({
   const [active, setActive] = useState<Record<string, string>>({});
   const [ranges, setRanges] = useState<Record<string, { from?: string; to?: string }>>({});
   const [presets, setPresets] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState<SortState | null>(null);
   const [page, setPage] = useState(0);
 
   const filtered = useMemo(() => {
@@ -182,14 +229,29 @@ export function DataTable<T>({
     });
   }, [server, rows, query, active, ranges, filters, dateFilters, searchKeys, columns]);
 
+  const sorted = useMemo(() => {
+    // In server mode the parent returns rows already sorted by the backend.
+    if (server || !sort) return filtered;
+    const col = columns.find((c) => c.key === sort.key);
+    const factor = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort(
+      (a, b) =>
+        factor *
+        compareValues(
+          sortValueOf(a, col, sort.key),
+          sortValueOf(b, col, sort.key),
+        ),
+    );
+  }, [server, filtered, sort, columns]);
+
   const effPageSize = server ? server.pageSize : pageSize;
-  const totalCount = server ? server.total : filtered.length;
+  const totalCount = server ? server.total : sorted.length;
   const pageCount = Math.max(1, Math.ceil(totalCount / effPageSize));
   const current = server ? server.page : Math.min(page, pageCount - 1);
   // Server mode already hands us just the current page; client mode slices.
   const paged = server
-    ? filtered
-    : filtered.slice(current * pageSize, current * pageSize + pageSize);
+    ? sorted
+    : sorted.slice(current * pageSize, current * pageSize + pageSize);
   const colSpan = columns.length + (rowActions ? 1 : 0);
 
   function goToPage(p: number) {
@@ -212,6 +274,18 @@ export function DataTable<T>({
     setPresets((prev) => ({ ...prev, [key]: "custom" }));
     setPage(0);
     server?.onRangeChange?.(key, next);
+  }
+  function toggleSort(key: string) {
+    // Cycle through: ascending → descending → unsorted.
+    const next: SortState | null =
+      sort?.key !== key
+        ? { key, dir: "asc" }
+        : sort.dir === "asc"
+          ? { key, dir: "desc" }
+          : null;
+    setSort(next);
+    setPage(0);
+    server?.onSortChange?.(next);
   }
   function onPreset(key: string, preset: string) {
     setPresets((prev) => ({ ...prev, [key]: preset }));
@@ -295,7 +369,26 @@ export function DataTable<T>({
             <TableRow>
               {columns.map((c) => (
                 <TableHead key={c.key} className={c.className}>
-                  {c.label}
+                  {c.sortable ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(c.key)}
+                      className="-ml-1 inline-flex items-center gap-1 rounded px-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      aria-label={`Sort by ${c.label}`}>
+                      {c.label}
+                      {sort?.key === c.key ? (
+                        sort.dir === "asc" ? (
+                          <ArrowUpIcon className="size-3.5" />
+                        ) : (
+                          <ArrowDownIcon className="size-3.5" />
+                        )
+                      ) : (
+                        <ChevronsUpDownIcon className="size-3.5 opacity-40" />
+                      )}
+                    </button>
+                  ) : (
+                    c.label
+                  )}
                 </TableHead>
               ))}
               {rowActions && <TableHead className="text-right">Actions</TableHead>}

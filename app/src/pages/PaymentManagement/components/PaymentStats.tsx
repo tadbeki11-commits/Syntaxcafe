@@ -9,7 +9,7 @@ interface PaymentStatsProps {
 
 export const PaymentStats: React.FC<PaymentStatsProps> = ({ stats }) => {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
       <StatsCard
         title="Pending"
         value={stats.pendingCount}
@@ -22,11 +22,7 @@ export const PaymentStats: React.FC<PaymentStatsProps> = ({ stats }) => {
         icon={<DollarSign className="h-5 w-5" />}
         variant="success"
       />
-      <StatsCard
-        title="QR Payments"
-        value={stats.qrCount}
-        icon={<CreditCard className="h-5 w-5" />}
-      />
+  
       <StatsCard
         title="Completed"
         value={stats.completedCount}

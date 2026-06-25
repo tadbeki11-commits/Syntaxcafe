@@ -10,6 +10,7 @@ export class PaymentFacade {
 
   getAll = (params?: unknown, opts?: { localOnly?: boolean }) =>
     this.adapter.getAll(params, opts);
+  getHistory = (params?: unknown) => this.adapter.getHistory(params);
   getById = (id: number | string) => this.adapter.getById(id);
   getByOrder = (orderId: number | string) => this.adapter.getByOrder(orderId);
   createWithQR = (paymentData: unknown) => this.adapter.createWithQR(paymentData);

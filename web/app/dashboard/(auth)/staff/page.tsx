@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { StaffActivity } from "@/components/staff/staff-activity";
 import { CashierDepartmentsAction } from "@/components/staff/cashier-departments-action";
+import { ManageAccessAction } from "@/components/staff/manage-access-action";
 import { Users } from "@/lib/resources";
 import { CONFIGURABLE_ROLES } from "@/lib/permissions";
 
@@ -92,6 +93,12 @@ function StaffAccounts() {
               userName={row.full_name || row.name || row.username || "Cashier"}
             />
           ) : null}
+          <ManageAccessAction
+            userId={row.id}
+            userName={row.full_name || row.name || row.username || "Staff"}
+            currentRole={row.role}
+            onSaved={reload}
+          />
           <Button
             variant="ghost"
             size="sm"

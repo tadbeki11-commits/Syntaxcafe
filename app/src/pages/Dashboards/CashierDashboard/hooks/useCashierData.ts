@@ -45,20 +45,17 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
     return null;
   }, []);
 
-  // ── Admin cancel-order password feature ────────────────────────────────────
+  // ── Cancel-order password feature ────────────────────────────────────
   const [requireCancelPassword, setRequireCancelPassword] =
     useState<boolean>(false);
-  const [adminHashedPassword, setAdminHashedPassword] = useState<string | null>(
-    null,
-  );
-  const [adminDisplayName, setAdminDisplayName] =
-    useState<string>("Administrator");
+  const [hashedCancelPassword, setHashedCancelPassword] = useState<
+    string | null
+  >(null);
 
   // Cashiers must confirm cancellations with the locally cached admin password.
   useEffect(() => {
     if (!user) return;
     setRequireCancelPassword(user.role === "cashier");
-    setAdminDisplayName(user.full_name || user.username || "Administrator");
   }, [user?.id, user?.role, user?.full_name, user?.username]);
 
   // Refresh the locally cached admin cancellation hash.
@@ -107,10 +104,10 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
         .where(eq(localDbTables.systemSettings.key, "cancel_password"));
 
       const hp = settingRows[0]?.value || null;
-      setAdminHashedPassword(hp);
+      setHashedCancelPassword(hp);
       return hp;
     } catch {
-      setAdminHashedPassword(null);
+      setHashedCancelPassword(null);
       return null;
     }
   }, []);
@@ -413,17 +410,17 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
 
   // Auto-refresh on two cadences so the on-screen lists stay live without
   // hammering the backend:
-  //  • every 5 s — cheap local-only refresh (reads SQLite, no network).
-  //  • every 30 s — full remote reconcile (pulls the recent payment window).
+  //  • every 10 min — cheap local-only refresh (reads SQLite, no network).
+  //  • every 1 hour — full remote reconcile (pulls the recent payment window).
   // Previously the full reconcile ran every 5 s, re-pulling and re-upserting
   // the payment history on every tick.
   useEffect(() => {
     const lightInterval = setInterval(() => {
       refreshDashboardData({ localOnly: true });
-    }, 50000);
+    }, 600000);
     const fullInterval = setInterval(() => {
       refreshDashboardData();
-    }, 3000000);
+    }, 3600000);
 
     return () => {
       clearInterval(lightInterval);
@@ -732,25 +729,6 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
     }
   };
 
-  const generateStandaloneQR = async (amount: any) => {
-    try {
-      const paymentData = {
-        amount: amount,
-        payment_method: "qr_code",
-        status: "pending",
-        processed_by: user.id,
-        description: "Direct QR Payment",
-      };
-
-      const response = (await api.payments.createWithQR(paymentData)) as any;
-      setQrCode(response.data.data.qr_code);
-      toast.success("QR code generated successfully!");
-    } catch (error) {
-      console.error("Error generating QR code:", error);
-      toast.error("Failed to generate QR code.");
-    }
-  };
-
   const updateProfile = async () => {
     if (!syncStatus.online || !isOnline()) {
       toast.error(
@@ -844,16 +822,14 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
     openProcessPaymentConfirm,
     toggleRecentPaymentDetails,
     processPaymentWithMethod,
-    generateStandaloneQR,
     updateProfile,
     confirmCashPayment,
     ordersForPaymentSorted,
     // ── Cancel-password props ───────────────────────────────────────────────
     requireCancelPassword,
     setRequireCancelPassword,
-    adminHashedPassword,
+    hashedCancelPassword,
     refreshAdminHashedPassword,
-    adminDisplayName,
     onConfirmCancelAdminPassword,
     orderIndex,
   };

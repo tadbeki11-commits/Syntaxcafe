@@ -25,7 +25,12 @@ export const PaymentManagement: React.FC = () => {
     ordersForPayment,
     openView,
     stats,
-    paymentMethods
+    paymentMethods,
+    page,
+    setPage,
+    pageSize,
+    totalCount,
+    totalPages
   } = usePaymentData();
 
   return (
@@ -53,6 +58,11 @@ export const PaymentManagement: React.FC = () => {
         loading={loading}
         filteredPayments={filteredPayments}
         openView={openView}
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        totalPages={totalPages}
       />
 
       <ViewPaymentDialog

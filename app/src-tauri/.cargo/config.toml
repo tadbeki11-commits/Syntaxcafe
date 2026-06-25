@@ -1,0 +1,9 @@
+# ccache (present on this machine at /usr/lib64/ccache and on PATH) corrupts the
+# assembly object files that the `ring` crate compiles — it caches on
+# preprocessed output and the cached .o's drop their symbol tables, which makes
+# the final link fail with "undefined reference to ring_core_*". `ring` arrived
+# as a transitive dependency of tauri-plugin-updater (reqwest -> rustls -> ring).
+# Disabling ccache for this crate's builds avoids that without affecting CI
+# (the GitHub runners have no ccache, where this var is a harmless no-op).
+[env]
+CCACHE_DISABLE = "1"

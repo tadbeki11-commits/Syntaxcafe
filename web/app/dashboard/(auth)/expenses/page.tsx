@@ -163,6 +163,8 @@ export default function ExpensesPage() {
       key: "amount",
       label: "Amount",
       className: "text-right",
+      sortable: true,
+      sortValue: (r) => expenseAmount(r),
       render: (r) => (
         <span className="font-medium">{birr(expenseAmount(r))}</span>
       ),

@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DataTable, type Column } from "@/components/data-table";
+import { DataTable, type Column, type SortState } from "@/components/data-table";
 import { PageHeader } from "@/components/page-header";
 import { Orders, Payments, Settings } from "@/lib/resources";
 import { getUser } from "@/lib/auth";
@@ -52,6 +52,7 @@ type Order = {
   table_number?: number | null;
   employee_name?: string | null;
   employee_role?: string | null;
+  cashier_name?: string | null;
   customer_id?: string | null;
   notes?: string | null;
   items?: OrderItem[];
@@ -79,6 +80,7 @@ export default function OrdersPage() {
   const [paid, setPaid] = useState("");
   const [dateFrom, setDateFrom] = useState<string | undefined>();
   const [dateTo, setDateTo] = useState<string | undefined>();
+  const [sort, setSort] = useState<SortState | null>(null);
 
   // Debounce the search box so we don't refetch on every keystroke.
   useEffect(() => {
@@ -100,6 +102,10 @@ export default function OrdersPage() {
     if (paid) params.paid = paid;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (sort) {
+      params.sort_by = sort.key;
+      params.sort_dir = sort.dir;
+    }
     return Promise.all([
       Orders.page<Order>(params),
       Settings.paymentMethods().catch(() => []),
@@ -112,7 +118,7 @@ export default function OrdersPage() {
       })
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
-  }, [page, debouncedSearch, status, paid, dateFrom, dateTo]);
+  }, [page, debouncedSearch, status, paid, dateFrom, dateTo, sort]);
 
   useEffect(() => {
     reload();
@@ -215,12 +221,17 @@ export default function OrdersPage() {
     {
       key: "employee_name",
       label: "By",
-      searchValue: (o) => `${o.employee_name ?? ""} ${o.employee_role ?? ""}`,
+      searchValue: (o) =>
+        `${o.employee_name ?? ""} ${o.employee_role ?? ""} ${o.cashier_name ?? ""}`,
       render: (o) => (
         <div className="flex items-center gap-2">
           <span>{o.employee_name ?? "—"}</span>
-          {o.employee_role === "cashier" && (
-            <Badge variant="muted">Cashier</Badge>
+          {o.cashier_name ? (
+            <Badge variant="muted">Cashier: {o.cashier_name}</Badge>
+          ) : (
+            o.employee_role === "cashier" && (
+              <Badge variant="muted">Cashier</Badge>
+            )
           )}
         </div>
       ),
@@ -247,7 +258,12 @@ export default function OrdersPage() {
         </Badge>
       ),
     },
-    { key: "total_amount", label: "Total", render: (o) => birr(o.total_amount) },
+    {
+      key: "total_amount",
+      label: "Total",
+      sortable: true,
+      render: (o) => birr(o.total_amount),
+    },
     {
       key: "created_at",
       label: "Created",
@@ -294,6 +310,10 @@ export default function OrdersPage() {
             setPage(0);
             setDateFrom(range.from);
             setDateTo(range.to);
+          },
+          onSortChange: (s) => {
+            setPage(0);
+            setSort(s);
           },
         }}
         filters={[
@@ -386,6 +406,14 @@ export default function OrdersPage() {
                     </span>
                   )}
                 </dd>
+                {viewing.cashier_name && (
+                  <>
+                    <dt className="text-muted-foreground">Placed by cashier</dt>
+                    <dd className="text-right font-medium">
+                      {viewing.cashier_name}
+                    </dd>
+                  </>
+                )}
                 <dt className="text-muted-foreground">Table</dt>
                 <dd className="text-right font-medium">
                   {viewing.table_number != null

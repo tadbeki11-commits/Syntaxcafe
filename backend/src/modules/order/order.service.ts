@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
 import { and, asc, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "../../db/drizzle";
 import { menuItems } from "../../db/tables/menu-items.table";
 import { order_items } from "../../db/tables/order-items.table";
@@ -18,6 +19,11 @@ import {
   tenantInsert,
 } from "../../common/tenant/tenant-context";
 import { OrdersGateway } from "./orders.gateway";
+
+// Second alias on the users table so a single query can join both the waiter
+// (orders.employee_id) and the cashier who rang the order up on their behalf
+// (orders.cashier_id) without the two joins colliding.
+const cashierUsers = alias(users, "cashier_user");
 
 @Injectable()
 export class OrderService {
@@ -655,16 +661,23 @@ export class OrderService {
       .select({
         order: orders,
         employee: users,
+        cashier: cashierUsers,
       })
       .from(orders)
       .leftJoin(users, eq(orders.employee_id, users.id))
+      .leftJoin(cashierUsers, eq(orders.cashier_id, cashierUsers.id))
       .where(and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())))
       .limit(1);
 
     if (!orderRow) return null;
 
     const items = await this.loadOrderItems(id);
-    return this.toOrderResponse(orderRow.order, orderRow.employee, items);
+    return this.toOrderResponse(
+      orderRow.order,
+      orderRow.employee,
+      items,
+      orderRow.cashier,
+    );
   }
 
   async findAll(filters: any) {
@@ -688,9 +701,11 @@ export class OrderService {
       .select({
         order: orders,
         employee: users,
+        cashier: cashierUsers,
       })
       .from(orders)
       .leftJoin(users, eq(orders.employee_id, users.id))
+      .leftJoin(cashierUsers, eq(orders.cashier_id, cashierUsers.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(orders.created_at));
 
@@ -706,6 +721,7 @@ export class OrderService {
         row.order,
         row.employee,
         itemsByOrder.get(row.order.id) ?? [],
+        row.cashier,
       ),
     );
   }
@@ -835,12 +851,27 @@ export class OrderService {
     const limit = Math.min(Math.max(Number(filters.limit) || 25, 1), 100);
     const page = Math.max(Number(filters.page) || 1, 1);
 
+    // Whitelist of columns the client may sort by; anything else falls back to
+    // the default newest-first ordering.
+    const SORTABLE: Record<string, any> = {
+      total_amount: orders.total_amount,
+      created_at: orders.created_at,
+      table_number: orders.table_number,
+      order_number: orders.order_number,
+    };
+    const sortCol = SORTABLE[filters.sort_by as string];
+    const dir = filters.sort_dir === "asc" ? asc : desc;
+    const orderBy = sortCol
+      ? [dir(sortCol), desc(orders.created_at)]
+      : [desc(orders.created_at)];
+
     const baseQuery = db
-      .select({ order: orders, employee: users })
+      .select({ order: orders, employee: users, cashier: cashierUsers })
       .from(orders)
       .leftJoin(users, eq(orders.employee_id, users.id))
+      .leftJoin(cashierUsers, eq(orders.cashier_id, cashierUsers.id))
       .where(where)
-      .orderBy(desc(orders.created_at));
+      .orderBy(...orderBy);
 
     const rows = paginate
       ? await baseQuery.limit(limit).offset((page - 1) * limit)
@@ -854,6 +885,7 @@ export class OrderService {
         row.order,
         row.employee,
         itemsByOrder.get(row.order.id) ?? [],
+        row.cashier,
       ),
     );
 
@@ -997,9 +1029,11 @@ export class OrderService {
       .select({
         order: orders,
         employee: users,
+        cashier: cashierUsers,
       })
       .from(orders)
       .leftJoin(users, eq(orders.employee_id, users.id))
+      .leftJoin(cashierUsers, eq(orders.cashier_id, cashierUsers.id))
       .where(and(...conditions))
       .orderBy(asc(orders.created_at));
 
@@ -1011,6 +1045,7 @@ export class OrderService {
         row.order,
         row.employee,
         itemsByOrder.get(row.order.id) ?? [],
+        row.cashier,
       ),
     );
   }
@@ -1468,7 +1503,12 @@ export class OrderService {
     }));
   }
 
-  private toOrderResponse(order: any, employee: any, items: any[]) {
+  private toOrderResponse(
+    order: any,
+    employee: any,
+    items: any[],
+    cashier?: any,
+  ) {
     // Surface who placed the order so clients can show "Cashier" vs "Waiter".
     // cashier_id is only set when a cashier rang up an order on a waiter's behalf.
     const orderSource = order?.cashier_id ? "cashier" : "waiter";
@@ -1481,6 +1521,9 @@ export class OrderService {
       order_source: orderSource,
       employee_name: this.formatEmployeeName(employee),
       employee_role: employee?.role ?? null,
+      // Name of the cashier who placed the order on the waiter's behalf, when
+      // applicable. Null for orders a waiter placed for themselves.
+      cashier_name: this.formatEmployeeName(cashier),
       items,
     };
   }

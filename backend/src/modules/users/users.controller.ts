@@ -253,6 +253,46 @@ export class UsersController {
     }
   }
 
+  // ─── Reset credentials (owner/admin) ──────────────────────────────────────
+
+  @ApiOperation({
+    summary: "Reset a staff member's password or PIN (no current secret required)",
+  })
+  @ApiParam({ name: "id" })
+  @Post(":id/reset-password")
+  async resetPassword(@Param("id") id: string, @Body() body: any) {
+    const { password, pin } = body || {};
+    if (!password && !pin) {
+      throw new BadRequestException("Either password or pin is required");
+    }
+    try {
+      await this.usersService.resetCredentials(id, { password, pin });
+      return { status: "success", message: "Login reset successfully" };
+    } catch (error: any) {
+      throw new BadRequestException(error.message || "Failed to reset login");
+    }
+  }
+
+  // ─── Change role (owner/admin) ────────────────────────────────────────────
+
+  @ApiOperation({ summary: "Change a staff member's role" })
+  @ApiParam({ name: "id" })
+  @Patch(":id/role")
+  async changeRole(@Param("id") id: string, @Body() body: any) {
+    const role = body?.role;
+    if (!role) throw new BadRequestException("role is required");
+    try {
+      const updated = await this.usersService.changeRole(id, role);
+      return {
+        status: "success",
+        message: "Role updated successfully",
+        data: { user: { id: updated.id, role: updated.role } },
+      };
+    } catch (error: any) {
+      throw new BadRequestException(error.message || "Failed to change role");
+    }
+  }
+
   // ─── Change PIN ───────────────────────────────────────────────────────────
 
   @ApiOperation({ summary: "Change a user's 4-digit login PIN" })

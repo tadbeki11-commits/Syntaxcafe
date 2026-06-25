@@ -203,7 +203,13 @@ export default function MenuPage() {
       searchValue: (it) => deptLabel(it.main_category),
       render: (it) => deptLabel(it.main_category),
     },
-    { key: "price", label: "Price", render: (it) => birr(it.price) },
+    {
+      key: "price",
+      label: "Price",
+      sortable: true,
+      sortValue: (it) => it.price,
+      render: (it) => birr(it.price),
+    },
     {
       key: "is_available",
       label: "Available",

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import SyncProgressBar from './components/SyncProgressBar';
 import CleanupApprovalWatcher from './components/CleanupApprovalWatcher';
+import UpdateManager from './components/UpdateManager';
 import { isDeviceEnrolled, loadDeviceEnrollment } from '@/shared/utils/deviceToken';
 import EnrollmentPage from './pages/EnrollmentPage';
 
@@ -43,6 +44,7 @@ import RoleManagement from './pages/RoleManagement';
 import OrganizationManagement from './pages/OrganizationManagement/index';
 import OrganizationDetail from './pages/OrganizationManagement/OrganizationDetail';
 import CreateOrgOrder from './pages/OrganizationManagement/CreateOrgOrder';
+import AppUpdateSettings from './pages/Settings/AppUpdateSettings';
 
 
 
@@ -123,6 +125,7 @@ const DashboardRouter = () => {
         <Route path="settings/roles" element={<ProtectedRoute allowedRoles={['admin']}><RoleManagement /></ProtectedRoute>} />
         <Route path="settings/data-management" element={<ProtectedRoute allowedRoles={['admin']}><DataManagement /></ProtectedRoute>} />
         <Route path="settings/printer-settings" element={<ProtectedRoute allowedRoles={['admin']}><PrinterSettings /></ProtectedRoute>} />
+        <Route path="settings/updates" element={<ProtectedRoute allowedRoles={['admin', 'cashier']}><AppUpdateSettings /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
@@ -191,6 +194,7 @@ function App() {
         <div className="App">
           <SyncProgressBar />
           <CleanupApprovalWatcher />
+          <UpdateManager />
           <AppContent />
         </div>
       </AuthProvider>

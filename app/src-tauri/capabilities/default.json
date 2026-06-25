@@ -12,6 +12,9 @@
     "sql:allow-execute",
     "sql:allow-select",
     "thermal-printer:allow-list-thermal-printers",
-    "thermal-printer:allow-print-thermal-printer"
+    "thermal-printer:allow-print-thermal-printer",
+    "updater:default",
+    "process:allow-restart",
+    "process:default"
   ]
 }

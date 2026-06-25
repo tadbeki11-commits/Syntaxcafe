@@ -369,6 +369,91 @@ export class UsersService {
     }
   }
 
+  // Owner/admin credential reset — unlike changePassword/changePin this does NOT
+  // require the staff member's current secret. The owner manages staff who may
+  // have forgotten their login, so we trust the branch-scoped caller and rotate
+  // whichever credential(s) were supplied. Rehashes and re-syncs so the new login
+  // works everywhere the account is mirrored.
+  async resetCredentials(
+    id: string,
+    opts: { password?: string; pin?: string },
+  ) {
+    const branchId = requireBranchId();
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, id), eq(users.branch_id, branchId)))
+      .limit(1);
+    if (!user) throw new Error("User not found");
+
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
+    const updates: Record<string, any> = { updated_at: new Date() };
+    if (opts.password) {
+      updates.password_hash = await hash(opts.password, saltRounds);
+    }
+    if (opts.pin) {
+      if (!/^\d{4}$/.test(opts.pin)) {
+        throw new Error("PIN must be exactly 4 digits");
+      }
+      updates.pin_hash = await hash(opts.pin, saltRounds);
+    }
+    if (!updates.password_hash && !updates.pin_hash) {
+      throw new Error("Either a password or a 4-digit PIN is required");
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+
+    if (updated) {
+      await emitUpdated(db, "user", "USER_UPDATED", updated as any);
+    }
+  }
+
+  // Owner/admin role change. Branch-scoped; rejects empty roles. F&B managers log
+  // in from the platform portal by username alone, so promoting someone to that
+  // role requires their username to be unique platform-wide (mirrors register()).
+  async changeRole(id: string, role: string) {
+    const branchId = requireBranchId();
+    const cleanRole = String(role || "").trim();
+    if (!cleanRole) throw new Error("Role is required");
+
+    const [existing] = await db
+      .select({ id: users.id, username: users.username })
+      .from(users)
+      .where(and(eq(users.id, id), eq(users.branch_id, branchId)))
+      .limit(1);
+    if (!existing) throw new Error("User not found");
+
+    if (cleanRole === "fb_manager" && existing.username) {
+      const [clash] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(eq(users.username, existing.username), eq(users.role, "fb_manager")),
+        )
+        .limit(1);
+      if (clash && clash.id !== id) {
+        throw new Error(
+          "An F&B manager's username must be unique across the platform — that username is already taken.",
+        );
+      }
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({ role: cleanRole, updated_at: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+
+    if (updated) {
+      await emitUpdated(db, "user", "USER_UPDATED", updated as any);
+    }
+    return updated;
+  }
+
   async register(payload: any) {
     const {
       username,

@@ -27,7 +27,10 @@ export interface StuckPrintOrder {
 // truly offline / out of paper) rather than silently looping forever.
 const FAILURE_BANNER_THRESHOLD = 3;
 
-export const useCashierPrinting = ({ refreshDashboardData, enabled = true }: PrintingProps) => {
+export const useCashierPrinting = ({
+  refreshDashboardData,
+  enabled = true,
+}: PrintingProps) => {
   const [qzStatus, setQzStatus] = useState<any>({
     connected: true,
     error: null,
@@ -270,7 +273,7 @@ export const useCashierPrinting = ({ refreshDashboardData, enabled = true }: Pri
         recordPrintSuccess(orderId);
         toast.success(
           `🖨️ Order printed successfully (${copies} copy${copies > 1 ? "ies" : ""})`,
-          { duration: 2000 },
+          { duration: 1000 },
         );
       } catch (err: any) {
         console.error(
