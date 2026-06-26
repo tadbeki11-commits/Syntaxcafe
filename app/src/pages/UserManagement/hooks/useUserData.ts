@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "@/application";
 import toast from "react-hot-toast";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
@@ -30,15 +30,20 @@ export const useUserData = () => {
     return () => unsubscribe();
   }, []);
 
+  // Only the first load shows the full-screen spinner; background refetches
+  // (every sync cycle) refresh the list in place without flashing it.
+  const hasLoadedRef = useRef(false);
+
   const fetchUsers = async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedRef.current) setLoading(true);
       const response = await api.users.getAll();
       setUsers((response as any).data?.data?.users || []);
     } catch {
       toast.error("Failed to load users");
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   };
 

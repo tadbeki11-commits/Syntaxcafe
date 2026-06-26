@@ -10,7 +10,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onAddToCart }) => {
   return (
     <div
       onClick={() => onAddToCart(item)}
-      className="group relative flex min-h-[100px] cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-border/50 bg-background p-4 text-center shadow-sm transition-all duration-300  sm:min-h-[160px] sm:rounded-3xl"
+      className="group relative flex min-h-[100px] cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-border/50 bg-background p-4 text-center shadow-sm sm:min-h-[160px] sm:rounded-3xl"
     >
 
       <div className="relative z-10 flex w-full flex-1 flex-col items-center justify-center">
@@ -26,7 +26,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onAddToCart }) => {
           </span>
         </div>
         
-        <div className="w-8 h-8 rounded-full bg-muted/30 flex items-center justify-center text-muted-foreground/60 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 transform group-hover:rotate-90">
+        <div className="w-8 h-8 rounded-full bg-muted/30 flex items-center justify-center text-muted-foreground/60 group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
           <FiPlus className="w-4 h-4" />
         </div>
       </div>
@@ -34,4 +34,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onAddToCart }) => {
   );
 };
 
-export default MenuItemCard;
+// Memoized so the menu grid doesn't re-render every time the cart changes — with
+// a stable `onAddToCart` and stable item objects, adding an item touches only the
+// cart, not the grid (prevents the click-flicker).
+export default React.memo(MenuItemCard);

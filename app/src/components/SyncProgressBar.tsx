@@ -20,6 +20,13 @@ export const SyncProgressBar = () => {
       hideTimer.current = null;
     }
 
+    // Background cycles (auto-sync tick, reconnect flush) are marked silent — do
+    // not surface them in the header. They still sync + refresh data; we just
+    // don't flash the "Syncing N%" bar on every routine tick.
+    if (progress.silent) {
+      return;
+    }
+
     if (progress.active) {
       startedRef.current = true;
       const ratio =
@@ -44,7 +51,7 @@ export const SyncProgressBar = () => {
         hideTimer.current = null;
       }
     };
-  }, [progress.active, progress.completed, progress.total]);
+  }, [progress.active, progress.completed, progress.total, progress.silent]);
 
   if (!visible) return null;
 

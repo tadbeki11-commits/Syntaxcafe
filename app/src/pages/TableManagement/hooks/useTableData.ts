@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import api from "@/application";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
@@ -45,9 +45,13 @@ export const useTableData = () => {
     }
   };
 
+  // Only the first load shows the full-screen spinner; background refetches
+  // (every sync cycle) refresh the list in place without flashing it.
+  const hasLoadedRef = useRef(false);
+
   const fetchTables = async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedRef.current) setLoading(true);
       const response = await api.tables.getAll();
       const data = (
         ((response as any).data?.data?.tables || []) as Table[]
@@ -57,6 +61,7 @@ export const useTableData = () => {
       toast.error("Failed to load tables");
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   };
 

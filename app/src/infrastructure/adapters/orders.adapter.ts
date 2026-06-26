@@ -13,6 +13,8 @@ import {
 import {
   getPrinterForDepartment,
   getDepartmentStations,
+  getActivePrinterName,
+  getSimplePrintMode,
 } from "@/infrastructure/printing/printer-config";
 import { eq } from "drizzle-orm";
 import {
@@ -947,6 +949,16 @@ const ordersAdapterImpl = {
     const availablePrinters = await listAvailablePrinters();
     const targetPrinter = resolvePrinter(printerName, availablePrinters);
 
+    // Simple printing mode: bypass the per-department / station routing map and
+    // send every ticket to the single active printer — the same target the
+    // "Test print" button resolves. This rescues sites where test prints work
+    // but order tickets route to a department printer that isn't configured /
+    // doesn't exist on this device.
+    const simplePrintMode = getSimplePrintMode();
+    const simplePrinter = simplePrintMode
+      ? resolvePrinter(printerName || getActivePrinterName(), availablePrinters)
+      : "";
+
     // Group items by main_category (prefer menu.main_category, then item fields)
     const itemsByDept: Record<string, any[]> = {};
     const itemDeptPairs = await Promise.all(
@@ -1134,7 +1146,9 @@ const ordersAdapterImpl = {
 
     for (const dept of departments) {
       const deptItems = itemsByDept[dept];
-      const stations = getDepartmentStations(dept);
+      // Simple mode collapses all routing: one prep ticket per department, every
+      // ticket forced onto the active printer (no station fan-out).
+      const stations = simplePrintMode ? [] : getDepartmentStations(dept);
 
       if (stations.length > 0) {
         // Advanced routing (e.g. butchery): fan the same items out to each
@@ -1149,13 +1163,18 @@ const ordersAdapterImpl = {
           await queueTicket(blocks, station.printer, station.copies);
         }
       } else {
-        // Default: a single prep ticket to the department's printer.
+        // Default: a single prep ticket to the department's printer (or the
+        // active printer when simple mode is on).
         const blocks = buildTicketBlocks(
           deptItems,
           `DEPT: ${dept.toUpperCase()}`,
           false,
         );
-        await queueTicket(blocks, getPrinterForDepartment(dept), 1);
+        await queueTicket(
+          blocks,
+          simplePrintMode ? simplePrinter : getPrinterForDepartment(dept),
+          1,
+        );
       }
     }
 

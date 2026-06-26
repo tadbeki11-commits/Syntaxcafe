@@ -18,6 +18,13 @@ export type SyncProgress = {
   total: number;
   /** Name of the task currently running (for status display). */
   task?: string;
+  /**
+   * Background/automatic cycle (auto-sync tick, reconnect flush). The global
+   * SyncProgressBar ignores these so routine background syncs don't flash the
+   * "Syncing N%" bar in the header on every tick. Only foreground syncs
+   * (manual "Sync" press, post-login hydration) drive the visible bar.
+   */
+  silent?: boolean;
 };
 
 export type SyncProgressCallback = (progress: SyncProgress) => void;
@@ -189,7 +196,12 @@ class SimpleSyncEngine {
         ? syncTasks.filter((task) => targetTasks.includes(task.name))
         : syncTasks;
 
-      this.progress = { active: true, completed: 0, total: tasksToRun.length };
+      this.progress = {
+        active: true,
+        completed: 0,
+        total: tasksToRun.length,
+        silent: opts?.silent === true,
+      };
       this.emitProgress();
 
       for (const task of tasksToRun) {
@@ -221,6 +233,7 @@ class SimpleSyncEngine {
         active: false,
         completed: this.progress.total,
         total: this.progress.total,
+        silent: opts?.silent === true,
       };
       this.emitProgress();
       this.notifyListeners();
@@ -288,7 +301,7 @@ class SimpleSyncEngine {
       // Flush offline-created orders as soon as connectivity returns so they
       // can never be stranded locally. Fire-and-forget; sync() self-guards
       // against overlapping runs and re-verifies the connection.
-      void this.sync(RECONNECT_SYNC_TASKS).catch((error) =>
+      void this.sync(RECONNECT_SYNC_TASKS, { silent: true }).catch((error) =>
         console.warn("[sync] Reconnect order flush failed", error),
       );
     } else {

@@ -56,6 +56,10 @@ export const useMenuData = () => {
     unsyncedCount: 0,
   });
 
+  // Only the first load shows the full-screen spinner; background refetches
+  // (every sync cycle) refresh the menu in place without flashing it.
+  const hasLoadedRef = useRef(false);
+
   // ── Recipe state ──────────────────────────────────────────────────────────
   const [recipesMap, setRecipesMap] = useState<Record<string, LocalRecipe>>({});
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
@@ -70,7 +74,7 @@ export const useMenuData = () => {
 
   const fetchMenu = async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedRef.current) setLoading(true);
       const response = await api.menu.getAll(undefined, isAdmin);
       const payload = (response as any).data;
       const data =
@@ -143,6 +147,7 @@ export const useMenuData = () => {
       );
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   };
 

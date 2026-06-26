@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import api from "@/application";
 import toast from "react-hot-toast";
 import { syncEngine } from "@/infrastructure/sync/sync-engine";
@@ -109,10 +109,15 @@ export const useInventoryData = () => {
     }
   };
 
+  // Only the first load shows the full-screen spinner. Background refetches
+  // (every sync cycle, pagination, search) update data in place without
+  // flashing the spinner over the whole page.
+  const hasLoadedRef = useRef(false);
+
   /** Full refresh — fetches everything (inventory + transfers + users + locations). */
   const fetchAll = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedRef.current) setLoading(true);
       const [invRes, transferRes, usersRes, locationsRes] = await Promise.all([
         api.inventory.getAll(page, limit, searchTerm),
         (api.inventory as any).getTransfers?.(transferPage, transferLimit),
@@ -160,6 +165,7 @@ export const useInventoryData = () => {
       toast.error("Failed to load inventory");
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   }, [page, limit, searchTerm, transferPage, transferLimit]);
 

@@ -41,6 +41,8 @@ import {
   setDepartmentConfig,
   replaceDepartmentConfigMap,
   createStationId,
+  getSimplePrintMode,
+  setSimplePrintMode,
   type DepartmentStation,
   type DepartmentPrintConfig,
 } from '@/infrastructure/printing/printer-config';
@@ -109,9 +111,21 @@ const PrinterSettings: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [testingPrinter, setTestingPrinter] = useState<string | null>(null);
   const [printerAssignments, setPrinterAssignments] = useState<Record<string, string>>(getPrinterDepartmentMap());
-  const [printCopies, setPrintCopies] = useState<number>(getPrintCopies());
+
   const [departmentConfigs, setDepartmentConfigs] = useState<Record<string, DepartmentPrintConfig>>(getDepartmentConfigMap());
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const [simplePrintMode, setSimplePrintModeState] = useState<boolean>(getSimplePrintMode());
+
+  const handleToggleSimplePrintMode = (enabled: boolean) => {
+    setSimplePrintMode(enabled);
+    setSimplePrintModeState(enabled);
+    toast.success(
+      enabled
+        ? '🖨️ Simple printing on — all order tickets go to the active printer'
+        : 'Simple printing off — order tickets use department routing',
+      { duration: 2500 },
+    );
+  };
 
   // Debounced push of the whole routing map to the branch backend. Local
   // storage is always written synchronously by the change handlers; this just
@@ -395,6 +409,30 @@ const PrinterSettings: React.FC = () => {
               </Badge>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Simple Printing Mode ── */}
+      <Card className="shadow-sm border-border/60">
+        <CardContent className="py-4 px-5">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <Checkbox
+              checked={simplePrintMode}
+              onCheckedChange={(value) => handleToggleSimplePrintMode(value === true)}
+              className="mt-0.5"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm text-foreground">Simple printing mode</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                Send every order ticket to the active printer
+                {getActivePrinterName() ? (
+                  <> (<span className="font-semibold text-foreground">{getActivePrinterName()}</span>)</>
+                ) : null}
+                {' '}— the same printer the Test button uses — instead of the department
+                routing below. Turn this on if test prints work but order tickets don't.
+              </p>
+            </div>
+          </label>
         </CardContent>
       </Card>
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/application';
 
 export const useStockLocations = (includeInactive = true) => {
@@ -6,9 +6,13 @@ export const useStockLocations = (includeInactive = true) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Only the first load shows the full-screen spinner; background refreshes
+  // (every sync cycle) update the list in place without flashing it.
+  const hasLoadedRef = useRef(false);
+
   const refresh = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedRef.current) setLoading(true);
       setError(null);
       const response = await api.stockLocations.getAll(includeInactive);
       const list = response.data?.data?.locations ?? response.data?.locations ?? [];
@@ -17,6 +21,7 @@ export const useStockLocations = (includeInactive = true) => {
       setError(e?.message ?? 'Failed to load stock locations');
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   }, [includeInactive]);
 

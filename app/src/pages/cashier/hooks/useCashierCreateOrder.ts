@@ -7,6 +7,15 @@ import { syncEngine } from "@/infrastructure/sync/sync-engine";
 import { useSyncRefetch } from "@/hooks/useSyncRefetch";
 import { useAuth } from "@/context/AuthContext";
 
+// Cheap content fingerprint of the menu list — lets a background refetch detect
+// "nothing changed" and skip the state update (and the re-render/flash).
+const menuSignature = (items: any[]): string =>
+  Array.isArray(items)
+    ? items
+        .map((i) => `${i?.id}:${i?.name}:${i?.price}:${i?.is_available}`)
+        .join("|")
+    : "";
+
 export const useCashierCreateOrder = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,6 +36,11 @@ export const useCashierCreateOrder = () => {
 
   const submitLockRef = useRef(false);
   const [isOnline, setIsOnline] = useState(true);
+
+  // Only the first load shows the full-screen spinner. Subsequent
+  // reloadKey-driven refetches (every background sync cycle) refresh the menu /
+  // tables in place — without flashing the spinner over the whole page.
+  const hasLoadedRef = useRef(false);
 
   // Bumped when a sync cycle finishes so the menu/tables fetch effect re-runs
   // once background hydration / reconnect / manual sync lands fresh local data.
@@ -145,7 +159,7 @@ export const useCashierCreateOrder = () => {
 
     const fetchData = async () => {
       try {
-        setLoading(true);
+        if (!hasLoadedRef.current) setLoading(true);
         const [menuResult, tablesResult, settingsResult] =
           await Promise.allSettled([
             api.menu.getCafeMenu(),
@@ -182,8 +196,17 @@ export const useCashierCreateOrder = () => {
         }
 
         if (!cancelled) {
-          setMenuItems(resolvedMenuItems);
-          setFilteredItems(resolvedMenuItems);
+          // Skip the state update when a background refetch returns the same
+          // menu (the common case every sync cycle) — returning `prev` keeps the
+          // reference stable so the grid doesn't re-render/flash. `filteredItems`
+          // is derived from `menuItems` by the filter effect below, so we don't
+          // set it here (doing so would briefly show the full, unfiltered list
+          // before the active category/search is re-applied — a visible flash).
+          setMenuItems((prev) =>
+            menuSignature(prev) === menuSignature(resolvedMenuItems)
+              ? prev
+              : resolvedMenuItems,
+          );
         }
 
         if (tablesResult.status === "fulfilled") {
@@ -204,7 +227,10 @@ export const useCashierCreateOrder = () => {
         console.error("Error fetching data:", error);
         toast.error("Failed to load menu items or table status");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          hasLoadedRef.current = true;
+        }
       }
     };
 
@@ -312,45 +338,43 @@ export const useCashierCreateOrder = () => {
     return categories;
   }, [selectedMainCategory, menuItems, itemHasCategory]);
 
-  const addToOrder = useCallback(
-    (menuItem: any) => {
-      const existingItem = orderItems.find(
+  // Functional updater so this callback never depends on `orderItems` — a stable
+  // identity lets the memoized MenuItemCards skip re-rendering when the cart
+  // changes (otherwise every "add" re-rendered the whole menu grid → flicker).
+  const addToOrder = useCallback((menuItem: any) => {
+    setOrderItems((prev) => {
+      const existingItem = prev.find(
         (item) => item.menu_item_id === menuItem.id,
       );
-
       if (existingItem) {
-        setOrderItems((prev) =>
-          prev.map((item) =>
-            item.menu_item_id === menuItem.id
-              ? { ...item, quantity: item.quantity + 1 }
-              : item,
-          ),
+        return prev.map((item) =>
+          item.menu_item_id === menuItem.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item,
         );
-      } else {
-        setOrderItems((prev) => [
-          ...prev,
-          {
-            menu_item_id: menuItem.id,
-            menu_item_name: menuItem.name,
-            price: menuItem.price,
-            quantity: 1,
-            main_category: menuItem.main_category,
-            predefined_notes: Array.isArray(menuItem.predefined_notes)
-              ? menuItem.predefined_notes
-              : Array.isArray(menuItem?.meta?.predefined_notes)
-                ? menuItem.meta.predefined_notes
-                : [],
-          },
-        ]);
       }
+      return [
+        ...prev,
+        {
+          menu_item_id: menuItem.id,
+          menu_item_name: menuItem.name,
+          price: menuItem.price,
+          quantity: 1,
+          main_category: menuItem.main_category,
+          predefined_notes: Array.isArray(menuItem.predefined_notes)
+            ? menuItem.predefined_notes
+            : Array.isArray(menuItem?.meta?.predefined_notes)
+              ? menuItem.meta.predefined_notes
+              : [],
+        },
+      ];
+    });
 
-      toast.success("Added to order", {
-        id: "cashier-add-to-order",
-        duration: 2000,
-      });
-    },
-    [orderItems],
-  );
+    toast.success("Added to order", {
+      id: "cashier-add-to-order",
+      duration: 2000,
+    });
+  }, []);
 
   const removeFromOrder = useCallback((menuItemId: any) => {
     setOrderItems((prev) =>
