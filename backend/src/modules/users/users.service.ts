@@ -311,10 +311,14 @@ export class UsersService {
     currentPassword: string,
     newPassword: string,
   ) {
+    // Scope by business, not branch: owners/business admins have branch_id = NULL
+    // (cross-branch accounts) so a branch-pinned lookup would never match them and
+    // self-service password changes 400 with "User not found". Business scoping
+    // still isolates tenants, and the current-password check guards the rest.
     const [user] = await db
       .select({ id: users.id, password_hash: users.password_hash })
       .from(users)
-      .where(and(eq(users.id, id), eq(users.branch_id, requireBranchId())))
+      .where(and(eq(users.id, id), eq(users.business_id, requireBusinessId())))
       .limit(1);
 
     if (!user) throw new Error("User not found");
