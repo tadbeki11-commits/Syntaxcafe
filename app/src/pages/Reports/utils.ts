@@ -159,7 +159,7 @@ export const makeIsPaidOrder = (paidOrderIdSet: Set<string | null>) => {
     if (oid && paidOrderIdSet.has(oid)) return true;
     const st = normalizeStatus(order?.status);
     const pst = normalizeStatus(order?.payment_status);
-    return st === 'paid' || st === 'completed' || pst === 'paid';
+    return st === 'paid' || st === 'completed' || st === 'done' || pst === 'paid';
   };
 };
 

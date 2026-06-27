@@ -774,8 +774,7 @@ const ordersAdapterImpl = {
   getKitchenOrders: async () => {
     const localOrders = await readRows(localDbTables.orders);
     const kitchenOrders = localOrders.filter(
-      (o) =>
-        o.type === "cafe" && ["pending", "preparing"].includes(o.status || ""),
+      (o) => o.type === "cafe" && o.status === "pending",
     );
     return {
       data: { status: "success", data: kitchenOrders },
@@ -808,12 +807,21 @@ const ordersAdapterImpl = {
   getOrdersForPayment: async (params?: any) => {
     const localOrders = await readRows(localDbTables.orders);
     const scopedOrders = filterOrdersByParams(localOrders, params);
-    const activeLocalOrders = scopedOrders.filter(
-      (o) =>
-        o.status !== "completed" &&
-        o.status !== "cancelled" &&
-        o.status !== "paid",
-    );
+    // Awaiting-payment queue: exclude anything already closed. With the
+    // collapsed vocab a paid order is `done`, so the old check (completed/paid)
+    // missed them and they leaked back into the queue. Key off the payment axis
+    // and exclude the terminal lifecycle states (legacy values kept tolerant).
+    const activeLocalOrders = scopedOrders.filter((o) => {
+      const st = String(o.status || "").toLowerCase();
+      const pst = String(o.payment_status || "").toLowerCase();
+      return (
+        pst !== "paid" &&
+        st !== "done" &&
+        st !== "cancelled" &&
+        st !== "completed" &&
+        st !== "paid"
+      );
+    });
 
     const ordersWithWaiter = await Promise.all(
       activeLocalOrders.map(async (order) => {
@@ -839,7 +847,9 @@ const ordersAdapterImpl = {
     const occupiedOrders = localOrders.filter(
       (o) =>
         o.type === "cafe" &&
-        ["pending", "preparing", "ready"].includes(o.status || "") &&
+        // A table is occupied while its order is still open. With the collapsed
+        // vocab that is just "pending" (preparing/ready folded into it).
+        o.status === "pending" &&
         o.table_number != null,
     );
 

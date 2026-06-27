@@ -22,7 +22,7 @@ export const useOrderFiltering = (
       if (idKey && paidOrderIdSet.has(idKey)) return true;
       const st = normalizeStatus(order?.status);
       const pst = normalizeStatus(order?.payment_status);
-      return st === 'paid' || st === 'completed' || pst === 'paid';
+      return st === 'paid' || st === 'completed' || st === 'done' || pst === 'paid';
     };
 
     const getDerivedStatus = (order: any) => {
