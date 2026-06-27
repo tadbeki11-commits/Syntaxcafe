@@ -50,7 +50,7 @@ export function displayStatus(status?: string | null): DisplayStatus {
   const s = String(status ?? "").trim().toLowerCase();
   if (["cancelled", "canceled", "voided", "deleted", "refunded"].includes(s))
     return "deleted";
-  if (["paid", "completed"].includes(s)) return "paid";
+  if (["paid", "completed", "done"].includes(s)) return "paid";
   return "pending";
 }
 

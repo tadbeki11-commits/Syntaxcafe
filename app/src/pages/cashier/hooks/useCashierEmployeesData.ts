@@ -339,7 +339,7 @@ export const useCashierEmployeesData = () => {
     const served = rangeOrders.filter((o) => {
       const st = normalizeStatus(o.status);
       const pst = normalizeStatus(o.payment_status);
-      return ["completed", "paid"].includes(st) || pst === "paid";
+      return ["completed", "paid", "done"].includes(st) || pst === "paid";
     });
     const revenue = served.reduce(
       (sum, o) => sum + (parseFloat(o.total_amount) || 0),
@@ -352,7 +352,8 @@ export const useCashierEmployeesData = () => {
         const pst = normalizeStatus(o.payment_status);
         const isCanceled =
           st === "deleted" || st === "cancelled" || st === "canceled";
-        const isPaid = pst === "paid" || st === "paid" || st === "completed";
+        const isPaid =
+          pst === "paid" || st === "paid" || st === "completed" || st === "done";
         return !isCanceled && !isPaid;
       })
       .reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);

@@ -86,7 +86,7 @@ export const usePaymentsItemsData = () => {
       if (id && paidOrderIdSet.has(id)) return true;
       const st = normalizeStatus(o?.status);
       const pst = normalizeStatus(o?.payment_status);
-      return st === 'paid' || pst === 'paid' || st === 'completed';
+      return st === 'paid' || pst === 'paid' || st === 'completed' || st === 'done';
     };
 
     const paidOrders = ord.filter(isPaidOrder);

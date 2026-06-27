@@ -175,7 +175,9 @@ export const useWaiterOrderHistory = () => {
   const canAddItems = useCallback(
     (order: any) => {
       const effectiveStatus = getEffectiveStatus(order);
-      return ["pending", "preparing", "ready"].includes(effectiveStatus);
+      // Items can be added to an open order or a served ("done") one (which
+      // reopens it). preparing/ready are folded into these two states.
+      return ["pending", "done"].includes(effectiveStatus);
     },
     [getEffectiveStatus],
   );

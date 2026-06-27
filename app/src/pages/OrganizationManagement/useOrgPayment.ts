@@ -14,7 +14,10 @@ export const isOrderUnpaid = (order: any) => {
   const status = String(order?.status || '').toLowerCase();
   const paymentStatus = String(order?.payment_status || '').toLowerCase();
   return (
-    status !== 'cancelled' && status !== 'paid' && paymentStatus !== 'paid'
+    status !== 'cancelled' &&
+    status !== 'paid' &&
+    status !== 'done' &&
+    paymentStatus !== 'paid'
   );
 };
 
