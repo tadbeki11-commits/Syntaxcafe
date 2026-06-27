@@ -8,10 +8,9 @@ import { persistServerOrders } from "@/infrastructure/adapters/orders.adapter";
 
 interface PrintingProps {
   refreshDashboardData: () => Promise<void>;
-  // When false, the background engine (socket subscription, polling loop and
-  // print-leadership renewal) stays dormant. The interactive helpers
-  // (printOrderImmediately, testQzPrint) remain callable. Used so only the
-  // cashier role runs the auto-print engine.
+  // When false, the background engine (socket subscription and polling loop)
+  // stays dormant. The interactive helpers (printOrderImmediately, testQzPrint)
+  // remain callable. Used so only the cashier role runs the auto-print engine.
   enabled?: boolean;
 }
 
@@ -83,68 +82,8 @@ export const useCashierPrinting = ({
   const isPollingUnprintedRef = useRef(false);
   const qzPollDelayMsRef = useRef(2000);
   const lastQzPollErrorLogAtRef = useRef(0);
-  const printLeaderIdRef = useRef(
-    `${getApproximateServerNow()}-${Math.random().toString(16).slice(2)}`,
-  );
 
   const lastErrorToastAtRef = useRef(0);
-
-  const tryAcquirePrintLeadership = useCallback(() => {
-    if (typeof window === "undefined") return true;
-    const key = "hyper_coffee_leader_v1";
-    const now = getApproximateServerNow();
-    const ttlMs = 8000;
-    const myId = printLeaderIdRef.current;
-
-    try {
-      const raw = window.localStorage?.getItem(key);
-      const cur = raw ? JSON.parse(raw) : null;
-      const curId = cur && typeof cur.id === "string" ? cur.id : "";
-      const curExp = cur && typeof cur.exp === "number" ? cur.exp : 0;
-
-      const canTake = !curId || curExp <= now || curId === myId;
-      if (!canTake) return false;
-
-      const next = { id: myId, exp: now + ttlMs };
-      window.localStorage?.setItem(key, JSON.stringify(next));
-
-      const verifyRaw = window.localStorage?.getItem(key);
-      const verify = verifyRaw ? JSON.parse(verifyRaw) : null;
-      return verify?.id === myId;
-    } catch (e) {
-      return true;
-    }
-  }, []);
-
-  // Print Leadership Management
-  useEffect(() => {
-    if (!enabled) return;
-    if (typeof window === "undefined") return;
-    const renew = () => {
-      tryAcquirePrintLeadership();
-    };
-    renew();
-    const t = setInterval(renew, 4000);
-
-    const onUnload = () => {
-      try {
-        const key = "hyper_print_leader_v1";
-        const raw = window.localStorage?.getItem(key);
-        const cur = raw ? JSON.parse(raw) : null;
-        if (cur?.id === printLeaderIdRef.current) {
-          window.localStorage?.removeItem(key);
-        }
-      } catch (e) {
-        // ignore
-      }
-    };
-
-    window.addEventListener("beforeunload", onUnload);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("beforeunload", onUnload);
-    };
-  }, [tryAcquirePrintLeadership, enabled]);
 
   const maybeToastError = useCallback((err: any) => {
     const now = getApproximateServerNow();
@@ -162,7 +101,11 @@ export const useCashierPrinting = ({
   }, []);
 
   const pollUnprintedOrders = useCallback(async () => {
-    if (!tryAcquirePrintLeadership()) return;
+    // Same-window re-entrancy guard. Cross-window de-duplication is intentionally
+    // not done here: the auto-print engine runs in every cashier window so a
+    // single open window always prints. (Two windows on one PC would print each
+    // ticket twice — run one window per PC.) `printingRef` + mark-after-print
+    // keep a single window from double-printing or losing a ticket on failure.
     if (isPollingUnprintedRef.current) return;
     isPollingUnprintedRef.current = true;
     try {
@@ -240,7 +183,6 @@ export const useCashierPrinting = ({
   }, [
     maybeToastError,
     refreshDashboardData,
-    tryAcquirePrintLeadership,
     recordPrintFailure,
     recordPrintSuccess,
   ]);

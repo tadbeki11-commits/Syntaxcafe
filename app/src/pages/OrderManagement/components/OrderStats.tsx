@@ -21,7 +21,7 @@ export const OrderStats: React.FC<OrderStatsProps> = ({ orders, paidOrderIdSet }
     }, 0);
 
     const pendingOrders = orders.filter(order => order.status === 'pending').length;
-    const completedOrders = orders.filter(order => order.status === 'completed').length;
+    const completedOrders = orders.filter(order => order.status === 'done').length;
 
     return {
       totalOrders,

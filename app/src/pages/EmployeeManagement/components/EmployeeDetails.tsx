@@ -49,7 +49,7 @@ export const EmployeeDetails: React.FC<EmployeeDetailsProps> = ({ details }) => 
                   <TableCell>
                     <Badge 
                       variant={
-                        o.status === 'paid' ? 'success' : o.status === 'pending' ? 'warning' : 'secondary'
+                        o.status === 'done' ? 'success' : o.status === 'pending' ? 'warning' : 'secondary'
                       }
                     >
                       {o.status}

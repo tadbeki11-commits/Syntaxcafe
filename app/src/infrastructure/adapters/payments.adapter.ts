@@ -501,7 +501,10 @@ export const paymentsAdapter = {
             if (localOrder && localOrder.id) {
               await upsertOrder({
                 ...localOrder,
-                status: "paid",
+                // On the desktop POS, taking payment closes the order, so the
+                // lifecycle moves to "done" (collapsed vocab) while the money
+                // axis records "paid".
+                status: "done",
                 payment_status: "paid",
                 is_printed: 1,
                 updated_at: getApproximateServerIsoString(),
@@ -510,7 +513,7 @@ export const paymentsAdapter = {
             } else {
               await upsertOrder({
                 id: localPayment.order_id,
-                status: "paid",
+                status: "done",
                 payment_status: "paid",
                 synced: 1,
                 total_amount: localPayment.amount || 0,

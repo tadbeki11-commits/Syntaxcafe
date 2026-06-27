@@ -47,7 +47,8 @@ export const OrderStreamPanel: React.FC<OrderStreamPanelProps> = ({
                   </span>
                   <Badge
                     variant={
-                      order.status === 'completed' || order.status === 'paid'
+                      order.status === 'done' ||
+                      order.payment_status === 'paid'
                         ? 'success'
                         : 'warning'
                     }

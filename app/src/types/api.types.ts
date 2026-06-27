@@ -77,7 +77,8 @@ export interface Payment {
   order_id: string;
   amount: number;
   payment_method: "cash" | "card" | "mobile_payment";
-  status: "pending" | "paid" | "failed" | "refunded";
+  // A payment row only exists once confirmed, so it is never "pending".
+  status: "paid" | "cancelled";
   qr_code?: string;
   processed_by?: string;
   description?: string;

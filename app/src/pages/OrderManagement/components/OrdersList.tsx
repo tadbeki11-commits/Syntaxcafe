@@ -67,9 +67,8 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             return (
               <TableRow
                 key={order.id}
-                className={`transition-colors ${order.status === 'ready' ? 'bg-green-50/30' :
-                  order.status === 'preparing' ? 'bg-blue-50/30' :
-                    order.status === 'pending' ? 'bg-amber-50/30' : ''
+                className={`transition-colors ${order.status === 'done' ? 'bg-green-50/30' :
+                  order.status === 'pending' ? 'bg-amber-50/30' : ''
                   } hover:bg-muted/50`}
                 onClick={() => setSelectedOrder(order)}
               >

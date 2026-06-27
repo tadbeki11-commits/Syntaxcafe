@@ -265,9 +265,11 @@ export const useWaiterOrderHistory = () => {
       await api.orders.addItems(addingItemsOrderId, itemsData);
 
       const currentOrder = orders.find((o) => o.id === addingItemsOrderId);
-      if (currentOrder && normalizeStatus(currentOrder.status) === "ready") {
+      // Adding items to an already-served ("done") order reopens it for work.
+      // With the collapsed lifecycle that means moving it back to "pending".
+      if (currentOrder && normalizeStatus(currentOrder.status) === "done") {
         await api.orders.updateStatus(addingItemsOrderId, {
-          status: "preparing",
+          status: "pending",
           updated_by: user!.id,
         });
       }
@@ -339,7 +341,9 @@ export const useWaiterOrderHistory = () => {
     filteredOrders.forEach((order) => {
       const pst = normalizeStatus(order?.payment_status);
       const st = normalizeStatus(order?.status);
-      if (pst === "paid" || st === "completed" || st === "ready") {
+      // Revenue is money collected, so key off the payment axis. ("done" is
+      // fulfilled, not necessarily paid; legacy paid/completed kept tolerant.)
+      if (pst === "paid" || st === "paid" || st === "completed") {
         revenue += parseFloat(order.total_amount || 0);
       }
       if (order.table_number) {

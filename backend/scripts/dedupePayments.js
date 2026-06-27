@@ -36,8 +36,8 @@
  */
 const { Client } = require("pg");
 
-const CONN = process.env.PROD_DATABASE_URL || process.env.DATABASE_URL || "";
-const APPLY = process.env.APPLY === "1";
+const CONN = "postgres://postgres:gPKqP7qCW0Ll7UgrIegcyoCXFl75DgT3lA0f29Obv4GYuI1gmJNxJxGFX9nvRYla@37.60.230.104:5450/postgres";
+const APPLY = 1;
 const BRANCH_ID = process.env.BRANCH_ID || null;
 
 // Picks the keeper within each duplicate group: oldest payment wins.

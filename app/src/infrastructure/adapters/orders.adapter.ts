@@ -343,14 +343,14 @@ export const persistServerOrders = async (remoteOrders: any[]) => {
       for (const p of localPayments) {
         if (
           p?.order_id === remote.id &&
-          String(p?.status || "").toLowerCase() !== "deleted"
+          !TERMINAL_VOID_STATUSES.has(String(p?.status || "").toLowerCase())
         ) {
           await upsertRow(localDbTables.payments, {
             ...p,
-            status: "deleted",
+            status: "cancelled",
             synced: 1,
           });
-          p.status = "deleted";
+          p.status = "cancelled";
         }
       }
     }
@@ -741,10 +741,11 @@ const ordersAdapterImpl = {
     };
   },
   markReady: async (id: string, data: any) => {
-    return updateOrderWithChanges(id, { status: "ready" });
+    // Lifecycle collapsed to {pending, done, cancelled}: "ready" is "done".
+    return updateOrderWithChanges(id, { status: "done" });
   },
   complete: async (id: string, data: any) => {
-    return updateOrderWithChanges(id, { status: "completed" });
+    return updateOrderWithChanges(id, { status: "done" });
   },
   getPending: async (params?: any) => {
     const localOrders = await readRows(localDbTables.orders);
@@ -760,7 +761,7 @@ const ordersAdapterImpl = {
   },
   getReady: async (params?: any) => {
     const localOrders = await readRows(localDbTables.orders);
-    const readyLocal = localOrders.filter((o) => o.status === "ready");
+    const readyLocal = localOrders.filter((o) => o.status === "done");
 
     return {
       data: { status: "success", data: readyLocal },

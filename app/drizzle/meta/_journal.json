@@ -15,6 +15,13 @@
       "when": 1781153402802,
       "tag": "0001_device_enrollment",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1781153402803,
+      "tag": "0002_status_vocabulary",
+      "breakpoints": true
     }
   ]
 }

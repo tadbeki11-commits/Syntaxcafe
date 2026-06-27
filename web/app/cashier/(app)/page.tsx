@@ -411,7 +411,7 @@ export default function CashierQueuePage() {
         order_id: order.id,
         amount: order.total_amount,
         payment_method: "cash",
-        status: "deleted",
+        status: "cancelled",
         processed_by: user?.id,
       });
       toast.success(`Order #${order.order_number ?? ""} cancelled`);

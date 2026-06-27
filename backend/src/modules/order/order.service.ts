@@ -19,6 +19,12 @@ import {
   tenantInsert,
 } from "../../common/tenant/tenant-context";
 import { OrdersGateway } from "./orders.gateway";
+import {
+  ORDER_STATUS_PRIORITY,
+  normalizeOrderStatus,
+  normalizePaymentStatus,
+  normalizePaymentRowStatus,
+} from "../../common/status/order-status.constants";
 
 // Second alias on the users table so a single query can join both the waiter
 // (orders.employee_id) and the cashier who rang the order up on their behalf
@@ -267,36 +273,31 @@ export class OrderService {
       : [];
 
     if (existingOrder) {
-      // Priority: cancelled/voided > paid/completed > pending/preparing/ready
-      // Only update the existing order if the incoming status outranks the current one
-      const statusPriority: Record<string, number> = {
-        voided: 5,
-        cancelled: 5,
-        paid: 4,
-        completed: 3,
-        ready: 2,
-        preparing: 1,
-        pending: 0,
-      };
-
-      const incomingStatus = String(status || "").toLowerCase();
-      const existingStatus = String(existingOrder.status || "").toLowerCase();
-      const incomingPriority = statusPriority[incomingStatus] ?? -1;
-      const existingPriority = statusPriority[existingStatus] ?? -1;
+      // Lifecycle priority: cancelled (terminal) > done > pending. Only update
+      // the existing order if the incoming status outranks the current one.
+      // Legacy clients may still send overloaded values (paid/voided/...); fold
+      // them into the canonical vocab before comparing.
+      const incomingStatus = normalizeOrderStatus(status);
+      const existingStatus = normalizeOrderStatus(existingOrder.status);
+      const incomingPriority = ORDER_STATUS_PRIORITY[incomingStatus];
+      const existingPriority = ORDER_STATUS_PRIORITY[existingStatus];
 
       if (incomingPriority > existingPriority) {
-        // A cancellation/void is terminal: also clear paid state so the
-        // back-office/POS never keep showing it as "paid" (they key off
-        // payment_status), matching the online cancel path.
-        const isVoid =
-          incomingStatus === "cancelled" || incomingStatus === "voided";
+        const isVoid = incomingStatus === "cancelled";
+        // A legacy "paid" lifecycle implied money was collected; derive the
+        // payment axis from it when the client didn't send one explicitly.
+        const legacyPaid = String(status || "").toLowerCase() === "paid";
         await tx
           .update(orders)
           .set({
             status: incomingStatus,
             payment_status: isVoid
               ? "cancelled"
-              : payment_status || undefined,
+              : payment_status
+                ? normalizePaymentStatus(payment_status)
+                : legacyPaid
+                  ? "paid"
+                  : undefined,
             updated_at: new Date(),
           })
           .where(
@@ -307,7 +308,7 @@ export class OrderService {
           // no "paid" payment lingers for a cancelled order.
           await tx
             .update(payments)
-            .set({ status: "deleted", updated_at: new Date() })
+            .set({ status: "cancelled", updated_at: new Date() })
             .where(
               and(
                 eq(payments.order_id, id),
@@ -345,8 +346,14 @@ export class OrderService {
         is_price_override: Boolean(is_price_override),
         type: type || "cafe",
         total_amount,
-        status: status || "pending",
-        payment_status,
+        status: normalizeOrderStatus(status),
+        // Derive the payment axis from a legacy "paid" lifecycle when the client
+        // didn't send one explicitly; otherwise fold to the canonical vocab.
+        payment_status: payment_status
+          ? normalizePaymentStatus(payment_status)
+          : String(status || "").toLowerCase() === "paid"
+            ? "paid"
+            : "pending",
         notes,
         created_at: created_at ? new Date(created_at) : new Date(),
         meta: {},
@@ -421,7 +428,13 @@ export class OrderService {
       }
     }
 
-    if (String(status || "").toLowerCase() === "paid") {
+    // An order can arrive at the server already paid (created and paid offline
+    // before sync). Reconcile the stock sale when the payment axis says paid —
+    // tolerate legacy clients that still encode "paid" in the lifecycle status.
+    const arrivedPaid =
+      normalizePaymentStatus(payment_status) === "paid" ||
+      String(status || "").toLowerCase() === "paid";
+    if (arrivedPaid) {
       const syncedItems = await this.loadOrderItems(
         createdOrder.id,
         undefined,
@@ -489,7 +502,9 @@ export class OrderService {
       syncUserId,
     );
 
-    const resolvedStatus = status || "paid";
+    // A payment row only exists because money was confirmed, so it is never
+    // "pending": fold any legacy/pending value to paid (or cancelled).
+    const resolvedStatus = normalizePaymentRowStatus(status);
     const resolvedPaidAt = paid_at ? new Date(paid_at) : new Date();
 
     await tx
@@ -526,7 +541,7 @@ export class OrderService {
         },
       });
 
-    if (status === "paid" || !status) {
+    if (resolvedStatus === "paid") {
       // A cancellation is terminal. If this order was voided (e.g. by the web
       // cashier) while an offline POS still held it as paid, the late-syncing
       // "paid" payment must NOT resurrect the order. Keep it cancelled, void this
@@ -538,15 +553,14 @@ export class OrderService {
           and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())),
         )
         .limit(1);
-      const orderStatus = String(orderRow?.status || "").toLowerCase();
 
-      if (["cancelled", "voided", "refunded"].includes(orderStatus)) {
+      if (normalizeOrderStatus(orderRow?.status) === "cancelled") {
         await tx
           .update(payments)
-          .set({ status: "deleted", updated_at: new Date() })
+          .set({ status: "cancelled", updated_at: new Date() })
           .where(eq(payments.id, id));
         console.log(
-          `[BulkSync] Order ${order_id} is ${orderStatus}; not flipping to paid from synced payment ${id} (payment voided).`,
+          `[BulkSync] Order ${order_id} is cancelled; not marking paid from synced payment ${id} (payment voided).`,
         );
         return;
       }
@@ -562,9 +576,11 @@ export class OrderService {
         )
         .limit(1);
 
+      // Payment only sets the payment axis. Lifecycle (`done` = served) is a
+      // separate transition the kitchen/waiter drives, so leave `status` alone.
       await tx
         .update(orders)
-        .set({ status: "paid", payment_status: "paid", updated_at: new Date() })
+        .set({ payment_status: "paid", updated_at: new Date() })
         .where(
           and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())),
         );
@@ -811,13 +827,9 @@ export class OrderService {
     if (filters.table_number)
       conditions.push(eq(orders.table_number, filters.table_number));
     if (filters.paid === "paid")
-      conditions.push(
-        sql`(${orders.payment_status} = 'paid' or ${orders.status} = 'paid')`,
-      );
+      conditions.push(sql`${orders.payment_status} = 'paid'`);
     else if (filters.paid === "unpaid")
-      conditions.push(
-        sql`not (${orders.payment_status} = 'paid' or ${orders.status} = 'paid')`,
-      );
+      conditions.push(sql`coalesce(${orders.payment_status}, '') <> 'paid'`);
 
     const search = String(filters.search ?? "").trim().toLowerCase();
     if (search) {
@@ -834,14 +846,15 @@ export class OrderService {
     }
 
     const where = and(...conditions);
-    const paid = sql`(${orders.payment_status} = 'paid' or ${orders.status} = 'paid')`;
-    const notVoided = sql`${orders.status} not in ('cancelled', 'voided', 'refunded')`;
+    const paid = sql`${orders.payment_status} = 'paid'`;
+    const notVoided = sql`${orders.status} <> 'cancelled'`;
+    const pendingPayment = sql`${orders.payment_status} = 'pending'`;
 
     const [agg] = await db
       .select({
         total: count(),
         collected: sql<number>`coalesce(sum(case when ${notVoided} and ${paid} then coalesce(${orders.total_amount}, 0) else 0 end), 0)`,
-        outstanding: sql<number>`coalesce(sum(case when ${notVoided} and not ${paid} then coalesce(${orders.total_amount}, 0) else 0 end), 0)`,
+        outstanding: sql<number>`coalesce(sum(case when ${notVoided} and ${pendingPayment} then coalesce(${orders.total_amount}, 0) else 0 end), 0)`,
         pending: sql<number>`count(*) filter (where ${orders.status} = 'pending')`,
       })
       .from(orders)
@@ -909,7 +922,8 @@ export class OrderService {
 
   async updateStatus(id: string, status: string, updatedBy?: any) {
     const branchId = requireBranchId();
-    const isCancel = String(status || "").toLowerCase() === "cancelled";
+    const nextStatus = normalizeOrderStatus(status);
+    const isCancel = nextStatus === "cancelled";
 
     const updated = await db.transaction(async (tx: any) => {
       const [existingOrder] = await tx
@@ -921,7 +935,7 @@ export class OrderService {
       // Cancelling voids the order: also clear any paid/partially-paid state so
       // the back-office and POS don't keep showing it as "paid" (they key off
       // payment_status), and so it leaves every cashier queue.
-      const setFields: any = { status, updated_at: new Date() };
+      const setFields: any = { status: nextStatus, updated_at: new Date() };
       if (isCancel) setFields.payment_status = "cancelled";
 
       const [updated] = await tx
@@ -932,13 +946,11 @@ export class OrderService {
 
       if (updated) {
         const wasPaid =
-          String(existingOrder?.payment_status || "").toLowerCase() ===
-            "paid" ||
-          String(existingOrder?.status || "").toLowerCase() === "paid";
+          normalizePaymentStatus(existingOrder?.payment_status) === "paid";
 
         if (
           isCancel &&
-          existingOrder?.status !== "cancelled" &&
+          normalizeOrderStatus(existingOrder?.status) !== "cancelled" &&
           wasPaid
         ) {
           const currentItems = await this.loadOrderItems(id, undefined, tx);
@@ -958,7 +970,7 @@ export class OrderService {
         if (isCancel) {
           await tx
             .update(payments)
-            .set({ status: "deleted", updated_at: new Date() })
+            .set({ status: "cancelled", updated_at: new Date() })
             .where(
               and(
                 eq(payments.order_id, id),
@@ -967,7 +979,7 @@ export class OrderService {
             );
         }
 
-        await this.logStatusChange(id, status, updatedBy);
+        await this.logStatusChange(id, nextStatus, updatedBy);
         const full = await this.findById(id);
         if (full) {
           await emitUpdated(tx, "order", "ORDER_UPDATED", full as any);
@@ -1021,7 +1033,7 @@ export class OrderService {
   async getPendingOrders(type?: string) {
     const conditions = [
       eq(orders.branch_id, requireBranchId()),
-      inArray(orders.status, ["pending", "preparing"]),
+      eq(orders.status, "pending"),
     ] as any[];
     if (type) conditions.push(eq(orders.type, type));
 
@@ -1053,7 +1065,7 @@ export class OrderService {
   async getReadyOrders(type?: string) {
     const conditions = [
       eq(orders.branch_id, requireBranchId()),
-      eq(orders.status, "ready"),
+      eq(orders.status, "done"),
     ] as any[];
     if (type) conditions.push(eq(orders.type, type));
 
@@ -1096,7 +1108,7 @@ export class OrderService {
         and(
           eq(orders.branch_id, requireBranchId()),
           eq(orders.type, "cafe"),
-          inArray(orders.status, ["pending", "preparing"]),
+          eq(orders.status, "pending"),
           eq(order_items.item_type, "food"),
         ),
       )
@@ -1117,13 +1129,13 @@ export class OrderService {
   }
 
   async markOrderReady(id: string, updatedBy?: any) {
-    const updated = await this.updateStatus(id, "ready", updatedBy);
-    await this.markFoodItemsReady(id);
+    // Lifecycle collapsed to {pending, done, cancelled}: "ready" is "done".
+    const updated = await this.updateStatus(id, "done", updatedBy);
     return updated;
   }
 
   async completeOrder(id: string, completedBy?: any) {
-    return this.updateStatus(id, "completed", completedBy);
+    return this.updateStatus(id, "done", completedBy);
   }
 
   async getOrdersForPayment(filters: any) {
@@ -1148,7 +1160,7 @@ export class OrderService {
     const conditions = [
       eq(orders.branch_id, branchId),
       sql`coalesce(${orders.payment_status}, '') <> 'paid'`,
-      sql`coalesce(${orders.status}, '') not in ('paid', 'cancelled')`,
+      sql`coalesce(${orders.status}, '') <> 'cancelled'`,
     ] as any[];
     if (filters.employee_id) {
       conditions.push(eq(orders.employee_id, filters.employee_id));
@@ -1239,8 +1251,7 @@ export class OrderService {
         .limit(1);
       if (!existingOrder) return null;
       const wasPaid =
-        String(existingOrder?.payment_status || "").toLowerCase() === "paid" ||
-        String(existingOrder?.status || "").toLowerCase() === "paid";
+        normalizePaymentStatus(existingOrder?.payment_status) === "paid";
       const previousItems = await this.loadOrderItems(id, undefined, tx);
       await tx.delete(order_items).where(eq(order_items.order_id, id));
 
@@ -1294,8 +1305,7 @@ export class OrderService {
         .limit(1);
       if (!existingOrder) return null;
       const wasPaid =
-        String(existingOrder?.payment_status || "").toLowerCase() === "paid" ||
-        String(existingOrder?.status || "").toLowerCase() === "paid";
+        normalizePaymentStatus(existingOrder?.payment_status) === "paid";
       const previousItems = await this.loadOrderItems(id, undefined, tx);
       const [order] = await tx
         .select({ total_amount: orders.total_amount })
@@ -1388,12 +1398,10 @@ export class OrderService {
 
     const filtered = rows.filter((row: any) => {
       if (orderType === "beverage_only") {
-        return row.order.status === "ready" || row.order.status === "completed";
+        return row.order.status === "done";
       }
       if (orderType === "kitchen") {
-        return (
-          row.order.status === "pending" || row.order.status === "preparing"
-        );
+        return row.order.status === "pending";
       }
       return true;
     });
@@ -1440,7 +1448,9 @@ export class OrderService {
         and(
           eq(orders.branch_id, requireBranchId()),
           eq(orders.type, "cafe"),
-          inArray(orders.status, ["pending", "preparing", "ready"]),
+          // Active orders still holding a table: everything not yet finished
+          // or cancelled. With the collapsed lifecycle that is just "pending".
+          eq(orders.status, "pending"),
         ),
       )
       .orderBy(asc(orders.table_number));
@@ -1471,7 +1481,8 @@ export class OrderService {
   private async markFoodItemsReady(orderId: string) {
     const order = await this.findById(orderId);
     if (!order) return;
-    await this.updateStatus(orderId, "ready");
+    // "ready" collapsed into the "done" lifecycle state.
+    await this.updateStatus(orderId, "done");
   }
 
   private async loadOrderItems(

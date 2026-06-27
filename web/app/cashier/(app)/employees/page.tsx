@@ -608,7 +608,7 @@ export default function CashierEmployeesPage() {
         order_id: order.id,
         amount: order.total_amount,
         payment_method: "cash",
-        status: "deleted",
+        status: "cancelled",
         processed_by: user?.id,
       });
       toast.success("Order cancelled");

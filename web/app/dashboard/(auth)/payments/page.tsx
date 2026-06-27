@@ -30,8 +30,9 @@ type Payment = {
   created_at: string;
 };
 
-// paid_at is when the payment was actually taken. created_at is the sync time
-// for payments that came from an offline client, so it misrepresents the date.
+// The backend serializes paid_at/created_at as the payment's *order* created
+// time (so every interface dates a payment by its order, not when the money was
+// taken — the true times are on actual_paid_at/payment_created_at).
 const paymentDate = (r: Payment) => r.paid_at || r.created_at;
 
 const columns: Column<Payment>[] = [
@@ -39,6 +40,7 @@ const columns: Column<Payment>[] = [
   {
     key: "order_number",
     label: "Order",
+    sortable: true,
     render: (r) =>
       r.order_id ? (
         <Link
@@ -172,8 +174,7 @@ export default function PaymentsPage() {
             label: "Status",
             options: [
               { value: "paid", label: "Paid" },
-              { value: "pending", label: "Pending" },
-              { value: "failed", label: "Failed" },
+              { value: "cancelled", label: "Cancelled" },
             ],
           },
         ]}

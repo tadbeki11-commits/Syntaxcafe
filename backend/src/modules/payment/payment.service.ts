@@ -14,6 +14,10 @@ import {
   requireBranchId,
   tenantInsert,
 } from "../../common/tenant/tenant-context";
+import {
+  normalizeOrderStatus,
+  normalizePaymentRowStatus,
+} from "../../common/status/order-status.constants";
 const QRCode: any = require("qrcode");
 
 @Injectable()
@@ -55,57 +59,121 @@ export class PaymentService {
       description,
       status,
     } = paymentData;
+    const branchId = requireBranchId();
 
-    // A normal payment is created "pending" and turns "paid" on confirm. The one
-    // exception is a void/cancel ledger marker, which the cashier portal records
-    // with status "deleted" — honor that so the order reads as voided (not
-    // pending/paid) on the POS and back-office.
-    const resolvedStatus = status === "deleted" ? "deleted" : "pending";
+    // A payment row exists only because money was confirmed, so recording one IS
+    // the confirmation: it lands "paid" (and settles the order + deducts stock)
+    // in a single step — no separate confirm pass, no "pending" row. The one
+    // exception is a void/cancel ledger marker (the cashier portal sends a
+    // legacy "deleted" status) which is recorded as "cancelled" without touching
+    // the order, so it reads as voided on the POS and back-office.
+    const resolvedStatus = normalizePaymentRowStatus(status);
 
-    // Idempotency guard against duplicate full-order payments. A double-click,
-    // a client retry of a request that actually succeeded, or two cashier
-    // surfaces confirming the same order would otherwise each insert a fresh row
-    // and double-charge the order. Department-split payments are exempt: those
-    // legitimately produce several rows per order (one per department) and are
-    // recorded via settleDepartment, which has its own per-department guard.
-    if (order_id && resolvedStatus !== "deleted") {
-      const [existing] = await db
-        .select({ id: payments.id, status: payments.status })
-        .from(payments)
-        .where(
-          and(
-            eq(payments.order_id, order_id),
-            eq(payments.branch_id, requireBranchId()),
-            sql`coalesce(${payments.status}, '') in ('pending', 'paid')`,
-            sql`coalesce(${payments.meta} ->> 'scope', '') <> 'department'`,
-          ),
-        )
-        .limit(1);
-
-      if (existing) {
-        // Return the row that already covers this order instead of creating a
-        // duplicate. Callers treat this as success (idempotent create).
-        return existing;
+    if (resolvedStatus === "cancelled") {
+      const [voided] = await db
+        .insert(payments)
+        .values({
+          ...tenantInsert(),
+          order_id: order_id || null,
+          amount,
+          amount_cents: amount,
+          payment_method,
+          method: payment_method,
+          status: "cancelled",
+          processed_by,
+          description: description || null,
+        })
+        .returning();
+      if (voided) {
+        await emitCreated(db, "payment", "PAYMENT_CREATED", voided as any);
       }
+      return voided;
     }
 
-    const [created] = await db
-      .insert(payments)
-      .values({
-        ...tenantInsert(),
-        order_id: order_id || null,
-        amount,
-        amount_cents: amount,
-        payment_method,
-        method: payment_method,
-        status: resolvedStatus,
-        processed_by,
-        description: description || null,
-      })
-      .returning();
+    const { payment: created, isNew } = await db.transaction(
+      async (tx: any) => {
+        // Idempotency guard against duplicate full-order payments. A double-click,
+        // a client retry of a request that actually succeeded, or two cashier
+        // surfaces confirming the same order would otherwise each insert a fresh
+        // row and double-charge. Department-split payments are exempt: those
+        // legitimately produce several rows per order (one per department) and
+        // are recorded via settleDepartment, which has its own per-dept guard.
+        if (order_id) {
+          const [existing] = await tx
+            .select({ id: payments.id, status: payments.status })
+            .from(payments)
+            .where(
+              and(
+                eq(payments.order_id, order_id),
+                eq(payments.branch_id, branchId),
+                eq(payments.status, "paid"),
+                sql`coalesce(${payments.meta} ->> 'scope', '') <> 'department'`,
+              ),
+            )
+            .limit(1);
+          if (existing) return { payment: existing, isNew: false };
 
-    if (created) {
+          // A cancellation is terminal: never pay a cancelled order. Record the
+          // money as a voided (cancelled) payment instead of resurrecting it.
+          const [orderRow] = await tx
+            .select({ status: orders.status })
+            .from(orders)
+            .where(
+              and(eq(orders.id, order_id), eq(orders.branch_id, branchId)),
+            )
+            .limit(1);
+          if (normalizeOrderStatus(orderRow?.status) === "cancelled") {
+            const [voided] = await tx
+              .insert(payments)
+              .values({
+                ...tenantInsert(),
+                order_id,
+                amount,
+                amount_cents: amount,
+                payment_method,
+                method: payment_method,
+                status: "cancelled",
+                processed_by,
+                description: description || null,
+              })
+              .returning();
+            return { payment: voided, isNew: true };
+          }
+        }
+
+        const [created] = await tx
+          .insert(payments)
+          .values({
+            ...tenantInsert(),
+            order_id: order_id || null,
+            amount,
+            amount_cents: amount,
+            payment_method,
+            method: payment_method,
+            status: "paid",
+            processed_by,
+            paid_at: new Date(),
+            description: description || null,
+          })
+          .returning();
+
+        if (order_id) {
+          // Payment only settles the money axis; lifecycle (`done` = served) is
+          // a separate transition, so leave orders.status alone.
+          await tx
+            .update(orders)
+            .set({ payment_status: "paid", updated_at: new Date() })
+            .where(and(eq(orders.id, order_id), eq(orders.branch_id, branchId)));
+          await this.deductOrderStock(tx, order_id, processed_by);
+        }
+
+        return { payment: created, isNew: true };
+      },
+    );
+
+    if (created && isNew) {
       await emitCreated(db, "payment", "PAYMENT_CREATED", created as any);
+      await this.pushOrderUpdate(order_id);
     }
     return created;
   }
@@ -127,22 +195,18 @@ export class PaymentService {
 
     if (!row) return undefined;
 
-    return {
-      ...row.payment,
-      customer_id: row.order?.customer_id,
-      order_number: row.order?.order_number,
-      order_type: row.order?.type,
-      processed_by_name: this.formatEmployeeName(row.user),
-    };
+    return this.serializePayment(row.payment, row.order, row.user);
   }
 
   async findByOrderId(orderId: string) {
     const rows = await db
       .select({
         payment: payments,
+        order: orders,
         user: users,
       })
       .from(payments)
+      .leftJoin(orders, eq(payments.order_id, orders.id))
       .leftJoin(users, eq(payments.processed_by, users.id))
       .where(
         and(
@@ -152,10 +216,9 @@ export class PaymentService {
       )
       .orderBy(desc(payments.created_at));
 
-    return rows.map((row: any) => ({
-      ...row.payment,
-      processed_by_name: this.formatEmployeeName(row.user),
-    }));
+    return rows.map((row: any) =>
+      this.serializePayment(row.payment, row.order, row.user),
+    );
   }
 
   async updateStatus(id: string, status: string, processedBy?: any) {
@@ -177,7 +240,7 @@ export class PaymentService {
 
     const payment = await db.transaction(async (tx: any) => {
       const [existing] = await tx
-        .select({ order_id: payments.order_id })
+        .select({ order_id: payments.order_id, status: payments.status })
         .from(payments)
         .where(and(eq(payments.id, id), eq(payments.branch_id, branchId)))
         .limit(1);
@@ -185,6 +248,9 @@ export class PaymentService {
       if (!existing) {
         throw new Error("Payment not found");
       }
+
+      // Payments are now created already-paid (see create()), so confirm is
+      // idempotent — but stay robust for legacy rows and conflicting calls.
 
       // A cancellation/void is terminal. If the order was voided (e.g. by the
       // web cashier) a late or conflicting confirm must not resurrect it — record
@@ -196,12 +262,11 @@ export class PaymentService {
           and(eq(orders.id, existing.order_id), eq(orders.branch_id, branchId)),
         )
         .limit(1);
-      const orderStatus = String(orderRow?.status || "").toLowerCase();
-      if (["cancelled", "voided", "refunded"].includes(orderStatus)) {
+      if (normalizeOrderStatus(orderRow?.status) === "cancelled") {
         const [voided] = await tx
           .update(payments)
           .set({
-            status: "deleted",
+            status: "cancelled",
             processed_by: processedBy,
             updated_at: new Date(),
           })
@@ -221,13 +286,10 @@ export class PaymentService {
         .where(and(eq(payments.id, id), eq(payments.branch_id, branchId)))
         .returning();
 
+      // Settle only the money axis; lifecycle stays where the kitchen left it.
       await tx
         .update(orders)
-        .set({
-          status: "paid",
-          payment_status: "paid",
-          updated_at: new Date(),
-        })
+        .set({ payment_status: "paid", updated_at: new Date() })
         .where(
           and(eq(orders.id, payment.order_id), eq(orders.branch_id, branchId)),
         );
@@ -408,11 +470,14 @@ export class PaymentService {
       const present = new Set<string>(lines.map(deptOf));
       const fullyPaid = Array.from(present).every((d) => settled.has(d));
 
+      // Only the money axis moves. The 3-value payment vocab has no
+      // "partially_paid": an order keeps "pending" until every department is
+      // settled, then flips to "paid". Per-department progress still lives on
+      // the individual payment rows (meta.scope = "department").
       await tx
         .update(orders)
         .set({
-          ...(fullyPaid ? { status: "paid" } : {}),
-          payment_status: fullyPaid ? "paid" : "partially_paid",
+          payment_status: fullyPaid ? "paid" : "pending",
           updated_at: new Date(),
         })
         .where(and(eq(orders.id, orderId), eq(orders.branch_id, branchId)));
@@ -462,14 +527,9 @@ export class PaymentService {
       )
       .orderBy(asc(payments.created_at));
 
-    return rows.map((row: any) => ({
-      ...row.payment,
-      customer_id: row.order.customer_id,
-      order_number: row.order.order_number,
-      order_type: row.order.type,
-      table_number: row.order.table_number,
-      processed_by_name: this.formatEmployeeName(row.user),
-    }));
+    return rows.map((row: any) =>
+      this.serializePayment(row.payment, row.order, row.user),
+    );
   }
 
   private parseDateBound(value: string, end: boolean): Date {
@@ -485,7 +545,10 @@ export class PaymentService {
    * whole window so the stat cards stay correct without loading every payment.
    */
   async getPaymentHistory(filters: any) {
-    const paidTimestamp = sql`coalesce(${payments.paid_at}, ${payments.created_at})`;
+    // Every interface presents payments on their order's created time, so the
+    // date window, sorting and bucketing all key off the order — not when the
+    // money was actually taken.
+    const displayTime = sql`coalesce(${orders.created_at}, ${payments.created_at})`;
 
     // Pagination and the default 30-day window are opt-in: a caller that passes
     // neither page/limit nor an explicit date range gets the full history (which
@@ -505,8 +568,8 @@ export class PaymentService {
       from = filters.date_from
         ? this.parseDateBound(filters.date_from, false)
         : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
-      conditions.push(gte(paidTimestamp, from));
-      conditions.push(lte(paidTimestamp, to));
+      conditions.push(gte(displayTime, from));
+      conditions.push(lte(displayTime, to));
     }
 
     if (filters.status) conditions.push(eq(payments.status, filters.status));
@@ -538,6 +601,7 @@ export class PaymentService {
         pending: sql<number>`count(*) filter (where lower(coalesce(${payments.status}, '')) = 'pending')`,
       })
       .from(payments)
+      .innerJoin(orders, eq(payments.order_id, orders.id))
       .where(where);
 
     const limit = Math.min(Math.max(Number(filters.limit) || 25, 1), 100);
@@ -547,13 +611,14 @@ export class PaymentService {
     // the default newest-first ordering.
     const SORTABLE: Record<string, any> = {
       amount: payments.amount,
-      paid_at: paidTimestamp,
+      paid_at: displayTime,
+      order_number: orders.order_number,
     };
     const sortCol = SORTABLE[filters.sort_by as string];
     const dir = filters.sort_dir === "asc" ? asc : desc;
     const orderBy = sortCol
-      ? [dir(sortCol), desc(paidTimestamp)]
-      : [desc(paidTimestamp)];
+      ? [dir(sortCol), desc(displayTime)]
+      : [desc(displayTime)];
 
     const baseQuery = db
       .select({
@@ -571,14 +636,9 @@ export class PaymentService {
       ? await baseQuery.limit(limit).offset((page - 1) * limit)
       : await baseQuery;
 
-    const list = rows.map((row: any) => ({
-      ...row.payment,
-      customer_id: row.order.customer_id,
-      order_number: row.order.order_number,
-      order_type: row.order.type,
-      table_number: row.order.table_number,
-      processed_by_name: this.formatEmployeeName(row.user),
-    }));
+    const list = rows.map((row: any) =>
+      this.serializePayment(row.payment, row.order, row.user),
+    );
 
     const collected = Number(agg?.collected ?? 0);
     const paidCount = Number(agg?.paid_count ?? 0);
@@ -606,5 +666,30 @@ export class PaymentService {
       .filter(Boolean)
       .join(" ")
       .trim();
+  }
+
+  /**
+   * Shape a payment for any client-facing list/detail. Every interface shows a
+   * payment against its *order's* created time, not when the money was actually
+   * taken: the displayed `paid_at`/`created_at` are overwritten with the order's
+   * created_at so dates, sorting and date-bucketing line up with the order. The
+   * true confirmation/insert times are preserved (audit) under `actual_paid_at`
+   * and `payment_created_at`.
+   */
+  private serializePayment(payment: any, order: any, user?: any) {
+    const displayTime = order?.created_at ?? payment.created_at;
+    return {
+      ...payment,
+      paid_at: displayTime,
+      created_at: displayTime,
+      display_time: displayTime,
+      actual_paid_at: payment.paid_at,
+      payment_created_at: payment.created_at,
+      customer_id: order?.customer_id,
+      order_number: order?.order_number,
+      order_type: order?.type,
+      table_number: order?.table_number,
+      processed_by_name: this.formatEmployeeName(user),
+    };
   }
 }

@@ -549,7 +549,7 @@ export const useCashierData = ({ user, printOrderImmediately }: DataProps) => {
         order_id: order.id,
         amount: order.total_amount,
         payment_method: "cash",
-        status: "deleted",
+        status: "cancelled",
         processed_by: user.id,
       })) as any;
 

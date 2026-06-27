@@ -75,6 +75,7 @@ export const RecentOrdersPanel: React.FC<RecentOrdersPanelProps> = ({
                       ) : (
                         <Badge
                           variant={
+                            displayStatus === "done" ||
                             displayStatus === "completed" ||
                             displayStatus === "paid"
                               ? "success"
