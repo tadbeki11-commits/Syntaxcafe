@@ -158,11 +158,15 @@ export class PaymentService {
           .returning();
 
         if (order_id) {
-          // Payment only settles the money axis; lifecycle (`done` = served) is
-          // a separate transition, so leave orders.status alone.
+          // Payment is the completion event in this POS (no separate "served"
+          // step), so it closes the order: lifecycle -> done, money -> paid.
           await tx
             .update(orders)
-            .set({ payment_status: "paid", updated_at: new Date() })
+            .set({
+              status: "done",
+              payment_status: "paid",
+              updated_at: new Date(),
+            })
             .where(and(eq(orders.id, order_id), eq(orders.branch_id, branchId)));
           await this.deductOrderStock(tx, order_id, processed_by);
         }
@@ -286,10 +290,10 @@ export class PaymentService {
         .where(and(eq(payments.id, id), eq(payments.branch_id, branchId)))
         .returning();
 
-      // Settle only the money axis; lifecycle stays where the kitchen left it.
+      // Payment closes the order: lifecycle -> done, money -> paid.
       await tx
         .update(orders)
-        .set({ payment_status: "paid", updated_at: new Date() })
+        .set({ status: "done", payment_status: "paid", updated_at: new Date() })
         .where(
           and(eq(orders.id, payment.order_id), eq(orders.branch_id, branchId)),
         );
@@ -470,13 +474,14 @@ export class PaymentService {
       const present = new Set<string>(lines.map(deptOf));
       const fullyPaid = Array.from(present).every((d) => settled.has(d));
 
-      // Only the money axis moves. The 3-value payment vocab has no
-      // "partially_paid": an order keeps "pending" until every department is
-      // settled, then flips to "paid". Per-department progress still lives on
+      // The 3-value payment vocab has no "partially_paid": an order keeps
+      // "pending" until every department is settled, then flips to "paid" and
+      // the order closes (lifecycle -> done). Per-department progress lives on
       // the individual payment rows (meta.scope = "department").
       await tx
         .update(orders)
         .set({
+          ...(fullyPaid ? { status: "done" } : {}),
           payment_status: fullyPaid ? "paid" : "pending",
           updated_at: new Date(),
         })

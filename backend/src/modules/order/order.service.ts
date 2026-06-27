@@ -576,11 +576,11 @@ export class OrderService {
         )
         .limit(1);
 
-      // Payment only sets the payment axis. Lifecycle (`done` = served) is a
-      // separate transition the kitchen/waiter drives, so leave `status` alone.
+      // Payment is the completion event in this POS, so it closes the order:
+      // lifecycle -> done, money -> paid.
       await tx
         .update(orders)
-        .set({ payment_status: "paid", updated_at: new Date() })
+        .set({ status: "done", payment_status: "paid", updated_at: new Date() })
         .where(
           and(eq(orders.id, order_id), eq(orders.branch_id, requireBranchId())),
         );
