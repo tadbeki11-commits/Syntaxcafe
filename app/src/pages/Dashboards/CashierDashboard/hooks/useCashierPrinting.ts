@@ -119,20 +119,10 @@ export const useCashierPrinting = ({
         try {
           // console.log(`[Tauri Print] Attempting to print order #${order.id}`);
 
-          // Respect cashier's configured number of copies
-          const copies = (() => {
-            try {
-              const raw = localStorage.getItem("cashier_print_copies");
-              const n = parseInt(raw || "", 10);
-              return Number.isFinite(n) && n > 0 ? Math.min(n, 10) : 1;
-            } catch {
-              return 1;
-            }
-          })();
-
-          for (let i = 0; i < copies; i++) {
-            await (api.orders as any).printOrderNative(order.id);
-          }
+          // printOrderNative owns all copy/station fan-out internally (per-station
+          // copies for routed departments, the global copies setting for plain
+          // ones). Call it exactly once so copies are never multiplied here.
+          await (api.orders as any).printOrderNative(order.id);
 
           // Mark printed only AFTER the ticket physically printed. If the
           // native print above throws, the order stays unprinted and the next
@@ -145,10 +135,9 @@ export const useCashierPrinting = ({
           const tablePart = order.table_number
             ? ` (Table ${order.table_number})`
             : "";
-          toast.success(
-            `🖨️ Order # ${tablePart} printed successfully (${copies} copy${copies > 1 ? "ies" : ""})`,
-            { duration: 2000 },
-          );
+          toast.success(`🖨️ Order #${tablePart} printed successfully`, {
+            duration: 2000,
+          });
           printed = true;
         } catch (err) {
           console.error(
@@ -192,20 +181,9 @@ export const useCashierPrinting = ({
       if (printingRef.current.has(orderId)) return;
       printingRef.current.add(orderId);
       try {
-        // Respect cashier's configured number of copies
-        const copies = (() => {
-          try {
-            const raw = localStorage.getItem("cashier_print_copies");
-            const n = parseInt(raw || "", 10);
-            return Number.isFinite(n) && n > 0 ? Math.min(n, 10) : 1;
-          } catch {
-            return 1;
-          }
-        })();
-
-        for (let i = 0; i < copies; i++) {
-          await (api.orders as any).printOrderNative(orderId);
-        }
+        // printOrderNative owns all copy/station fan-out internally; call it
+        // once so copies are never multiplied at this layer.
+        await (api.orders as any).printOrderNative(orderId);
 
         // Mark printed only AFTER the ticket physically printed, so a printer
         // failure leaves the order queued for the background poll to retry.
@@ -213,10 +191,7 @@ export const useCashierPrinting = ({
 
         setQzStatus({ connected: true, error: null });
         recordPrintSuccess(orderId);
-        toast.success(
-          `🖨️ Order printed successfully (${copies} copy${copies > 1 ? "ies" : ""})`,
-          { duration: 1000 },
-        );
+        toast.success(`🖨️ Order printed successfully`, { duration: 1000 });
       } catch (err: any) {
         console.error(
           `[Immediate Tauri Print] Print failed for order #${orderId}:`,
