@@ -237,6 +237,29 @@ export default function OrdersPage() {
       ),
     },
     {
+      key: "items",
+      label: "Items",
+      searchValue: (o) =>
+        (o.items ?? [])
+          .map((it) => it.name ?? it.menu_item_name ?? "")
+          .join(" "),
+      render: (o) => {
+        const items = o.items ?? [];
+        if (items.length === 0) return <span className="text-muted-foreground">—</span>;
+        const summary = items
+          .map((it) => `${it.quantity}× ${it.name ?? it.menu_item_name ?? "Item"}`)
+          .join(", ");
+        return (
+          <span
+            className="text-muted-foreground block max-w-[16rem] truncate"
+            title={summary}
+          >
+            {summary}
+          </span>
+        );
+      },
+    },
+    {
       key: "status",
       label: "Status",
       render: (o) => (
