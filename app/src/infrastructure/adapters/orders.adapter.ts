@@ -15,6 +15,7 @@ import {
   getDepartmentStations,
   getActivePrinterName,
   getSimplePrintMode,
+  getPrintCopies,
 } from "@/infrastructure/printing/printer-config";
 import { eq } from "drizzle-orm";
 import {
@@ -1175,7 +1176,9 @@ const ordersAdapterImpl = {
         }
       } else {
         // Default: a single prep ticket to the department's printer (or the
-        // active printer when simple mode is on).
+        // active printer when simple mode is on). This branch has no per-station
+        // copies, so the global "number of copies" setting is the sole copy
+        // control here — it is applied once, never on top of station copies.
         const blocks = buildTicketBlocks(
           deptItems,
           `DEPT: ${dept.toUpperCase()}`,
@@ -1184,7 +1187,7 @@ const ordersAdapterImpl = {
         await queueTicket(
           blocks,
           simplePrintMode ? simplePrinter : getPrinterForDepartment(dept),
-          1,
+          getPrintCopies(),
         );
       }
     }
