@@ -262,15 +262,33 @@ export class OrderService {
     const safeTableNumber = this.normalizeTableNumber(table_number);
     const safeOrganizationId = this.normalizeOrganizationId(organization_id);
 
+    // The id existence check must NOT be branch-scoped: `orders.id` is a global
+    // primary key, so an id can only ever belong to one row regardless of
+    // branch. Scoping this by branch_id produced false negatives for orders that
+    // already exist under another tenant (e.g. seed-tenant leftovers re-synced
+    // into a real branch), which then fell through to an INSERT and crashed the
+    // whole bulk-sync batch with a duplicate-key (orders_pkey) violation.
     const [existingOrder] = id
       ? await tx
-          .select({ id: orders.id, status: orders.status })
+          .select({
+            id: orders.id,
+            status: orders.status,
+            branch_id: orders.branch_id,
+          })
           .from(orders)
-          .where(
-            and(eq(orders.id, id), eq(orders.branch_id, requireBranchId())),
-          )
+          .where(eq(orders.id, id))
           .limit(1)
       : [];
+
+    // Same id, but the row lives under a different branch — almost always a
+    // seed/template order carrying a reused PK. Don't touch it and don't try to
+    // re-insert it; report it as persisted so the client stops retrying.
+    if (existingOrder && existingOrder.branch_id !== requireBranchId()) {
+      console.warn(
+        `[BulkSync] Order ${id} already exists under branch ${existingOrder.branch_id}, not ${requireBranchId()}; treating as persisted to avoid a duplicate-key crash.`,
+      );
+      return { id, exists: true as const };
+    }
 
     if (existingOrder) {
       // Lifecycle priority: cancelled (terminal) > done > pending. Only update
@@ -633,12 +651,24 @@ export class OrderService {
     const skippedIds: string[] = [];
     await db.transaction(async (tx: any) => {
       for (const orderData of syncOrders) {
-        const result = await this.syncOrder(
-          orderData,
-          validUserIds,
-          syncUserId,
-          tx,
-        );
+        let result: any;
+        try {
+          // Run each order inside its own savepoint (nested transaction) so an
+          // unexpected failure on one order rolls back only that order instead
+          // of aborting — and re-poisoning — the entire batch. Without this, a
+          // single bad row makes every other order in the push fail too, and the
+          // client retries the same doomed batch forever.
+          result = await tx.transaction((sp: any) =>
+            this.syncOrder(orderData, validUserIds, syncUserId, sp),
+          );
+        } catch (error) {
+          console.error(
+            `[OrderService] bulk sync failed for order ${orderData?.id}; skipping it so the rest of the batch still commits:`,
+            (error as Error)?.message,
+          );
+          if (orderData?.id) skippedIds.push(orderData.id);
+          continue;
+        }
         if (!result?.id) continue;
         if ("skipped" in result && result.skipped) {
           skippedIds.push(result.id);
@@ -654,7 +684,16 @@ export class OrderService {
       }
 
       for (const paymentData of syncPayments) {
-        await this.syncPayment(paymentData, validUserIds, syncUserId, tx);
+        try {
+          await tx.transaction((sp: any) =>
+            this.syncPayment(paymentData, validUserIds, syncUserId, sp),
+          );
+        } catch (error) {
+          console.error(
+            `[OrderService] bulk sync failed for payment ${paymentData?.id}; skipping it so the rest of the batch still commits:`,
+            (error as Error)?.message,
+          );
+        }
       }
     });
 
