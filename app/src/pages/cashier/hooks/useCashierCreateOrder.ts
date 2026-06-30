@@ -55,10 +55,13 @@ export const useCashierCreateOrder = () => {
   }, []);
 
   const slugifyCategory = useCallback((value: any) => {
+    // Keep Unicode letters/numbers (\p{L}\p{N}) — an [a-z0-9]-only slug maps every
+    // Amharic category name to "" so all departments collapse to the same empty
+    // slug and the main-category filter matches every item (i.e. stops filtering).
     return String(value || "")
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
       .replace(/(^-|-$)/g, "");
   }, []);
 

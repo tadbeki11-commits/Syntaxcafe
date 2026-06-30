@@ -133,7 +133,9 @@ const slugify = (value: string) =>
   String(value || "")
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
+    // Keep Unicode letters/numbers — an [a-z0-9]-only slug collapses every Amharic
+    // category to "" (breaks category derivation, dedup and filter matching).
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/(^-|-$)/g, "");
 
 const normalizeCategory = (category: any, fallbackType = "main") => {
