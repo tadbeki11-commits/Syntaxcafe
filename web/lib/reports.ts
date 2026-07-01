@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { Orders } from "./resources";
 
 // ---------------------------------------------------------------------------
 // Types (ported from app/src/pages/Reports/types.ts)
@@ -150,6 +151,31 @@ export const buildSheetFromRows = (rows: any[], headers: string[]): XLSX.WorkShe
   }
 
   return XLSX.utils.aoa_to_sheet([Array.isArray(headers) ? headers : []]);
+};
+
+// A single worksheet can hold several titled tables stacked vertically. This is
+// used so each report tab (which usually renders more than one widget) maps to
+// exactly one sheet in the workbook.
+type SheetSection = {
+  title?: string;
+  columns?: (string | number)[];
+  rows?: (string | number | null | undefined)[][];
+};
+
+export const buildSectionSheet = (sections: SheetSection[]): XLSX.WorkSheet => {
+  const aoa: (string | number | null | undefined)[][] = [];
+  sections.forEach((section, idx) => {
+    if (idx > 0) aoa.push([]); // blank spacer row between sections
+    if (section.title) aoa.push([section.title]);
+    if (section.columns && section.columns.length) aoa.push(section.columns);
+    const rows = Array.isArray(section.rows) ? section.rows : [];
+    if (rows.length) {
+      rows.forEach((row) => aoa.push(row));
+    } else {
+      aoa.push(["No data"]);
+    }
+  });
+  return XLSX.utils.aoa_to_sheet(aoa.length ? aoa : [[]]);
 };
 
 export const filterSourceDataByDateRange = (
@@ -565,10 +591,11 @@ export const calculateReportData = (
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 8);
 
+  // Hourly performance is a time-of-day series: keep it chronological (00:00 →
+  // 23:00) so the chart reads as a daily pattern rather than a top-N ranking.
   const hourlyPerformance = Array.from(hourlyMap.values())
     .filter((point) => point.orders > 0 || point.revenue > 0)
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 8);
+    .sort((a, b) => a.hour.localeCompare(b.hour));
 
   const recentOrders = orders
     .slice()
@@ -602,11 +629,15 @@ export const calculateReportData = (
 
 // ---------------------------------------------------------------------------
 // Period stats — drives the single date-dependent summary card on the report
-// page. Computed from the full source set (independent of the date-range
-// picker) so the Today / This Month / This Year toggle is the sole driver.
+// page. Driven either by the Today / This Month / This Year toggle, or by an
+// explicit date range from the page's date picker when one is supplied.
 // ---------------------------------------------------------------------------
 
 export type StatsPeriod = "today" | "month" | "year";
+
+// An explicit window; either bound may be open (null) to leave that side
+// unbounded, matching the date-picker's "from only" / "to only" behaviour.
+export type StatsDateRange = { from: Date | null; to: Date | null };
 
 export interface PeriodStats {
   totalOrders: number;
@@ -639,6 +670,7 @@ export const calculatePeriodStats = (
   menuItemsRaw: any[],
   unitRaw: string,
   period: StatsPeriod,
+  range?: StatsDateRange | null,
 ): PeriodStats => {
   const unit = String(unitRaw || "all").trim().toLowerCase() || "all";
   const orders = Array.isArray(ordersRaw) ? ordersRaw : [];
@@ -663,11 +695,15 @@ export const calculatePeriodStats = (
   const getOrderTotalForSelectedUnit = (order: any) =>
     unit === "all" ? getOrderSubtotalForUnit(order, "all") : getOrderSubtotalForUnit(order, unit);
 
-  const { from, to } = getPeriodRange(period);
+  // An explicit range (from the date picker) takes precedence over the
+  // Today / Month / Year toggle. Either bound may be open.
+  const { from, to } = range ?? getPeriodRange(period);
   const within = (iso: string) => {
     const dt = new Date(iso);
     if (Number.isNaN(dt.getTime())) return false;
-    return dt >= from && dt <= to;
+    if (from && dt < from) return false;
+    if (to && dt > to) return false;
+    return true;
   };
 
   let totalOrders = 0;
@@ -729,7 +765,7 @@ export const generateCSVReport = (metricsData: ReportData): string => {
 // Builds the workbook from already-fetched source data and triggers a download.
 // ---------------------------------------------------------------------------
 
-export function exportBusinessData(
+export async function exportBusinessData(
   source: SourceData,
   businessUnit: string,
   dateFrom: string,
@@ -886,6 +922,74 @@ export function exportBusinessData(
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryAoa), "Summary");
 
+  // ----- Per-tab sheets: one worksheet per report tab -----
+  const paymentMethodRows = Object.entries(exportMetrics.paymentMethods || {}).map(
+    ([method, count]) => [String(method).replace(/_/g, " "), Number(count) || 0],
+  );
+  const revenueTrendRows = (exportMetrics.revenueTrend || []).map((p) => [
+    p.label,
+    p.orders,
+    p.revenue,
+  ]);
+  const categorySalesRows = (exportMetrics.categorySales || []).map((c) => [
+    c.name,
+    c.quantity,
+    c.revenue,
+  ]);
+  const topItemRows = (exportMetrics.topItems || []).map((t) => [t.name, t.sold, t.revenue ?? 0]);
+  const hourlyRows = (exportMetrics.hourlyPerformance || []).map((h) => [
+    h.hour,
+    h.orders,
+    h.revenue,
+  ]);
+
+  // Overview tab: revenue trend + payment methods
+  XLSX.utils.book_append_sheet(
+    wb,
+    buildSectionSheet([
+      { title: "Revenue Trend", columns: ["Date", "Orders", "Revenue"], rows: revenueTrendRows },
+      { title: "Payment Methods", columns: ["Method", "Paid Payments"], rows: paymentMethodRows },
+    ]),
+    "Overview",
+  );
+
+  // Product Mix tab: popular menu items + category sales
+  XLSX.utils.book_append_sheet(
+    wb,
+    buildSectionSheet([
+      { title: "Popular Menu Items", columns: ["Item", "Qty Sold", "Revenue"], rows: topItemRows },
+      {
+        title: "Category Sales",
+        columns: ["Category", "Quantity", "Revenue"],
+        rows: categorySalesRows,
+      },
+    ]),
+    "Product Mix",
+  );
+
+  // Sales Breakdown tab: payment methods + category sales
+  XLSX.utils.book_append_sheet(
+    wb,
+    buildSectionSheet([
+      { title: "Payment Methods", columns: ["Method", "Paid Payments"], rows: paymentMethodRows },
+      {
+        title: "Category Sales",
+        columns: ["Category", "Quantity", "Revenue"],
+        rows: categorySalesRows,
+      },
+    ]),
+    "Sales Breakdown",
+  );
+
+  // Operations tab: hourly performance
+  XLSX.utils.book_append_sheet(
+    wb,
+    buildSectionSheet([
+      { title: "Hourly Performance", columns: ["Hour", "Orders", "Revenue"], rows: hourlyRows },
+    ]),
+    "Operations",
+  );
+
   const orderHeaders = [
     "order_id",
     "created_at",
@@ -1021,30 +1125,75 @@ export function exportBusinessData(
     "Items Summary",
   );
 
-  XLSX.utils.book_append_sheet(
-    wb,
-    buildSheetFromRows(exportMetrics.categorySales || [], ["name", "quantity", "revenue"]),
-    "Category Sales",
-  );
-  XLSX.utils.book_append_sheet(
-    wb,
-    buildSheetFromRows(exportMetrics.hourlyPerformance || [], ["hour", "orders", "revenue"]),
-    "Hourly Performance",
-  );
-  XLSX.utils.book_append_sheet(
-    wb,
-    buildSheetFromRows(exportMetrics.revenueTrend || [], ["label", "orders", "revenue"]),
-    "Revenue Trend",
-  );
+  // Z-Report tab: fetched from the backend for the selected date range.
+  // Empty dates fall back to today, matching the backend default.
+  let zReport: any = null;
+  try {
+    zReport = await Orders.zReport({
+      start_date: dateFrom || undefined,
+      end_date: dateTo || undefined,
+    });
+  } catch {
+    zReport = null;
+  }
 
-  const metricsCsv = generateCSVReport(exportMetrics);
-  const metricsAoa = String(metricsCsv || "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim().length > 0)
-    .map((line) =>
-      line.split(",").map((cell) => String(cell || "").replace(/^"|"$/g, "").replace(/""/g, '"')),
-    );
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(metricsAoa), "Metrics");
+  const zSections: SheetSection[] = [];
+  if (zReport) {
+    zSections.push({
+      title: "Z-Report Summary",
+      columns: ["Metric", "Value"],
+      rows: [
+        ["Period Start", zReport.period_start || ""],
+        ["Period End", zReport.period_end || ""],
+        ["Generated At", zReport.report_date || ""],
+        ["Total Orders", zReport.summary?.total_orders ?? 0],
+        ["Gross Sales", zReport.summary?.gross_sales ?? 0],
+        ["Refunds", zReport.summary?.refunds ?? 0],
+        ["Discounts", zReport.summary?.discounts ?? 0],
+        ["Net Sales", zReport.summary?.net_sales ?? 0],
+      ],
+    });
+    zSections.push({
+      title: "Payment Breakdown",
+      columns: ["Method", "Count", "Amount", "%"],
+      rows: (zReport.payment_breakdown || []).map((p: any) => [
+        p.method,
+        p.count,
+        p.amount,
+        `${Number(p.percentage || 0).toFixed(1)}%`,
+      ]),
+    });
+    zSections.push({
+      title: "Employee Activity",
+      columns: ["Employee", "Orders", "Sales"],
+      rows: (zReport.employee_activity || []).map((e: any) => [
+        e.employee_name,
+        e.orders_count,
+        e.total_sales,
+      ]),
+    });
+    zSections.push({
+      title: "Category Breakdown",
+      columns: ["Category", "Count", "Amount"],
+      rows: (zReport.category_breakdown || []).map((c: any) => [c.category, c.count, c.amount]),
+    });
+    zSections.push({
+      title: "Voided Transactions",
+      columns: ["Order ID", "Employee", "Amount", "Time"],
+      rows: (zReport.voided_transactions || []).map((t: any) => [
+        `#${t.order_id}`,
+        t.employee_name,
+        t.amount,
+        t.created_at,
+      ]),
+    });
+  } else {
+    zSections.push({
+      title: "Z-Report",
+      rows: [["Unable to load Z-Report for the selected range"]],
+    });
+  }
+  XLSX.utils.book_append_sheet(wb, buildSectionSheet(zSections), "Z-Report");
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const fromSlug = dateFrom || "all";

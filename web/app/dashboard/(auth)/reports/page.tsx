@@ -91,13 +91,13 @@ export default function ReportsPage() {
     );
   }, [loading, source, businessUnit, dateFrom, dateTo, topItemsPeriod]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (dateFrom && dateTo && dateFrom > dateTo) {
       toast.error("Invalid date range: From date must be before To date");
       return;
     }
     try {
-      exportBusinessData(source, businessUnit, dateFrom, dateTo);
+      await exportBusinessData(source, businessUnit, dateFrom, dateTo);
       toast.success("Export downloaded");
     } catch (e: any) {
       toast.error(e.message || "Failed to export report");
@@ -164,15 +164,15 @@ export default function ReportsPage() {
         </div>
       ) : (
         <>
-          <ReportsStats source={source} unit={businessUnit} />
+          <ReportsStats source={source} unit={businessUnit} dateFrom={dateFrom} dateTo={dateTo} />
 
-          <ProfitSummary
+          {/* <ProfitSummary
             orders={source.orders}
             payments={source.payments}
             expenses={expenses}
             from={dateFrom}
             to={dateTo}
-          />
+          /> */}
 
           <Tabs defaultValue="overview" className="space-y-5 overflow-auto">
             <TabsList className="flex h-auto w-full flex-wrap justify-between gap-1 p-1">
@@ -191,10 +191,6 @@ export default function ReportsPage() {
               <TabsTrigger value="operations" className="gap-2">
                 <BarChart2 className="size-4" />
                 <span className="hidden sm:inline">Operations</span>
-              </TabsTrigger>
-              <TabsTrigger value="orders" className="gap-2">
-                <ListOrdered className="size-4" />
-                <span className="hidden sm:inline">Orders</span>
               </TabsTrigger>
               <TabsTrigger value="z-report" className="gap-2">
                 <FileText className="size-4" />
@@ -242,12 +238,8 @@ export default function ReportsPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="orders" className="space-y-6">
-              <RecentOrdersList recentOrders={reportData.recentOrders} />
-            </TabsContent>
-
             <TabsContent value="z-report" className="space-y-6">
-              <ZReport />
+              <ZReport dateFrom={dateFrom} dateTo={dateTo} />
             </TabsContent>
           </Tabs>
         </>

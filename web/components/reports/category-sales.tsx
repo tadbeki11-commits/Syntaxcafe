@@ -1,9 +1,29 @@
+"use client";
+
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { birr } from "@/lib/format";
 import type { CategorySalesItem } from "@/lib/reports";
 
+const chartConfig = {
+  revenue: { label: "Revenue", color: "var(--primary)" },
+} satisfies ChartConfig;
+
+const compact = (value: number) =>
+  new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+
 export function CategorySales({ items }: { items: CategorySalesItem[] }) {
-  const maxRevenue = Math.max(...items.map((item) => item.revenue), 1);
+  const data = items.map((item) => ({
+    ...item,
+    name: item.name.charAt(0).toUpperCase() + item.name.slice(1),
+  }));
 
   return (
     <Card>
@@ -12,33 +32,53 @@ export function CategorySales({ items }: { items: CategorySalesItem[] }) {
         <CardDescription>Revenue and quantity by menu category</CardDescription>
       </CardHeader>
       <CardContent className="pt-6">
-        <div className="max-h-72 space-y-4 overflow-y-auto pr-1">
-          {items.length > 0 ? (
-            items.map((item) => (
-              <div key={item.name} className="space-y-1.5">
-                <div className="flex items-center justify-between gap-3 text-xs font-bold">
-                  <span className="truncate capitalize">{item.name}</span>
-                  <span className="shrink-0">{birr(item.revenue)}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="bg-muted h-2 flex-1 rounded-full">
-                    <div
-                      className="bg-primary h-2 rounded-full"
-                      style={{ width: `${(item.revenue / maxRevenue) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-muted-foreground w-16 text-right text-[10px]">
-                    {item.quantity} sold
-                  </span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-muted-foreground py-12 text-center text-xs font-bold">
-              No category sales in the selected window.
-            </p>
-          )}
-        </div>
+        {data.length > 0 ? (
+          <ChartContainer
+            config={chartConfig}
+            className="aspect-auto w-full"
+            style={{ height: Math.max(180, data.length * 38) }}>
+            <BarChart data={data} layout="vertical" margin={{ left: 4, right: 16 }}>
+              <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+              <XAxis
+                type="number"
+                dataKey="revenue"
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => compact(Number(v))}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tickLine={false}
+                axisLine={false}
+                width={96}
+                tickMargin={4}
+              />
+              <ChartTooltip
+                cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name, item) => (
+                      <div className="flex w-full flex-col gap-0.5">
+                        <span className="text-foreground font-mono font-medium tabular-nums">
+                          {birr(Number(value))}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {(item?.payload as any)?.quantity} sold
+                        </span>
+                      </div>
+                    )}
+                  />
+                }
+              />
+              <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ChartContainer>
+        ) : (
+          <p className="text-muted-foreground py-16 text-center text-xs font-medium">
+            No category sales in the selected window.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Printer, Calendar as CalendarIcon } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Printer, RefreshCw, CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { birr } from "@/lib/format";
 import { Orders } from "@/lib/resources";
 
@@ -45,62 +44,68 @@ interface ZReportData {
   }>;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (d: string) => new Date(d).toLocaleString();
+const fmtDay = (d: string) =>
+  new Date(`${d}T00:00:00`).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
-export function ZReport() {
-  const [startDate, setStartDate] = useState(today());
-  const [endDate, setEndDate] = useState(today());
+// Describe the active window, driven entirely by the parent page's date picker.
+const rangeLabel = (from: string, to: string) => {
+  if (from && to) return from === to ? fmtDay(from) : `${fmtDay(from)} – ${fmtDay(to)}`;
+  if (from) return `From ${fmtDay(from)}`;
+  if (to) return `Through ${fmtDay(to)}`;
+  return "Today";
+};
+
+export function ZReport({ dateFrom = "", dateTo = "" }: { dateFrom?: string; dateTo?: string }) {
   const [loading, setLoading] = useState(false);
   const [zReport, setZReport] = useState<ZReportData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchZReport = async () => {
+  const fetchZReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await Orders.zReport({ start_date: startDate, end_date: endDate });
+      const data = await Orders.zReport({
+        start_date: dateFrom || undefined,
+        end_date: dateTo || undefined,
+      });
       setZReport(data ?? null);
     } catch (err: any) {
       setError(err.message || "Failed to generate Z-report");
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateFrom, dateTo]);
+
+  // Refetch whenever the parent's selected range changes.
+  useEffect(() => {
+    fetchZReport();
+  }, [fetchZReport]);
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <CalendarIcon className="size-5" />
-            Date Range
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1">
-              <Label>Start Date</Label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border-input bg-background block h-9 rounded-md border px-3 text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>End Date</Label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="border-input bg-background block h-9 rounded-md border px-3 text-sm"
-              />
-            </div>
-            <Button onClick={fetchZReport} disabled={loading}>
-              {loading ? "Generating…" : "Generate Report"}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarRange className="size-5" />
+              Z-Report · {rangeLabel(dateFrom, dateTo)}
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={fetchZReport} disabled={loading}>
+              <RefreshCw className={`mr-2 size-4 ${loading ? "animate-spin" : ""}`} />
+              {loading ? "Refreshing…" : "Refresh"}
             </Button>
           </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-sm">
+            Sales settlement summary for the selected date range. Adjust the range using the date
+            picker at the top of the page.
+          </p>
         </CardContent>
       </Card>
 
