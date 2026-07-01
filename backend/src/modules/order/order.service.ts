@@ -887,13 +887,17 @@ export class OrderService {
     const where = and(...conditions);
     const paid = sql`${orders.payment_status} = 'paid'`;
     const notVoided = sql`${orders.status} <> 'cancelled'`;
-    const pendingPayment = sql`${orders.payment_status} = 'pending'`;
+    // Anything not yet paid counts as outstanding. Many orders only carry
+    // status='pending' with an empty/null payment_status (they never went
+    // through the payment axis), so keying off payment_status = 'pending'
+    // alone drops them. Match the "unpaid" list filter: not paid, not voided.
+    const unpaid = sql`coalesce(${orders.payment_status}, '') <> 'paid'`;
 
     const [agg] = await db
       .select({
         total: count(),
         collected: sql<number>`coalesce(sum(case when ${notVoided} and ${paid} then coalesce(${orders.total_amount}, 0) else 0 end), 0)`,
-        outstanding: sql<number>`coalesce(sum(case when ${notVoided} and ${pendingPayment} then coalesce(${orders.total_amount}, 0) else 0 end), 0)`,
+        outstanding: sql<number>`coalesce(sum(case when ${notVoided} and ${unpaid} then coalesce(${orders.total_amount}, 0) else 0 end), 0)`,
         pending: sql<number>`count(*) filter (where ${orders.status} = 'pending')`,
       })
       .from(orders)
