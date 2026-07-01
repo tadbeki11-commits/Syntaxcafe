@@ -1,5 +1,15 @@
 import { Injectable } from "@nestjs/common";
-import { and, between, count, eq, gte, inArray, lte, sql, sum } from "drizzle-orm";
+import {
+  and,
+  between,
+  count,
+  eq,
+  gte,
+  inArray,
+  lte,
+  sql,
+  sum,
+} from "drizzle-orm";
 import { db } from "../../db/drizzle";
 import { orders } from "../../db/tables/orders.table";
 import { payments } from "../../db/tables/payments.table";
@@ -70,28 +80,36 @@ export class ZReportService {
         and(
           eq(orders.branch_id, branchId),
           gte(orders.created_at, startDate),
-          lte(orders.created_at, endDate)
-        )
+          lte(orders.created_at, endDate),
+        ),
       );
 
     // Separate completed/paid orders from voided/cancelled
     const completedOrders = allOrders.filter(
-      (o) => o.status === "completed" || o.payment_status === "paid"
+      (o) => o.status === "completed" || o.payment_status === "paid",
     );
     const voidedOrders = allOrders.filter(
-      (o) => o.status === "cancelled" || o.status === "voided"
+      (o) => o.status === "cancelled" || o.status === "voided",
     );
 
     // Calculate summary
-    const totalOrders = completedOrders.length;
-    const totalSalesCents = completedOrders.reduce(
-      (sum, o) => sum + ((o.total_cents ?? 0) > 0 ? (o.total_cents ?? 0) : (o.total_amount ?? 0) * 100),
-      0
+    const totalOrders = allOrders.length;
+    const totalSalesCents = allOrders.reduce(
+      (sum, o) =>
+        sum +
+        ((o.total_cents ?? 0) > 0
+          ? (o.total_cents ?? 0)
+          : (o.total_amount ?? 0) * 100),
+      0,
     );
     const grossSalesCents = totalSalesCents; // Assuming no tax calculation yet
     const refundsCents = voidedOrders.reduce(
-      (sum, o) => sum + ((o.total_cents ?? 0) > 0 ? (o.total_cents ?? 0) : (o.total_amount ?? 0) * 100),
-      0
+      (sum, o) =>
+        sum +
+        ((o.total_cents ?? 0) > 0
+          ? (o.total_cents ?? 0)
+          : (o.total_amount ?? 0) * 100),
+      0,
     );
     const discountsCents = 0; // No discount field in current schema
     const netSalesCents = grossSalesCents - refundsCents - discountsCents;
@@ -111,8 +129,8 @@ export class ZReportService {
           eq(payments.status, "completed"),
           completedOrderIds.length > 0
             ? sql`${payments.order_id} IN ${completedOrderIds}`
-            : sql`1=0`
-        )
+            : sql`1=0`,
+        ),
       )
       .groupBy(payments.payment_method);
 
@@ -121,9 +139,8 @@ export class ZReportService {
       amount_cents: Number(p.amount),
       amount: Number(p.amount) / 100,
       count: Number(p.count),
-      percentage: totalSalesCents > 0 
-        ? (Number(p.amount) / totalSalesCents) * 100 
-        : 0,
+      percentage:
+        totalSalesCents > 0 ? (Number(p.amount) / totalSalesCents) * 100 : 0,
     }));
 
     // Get employee activity
@@ -141,8 +158,8 @@ export class ZReportService {
           eq(orders.branch_id, branchId),
           gte(orders.created_at, startDate),
           lte(orders.created_at, endDate),
-          sql`${orders.status} IN ('completed', 'paid')`
-        )
+          sql`${orders.status} IN ('completed', 'paid')`,
+        ),
       )
       .groupBy(orders.employee_id, users.username);
 
@@ -171,12 +188,15 @@ export class ZReportService {
           eq(orders.branch_id, branchId),
           gte(orders.created_at, startDate),
           lte(orders.created_at, endDate),
-          sql`${orders.status} IN ('cancelled', 'voided')`
-        )
+          sql`${orders.status} IN ('cancelled', 'voided')`,
+        ),
       );
 
     const voidedTxns = voidedTransactions.map((v) => {
-      const cents = (v.amount_cents ?? 0) > 0 ? (v.amount_cents ?? 0) : (v.amount ?? 0) * 100;
+      const cents =
+        (v.amount_cents ?? 0) > 0
+          ? (v.amount_cents ?? 0)
+          : (v.amount ?? 0) * 100;
       return {
         order_id: Number(v.order_id),
         employee_id: Number(v.employee_id) || 0,
@@ -193,7 +213,7 @@ export class ZReportService {
       amount: number;
       count: number;
     }>;
-   
+
     if (completedOrderIds.length > 0) {
       categoryData = await db
         .select({
@@ -204,8 +224,9 @@ export class ZReportService {
         .from(order_items)
         .leftJoin(menuItems, eq(order_items.menu_item_id, menuItems.id))
         .where(inArray(order_items.order_id, completedOrderIds))
-        .groupBy(sql`COALESCE(${order_items.main_category}, ${menuItems.main_category}, ${menuItems.category})`);
-      
+        .groupBy(
+          sql`COALESCE(${order_items.main_category}, ${menuItems.main_category}, ${menuItems.category})`,
+        );
     } else {
       categoryData = [];
     }
@@ -250,7 +271,7 @@ export class ZReportService {
       0,
       0,
       0,
-      0
+      0,
     );
     const endOfDay = new Date(
       now.getFullYear(),
@@ -259,7 +280,7 @@ export class ZReportService {
       23,
       59,
       59,
-      999
+      999,
     );
     return this.generateZReport(startOfDay, endOfDay);
   }
