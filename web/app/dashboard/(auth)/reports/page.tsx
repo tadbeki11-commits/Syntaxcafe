@@ -166,16 +166,12 @@ export default function ReportsPage() {
         <>
           <ReportsStats source={source} unit={businessUnit} dateFrom={dateFrom} dateTo={dateTo} />
 
-          {/* <ProfitSummary
-            orders={source.orders}
-            payments={source.payments}
-            expenses={expenses}
-            from={dateFrom}
-            to={dateTo}
-          /> */}
-
-          <Tabs defaultValue="overview" className="space-y-5 overflow-auto">
+          <Tabs defaultValue="z-report" className="space-y-5 overflow-auto">
             <TabsList className="flex h-auto w-full flex-wrap justify-between gap-1 p-1">
+              <TabsTrigger value="z-report" className="gap-2">
+                <FileText className="size-4" />
+                <span className="hidden sm:inline">Z-Report</span>
+              </TabsTrigger>
               <TabsTrigger value="overview" className="gap-2">
                 <TrendingUp className="size-4" />
                 <span className="hidden sm:inline">Overview</span>
@@ -192,11 +188,11 @@ export default function ReportsPage() {
                 <BarChart2 className="size-4" />
                 <span className="hidden sm:inline">Operations</span>
               </TabsTrigger>
-              <TabsTrigger value="z-report" className="gap-2">
-                <FileText className="size-4" />
-                <span className="hidden sm:inline">Z-Report</span>
-              </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="z-report" className="space-y-6">
+              <ZReport dateFrom={dateFrom} dateTo={dateTo} />
+            </TabsContent>
 
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
@@ -237,10 +233,7 @@ export default function ReportsPage() {
                 </Card>
               </div>
             </TabsContent>
-
-            <TabsContent value="z-report" className="space-y-6">
-              <ZReport dateFrom={dateFrom} dateTo={dateTo} />
-            </TabsContent>
+           
           </Tabs>
         </>
       )}

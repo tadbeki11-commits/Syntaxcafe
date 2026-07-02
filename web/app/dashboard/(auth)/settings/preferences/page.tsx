@@ -198,6 +198,116 @@ function CancelPasswordCard() {
   );
 }
 
+// Branch printer-settings password. Cashiers are prompted for this before they
+// can open the POS printer settings screen. We only ever learn whether one is
+// set, never its value.
+function PrinterPasswordCard() {
+  const [isSet, setIsSet] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Settings.printerPassword()
+      .then((d) => setIsSet(!!d.is_set))
+      .catch((e: any) => toast.error(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 4) {
+      setError("Password must be at least 4 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await Settings.updatePrinterPassword(password);
+      setIsSet(true);
+      setPassword("");
+      setConfirm("");
+      toast.success("Printer settings password updated");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <KeyRoundIcon className="size-5" />
+          Printer settings password
+        </CardTitle>
+        <CardDescription>
+          Cashiers must enter this password to open the printer settings on the
+          POS.{" "}
+          {!loading &&
+            (isSet
+              ? "A password is currently set. Enter a new one to change it."
+              : "No password is set yet for this branch — printer settings are open.")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-9 w-full max-w-sm" />
+            <Skeleton className="h-9 w-full max-w-sm" />
+          </div>
+        ) : (
+          <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="newPrinterPassword">New password</Label>
+              <Input
+                id="newPrinterPassword"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPrinterPassword">Confirm password</Label>
+              <Input
+                id="confirmPrinterPassword"
+                type="password"
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                disabled={saving}
+              />
+            </div>
+            {error && (
+              <p className="text-destructive text-sm font-medium sm:col-span-2">
+                {error}
+              </p>
+            )}
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={saving || !password}>
+                {saving
+                  ? "Saving…"
+                  : isSet
+                    ? "Update password"
+                    : "Set password"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PreferencesPage() {
   const [values, setValues] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -305,6 +415,8 @@ export default function PreferencesPage() {
       </Card>
 
       {hasBranch && <CancelPasswordCard />}
+
+      {hasBranch && <PrinterPasswordCard />}
     </div>
   );
 }

@@ -216,6 +216,16 @@ export const Settings = {
     apiFetch("/settings/system/cancel-password", put({ cancel_password })).then(
       (d) => d.data,
     ),
+  // Printer-settings password. Cashiers must enter this before opening the POS
+  // printer settings. As with the cancel password, the backend never returns
+  // the hash, only whether one is set.
+  printerPassword: () =>
+    apiFetch("/settings/system/printer-password").then((d) => d.data),
+  updatePrinterPassword: (printer_password: string) =>
+    apiFetch(
+      "/settings/system/printer-password",
+      put({ printer_password }),
+    ).then((d) => d.data),
   // Permanently delete every order and payment for the selected branch
   // (scoped server-side via x-branch-id). Irreversible.
   cleanupData: () => apiFetch("/settings/cleanup-data", j({})),

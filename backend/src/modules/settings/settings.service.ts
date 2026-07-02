@@ -448,4 +448,33 @@ export class SettingsService {
     await this.setSystemSetting("cancel_password", hashed);
     return { is_set: true };
   }
+
+  // Branch-scoped printer-settings password, settable from the owner web
+  // dashboard. Cashiers must enter it before opening the POS printer settings.
+  // As with the cancel password we never return the stored hash — only whether
+  // one is set — so it can't leak to the browser. The hash still rides down to
+  // the desktop POS via system/all sync so it can verify offline.
+  async getPrinterPasswordStatus(): Promise<{ is_set: boolean }> {
+    const printerPassword = await this.getSystemSetting(
+      "printer_settings_password",
+    );
+    return { is_set: !!printerPassword };
+  }
+
+  async verifyPrinterPassword(password: string): Promise<boolean> {
+    const printerPassword = await this.getSystemSetting(
+      "printer_settings_password",
+    );
+    if (!printerPassword) return false;
+    return compare(password, printerPassword);
+  }
+
+  async updatePrinterPassword(password: string): Promise<{ is_set: boolean }> {
+    if (!password || password.length < 4) {
+      throw new Error("Printer settings password must be at least 4 characters.");
+    }
+    const hashed = await hash(password, 10);
+    await this.setSystemSetting("printer_settings_password", hashed);
+    return { is_set: true };
+  }
 }
