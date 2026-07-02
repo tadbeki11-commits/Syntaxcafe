@@ -64,6 +64,10 @@ export class SettingsFacade {
   updatePrinterRoutingSettings = (map: Record<string, any>) =>
     this.adapter.updatePrinterRoutingSettings(map);
 
+  getPrinterPasswordStatus = () => this.adapter.getPrinterPasswordStatus();
+  verifyPrinterPassword = (password: string) =>
+    this.adapter.verifyPrinterPassword(password);
+
   getReceiptSettings = () => this.adapter.getReceiptSettings();
   getLocalReceiptSettings = () => this.adapter.getLocalReceiptSettings();
   updateReceiptSettings = (data: { enable_cashier_receipt: boolean }) =>

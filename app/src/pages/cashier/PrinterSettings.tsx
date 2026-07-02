@@ -5,7 +5,6 @@ import api from '@/application';
 import {
   Printer,
   RefreshCw,
-  CheckCircle2,
   ArrowLeft,
   Zap,
   Circle,
@@ -16,7 +15,9 @@ import {
   Trash2,
   ChevronDown,
   Layers,
-  GripVertical
+  GripVertical,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -24,8 +25,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronsUpDown } from 'lucide-react';
 import BranchBadge from '@/components/common/BranchBadge';
 
 import {
@@ -43,6 +42,8 @@ import {
   createStationId,
   getSimplePrintMode,
   setSimplePrintMode,
+  getTicketShowPrices,
+  setTicketShowPrices,
   type DepartmentStation,
   type DepartmentPrintConfig,
 } from '@/infrastructure/printing/printer-config';
@@ -103,26 +104,37 @@ function statusLabel(status?: string) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-const PrinterSettings: React.FC = () => {
+const PrinterSettingsContent: React.FC = () => {
   const navigate = useNavigate();
 
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [availableDepartments, setAvailableDepartments] = useState<DepartmentOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [testingPrinter, setTestingPrinter] = useState<string | null>(null);
-  const [printerAssignments, setPrinterAssignments] = useState<Record<string, string>>(getPrinterDepartmentMap());
 
   const [departmentConfigs, setDepartmentConfigs] = useState<Record<string, DepartmentPrintConfig>>(getDepartmentConfigMap());
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [simplePrintMode, setSimplePrintModeState] = useState<boolean>(getSimplePrintMode());
+  const [ticketShowPrices, setTicketShowPricesState] = useState<boolean>(getTicketShowPrices());
 
   const handleToggleSimplePrintMode = (enabled: boolean) => {
     setSimplePrintMode(enabled);
     setSimplePrintModeState(enabled);
     toast.success(
       enabled
-        ? '🖨️ Simple printing on — all order tickets go to the active printer'
-        : 'Simple printing off — order tickets use department routing',
+        ? '🖨️ Simple printing fallback on — unrouted tickets go to the active printer'
+        : 'Simple printing fallback off — unrouted departments will not print',
+      { duration: 2500 },
+    );
+  };
+
+  const handleToggleTicketShowPrices = (enabled: boolean) => {
+    setTicketShowPrices(enabled);
+    setTicketShowPricesState(enabled);
+    toast.success(
+      enabled
+        ? '💵 Prices will be printed on order tickets'
+        : 'Prices hidden on order tickets',
       { duration: 2500 },
     );
   };
@@ -197,7 +209,6 @@ const PrinterSettings: React.FC = () => {
       if (map && typeof map === 'object' && Object.keys(map).length > 0) {
         replaceDepartmentConfigMap(map);
         setDepartmentConfigs(getDepartmentConfigMap());
-        setPrinterAssignments(getPrinterDepartmentMap());
       } else {
         const local = getDepartmentConfigMap();
         if (Object.keys(local).length > 0) {
@@ -215,27 +226,7 @@ const PrinterSettings: React.FC = () => {
     loadRouting();
   }, [loadDepartments, loadPrinters, loadRouting]);
 
-  // ── Save selection ─────────────────────────────────────────────────────────
-  // One printer can serve multiple departments; each department maps to a single
-  // printer. Writes go through setPrinterDepartment so the department's advanced
-  // station routing (if any) is preserved.
-  const handleToggleDepartment = (printerName: string, departmentSlug: string, checked: boolean) => {
-    const departmentLabel =
-      availableDepartments.find((entry) => entry.slug === departmentSlug)?.name || departmentSlug;
-
-    const current = printerAssignments[departmentSlug];
-    setPrinterDepartment(departmentSlug, checked ? printerName : current === printerName ? '' : current || '');
-
-    setPrinterAssignments(getPrinterDepartmentMap());
-    setDepartmentConfigs(getDepartmentConfigMap());
-    pushRoutingToBackend();
-
-    if (checked) {
-      toast.success(`🖨️ ${printerName} now prints ${departmentLabel} receipts`, { duration: 2000 });
-    } else {
-      toast.success(`🖨️ ${printerName} no longer prints ${departmentLabel} receipts`, { duration: 2000 });
-    }
-  };
+  
 
   // ── Advanced station routing ─────────────────────────────────────────────────
   // A department can fan one order out to several stations (e.g. an Ethiopian
@@ -244,7 +235,6 @@ const PrinterSettings: React.FC = () => {
   const persistDepartmentConfig = (slug: string, config: DepartmentPrintConfig) => {
     setDepartmentConfig(slug, config);
     setDepartmentConfigs(getDepartmentConfigMap());
-    setPrinterAssignments(getPrinterDepartmentMap());
     pushRoutingToBackend();
   };
 
@@ -291,8 +281,6 @@ const PrinterSettings: React.FC = () => {
     toast.success('Butchery routing added — set a printer for each station', { duration: 2500 });
   };
 
-  const assignedDepartments = Object.entries(printerAssignments);
-  const assignedPrinterCount = new Set(Object.values(printerAssignments)).size;
 
   // ── Test print ─────────────────────────────────────────────────────────────
   const handleTestPrint = async (printerName: string) => {
@@ -382,37 +370,7 @@ const PrinterSettings: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* ── Active Printer Banner ── */}
-      <Card className={`border-2 shadow-sm transition-colors ${assignedPrinterCount > 0 ? 'border-green-500/40 bg-success/5' : 'border-yellow-500/40 bg-warning/5'}`}>
-        <CardContent className="py-4 px-5">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${assignedPrinterCount > 0 ? 'bg-success/15' : 'bg-warning/15'}`}>
-              <Printer className={`w-5 h-5 ${assignedPrinterCount > 0 ? 'text-success' : 'text-warning'}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Department Routing</p>
-              {assignedDepartments.length > 0 ? (
-                <p className="font-bold text-foreground truncate">
-                  {assignedDepartments.length} department{assignedDepartments.length !== 1 ? 's' : ''} mapped to {assignedPrinterCount} printer{assignedPrinterCount !== 1 ? 's' : ''}
-                </p>
-              ) : (
-                <p className="font-semibold text-warning flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  No departments mapped yet — using the system default printer
-                </p>
-              )}
-            </div>
-            {assignedDepartments.length > 0 && (
-              <Badge className="bg-success/15 text-success border-green-500/30 font-bold text-[10px]">
-                <CheckCircle2 className="w-3 h-3 mr-1" />
-                Routing active
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Simple Printing Mode ── */}
+      {/* ── Simple Printing Mode (fallback) ── */}
       <Card className="shadow-sm border-border/60">
         <CardContent className="py-4 px-5">
           <label className="flex items-start gap-3 cursor-pointer">
@@ -422,15 +380,25 @@ const PrinterSettings: React.FC = () => {
               className="mt-0.5"
             />
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm text-foreground">Simple printing mode</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                Send every order ticket to the active printer
-                {getActivePrinterName() ? (
-                  <> (<span className="font-semibold text-foreground">{getActivePrinterName()}</span>)</>
-                ) : null}
-                {' '}— the same printer the Test button uses — instead of the department
-                routing below. Turn this on if test prints work but order tickets don't.
-              </p>
+              <p className="font-bold text-sm text-foreground">Simple printing mode (fallback)</p>
+             
+            </div>
+          </label>
+        </CardContent>
+      </Card>
+
+      {/* ── Prices on tickets ── */}
+      <Card className="shadow-sm border-border/60">
+        <CardContent className="py-4 px-5">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <Checkbox
+              checked={ticketShowPrices}
+              onCheckedChange={(value) => handleToggleTicketShowPrices(value === true)}
+              className="mt-0.5"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm text-foreground">Show prices on simple-print tickets</p>
+       
             </div>
           </label>
         </CardContent>
@@ -481,22 +449,13 @@ const PrinterSettings: React.FC = () => {
 
           {!loading && printers.map((printer) => {
             const isTesting = testingPrinter === printer.name;
-            const assignedSlugs = Object.entries(printerAssignments)
-              .filter(([, assignedPrinter]) => assignedPrinter === printer.name)
-              .map(([dept]) => dept);
-            const assignedDepartmentOptions = assignedSlugs.map(
-              (slug) => availableDepartments.find((dept) => dept.slug === slug) || { name: slug, slug },
-            );
-            const hasAssignment = assignedSlugs.length > 0;
-
+          
             return (
               <div
                 key={printer.name}
                 className={`
                   relative rounded-xl border-2 p-4 transition-all duration-200 cursor-pointer group
-                  ${hasAssignment
-                    ? 'border-primary bg-primary/5 shadow-sm shadow-primary/10'
-                    : 'border-border/50 hover:border-primary/40 hover:bg-accent/30'
+                  border-primary bg-primary/5 shadow-sm shadow-primary/10'
                   }
                 `}
               >
@@ -565,17 +524,6 @@ const PrinterSettings: React.FC = () => {
               </div>
             );
           })}
-        </CardContent>
-      </Card>
-
-      {/* ── Help card ── */}
-      <Card className="border-border/40 bg-muted/20 shadow-none">
-        <CardContent className="py-4 px-5">
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            <span className="font-semibold text-foreground">How it works:</span>{' '}
-            Printers are discovered via CUPS (<code className="bg-muted px-1 rounded">lpstat</code>).
-            Assign a printer to a department, then orders with that department will print only on that printer.
-          </p>
         </CardContent>
       </Card>
 
@@ -744,6 +692,162 @@ const PrinterSettings: React.FC = () => {
               </div>
             );
           })}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// ─── Password gate ──────────────────────────────────────────────────────────
+// The owner sets a printer-settings password from the web dashboard. When one is
+// configured for the branch, the cashier must enter it before the printer
+// settings mount. This gate fails CLOSED: if we can't confirm with the server
+// (and there's no mirrored answer) that access is allowed, we block rather than
+// let someone in. The only way through is either "no password is set" or a
+// correct password.
+type GateState = 'checking' | 'locked' | 'unavailable' | 'unlocked';
+
+const PrinterSettings: React.FC = () => {
+  const navigate = useNavigate();
+  const [gate, setGate] = useState<GateState>('checking');
+  const [password, setPassword] = useState('');
+  const [verifying, setVerifying] = useState(false);
+
+  const checkStatus = useCallback(async () => {
+    setGate('checking');
+    try {
+      const { is_set, determined } = await api.settings.getPrinterPasswordStatus();
+      if (!determined) {
+        // Couldn't establish whether a password is required — fail closed.
+        setGate('unavailable');
+        return;
+      }
+      setGate(is_set ? 'locked' : 'unlocked');
+    } catch (err) {
+      console.warn('[PrinterSettings] Failed to check printer password status:', err);
+      setGate('unavailable');
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await checkStatus();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkStatus]);
+
+  const handleUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) return;
+    setVerifying(true);
+    try {
+      const ok = await api.settings.verifyPrinterPassword(password);
+      if (ok) {
+        setGate('unlocked');
+        setPassword('');
+      } else {
+        toast.error('Incorrect printer settings password');
+      }
+    } catch (err) {
+      console.error('[PrinterSettings] Password verification failed:', err);
+      toast.error('Could not verify password. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  if (gate === 'unlocked') {
+    return <PrinterSettingsContent />;
+  }
+
+  const unavailable = gate === 'unavailable';
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-6 flex items-start justify-center">
+      <Card className="w-full max-w-md mt-16 shadow-sm border-border/60">
+        <CardHeader className="pb-3 pt-6 px-6">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className={`p-2 rounded-lg ${unavailable ? 'bg-warning/15' : 'bg-primary/10'}`}>
+              {unavailable ? (
+                <AlertTriangle className="w-5 h-5 text-warning" />
+              ) : (
+                <Lock className="w-5 h-5 text-primary" />
+              )}
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold">
+                {unavailable ? 'Printer Settings Unavailable' : 'Printer Settings Locked'}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {unavailable
+                  ? 'Access could not be verified with the server'
+                  : 'Enter the password set by the owner to continue'}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="px-6 pb-6">
+          {gate === 'checking' ? (
+            <div className="space-y-3 py-4">
+              <div className="h-9 rounded-md bg-muted/40 animate-pulse" />
+              <div className="h-9 rounded-md bg-muted/40 animate-pulse w-2/3" />
+            </div>
+          ) : unavailable ? (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                We couldn't confirm whether this branch requires a printer-settings
+                password, so access is blocked. Check your connection to the server
+                and try again.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full font-bold"
+                onClick={checkStatus}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleUnlock} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="printerSettingsPassword" className="text-xs font-semibold">
+                  Password
+                </Label>
+                <Input
+                  id="printerSettingsPassword"
+                  type="password"
+                  autoFocus
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={verifying}
+                  placeholder="Enter printer settings password"
+                />
+              </div>
+              <Button type="submit" className="w-full font-bold" disabled={verifying || !password}>
+                {verifying ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <KeyRound className="w-4 h-4 mr-2" />
+                )}
+                {verifying ? 'Verifying…' : 'Unlock'}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
