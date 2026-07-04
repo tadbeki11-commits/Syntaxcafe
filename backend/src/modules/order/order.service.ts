@@ -1,5 +1,16 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
-import { and, asc, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lte,
+  ne,
+  sql,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "../../db/drizzle";
 import { menuItems } from "../../db/tables/menu-items.table";
@@ -523,6 +534,39 @@ export class OrderService {
     // A payment row only exists because money was confirmed, so it is never
     // "pending": fold any legacy/pending value to paid (or cancelled).
     const resolvedStatus = normalizePaymentRowStatus(status);
+
+    // Idempotency guard against duplicate payments for the same order. The
+    // onConflictDoUpdate below only dedups by payment `id`; two pushes with
+    // DIFFERENT ids but the same order_id (a re-appearing order paid twice, or
+    // two devices) would otherwise both insert and double-count revenue. Skip
+    // this push when a non-cancelled payment already exists for the order.
+    //
+    // This only applies to full-order payments. The web cashier portal settles
+    // an order across several department-scoped rows (meta.scope = "department"),
+    // which are legitimately multiple payments per order and must not be blocked.
+    const isDepartmentScoped =
+      String((paymentData?.meta as any)?.scope || "") === "department";
+    if (resolvedStatus !== "cancelled" && !isDepartmentScoped) {
+      const [duplicate] = await tx
+        .select({ id: payments.id })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.order_id, order_id),
+            eq(payments.branch_id, requireBranchId()),
+            ne(payments.id, id),
+            ne(payments.status, "cancelled"),
+            sql`coalesce(${payments.meta} ->> 'scope', '') <> 'department'`,
+          ),
+        )
+        .limit(1);
+      if (duplicate) {
+        console.warn(
+          `[BulkSync] Skipping payment ${id}: order ${order_id} already has payment ${duplicate.id} (duplicate).`,
+        );
+        return;
+      }
+    }
     const resolvedPaidAt = paid_at ? new Date(paid_at) : new Date();
 
     await tx
