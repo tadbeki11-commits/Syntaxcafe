@@ -332,7 +332,22 @@ export const persistServerOrders = async (remoteOrders: any[]) => {
     // the server says it's cancelled/voided, which always wins and stops the
     // local copy from being re-pushed (mapServerOrderToLocal marks it synced).
     if (cached && Number(cached.synced ?? 0) === 0 && !remoteVoided) continue;
-    await upsertOrder(mapServerOrderToLocal(remote, cached));
+
+    // Re-read the freshest local row immediately before writing. `localOrders`
+    // is a snapshot taken above (before this batch's network GET), so its
+    // `is_printed` can be stale: the auto-print engine may have flipped the flag
+    // 0→1 (markPrinted) after a ticket physically printed. Without this re-read,
+    // this stale-snapshot upsert writes is_printed back to 0 and the next poll
+    // re-prints the same order — a duplicate ticket. The printed flag is treated
+    // as sticky (monotonic): once set it never reverts.
+    const fresh = await findById(localDbTables.orders, remote.id);
+    const stickyPrinted =
+      Number(cached?.is_printed) === 1 || Number(fresh?.is_printed) === 1
+        ? 1
+        : Number(cached?.is_printed) || 0;
+    await upsertOrder(
+      mapServerOrderToLocal(remote, { ...cached, is_printed: stickyPrinted }),
+    );
     count += 1;
 
     // Mirror the desktop's own cancel workflow: a voided order's local payments
