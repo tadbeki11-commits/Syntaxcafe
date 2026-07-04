@@ -331,6 +331,39 @@ export const paymentsAdapter = {
     const isConfirmed = ["paid", "confirmed"].includes(paymentStatus);
     const isDeleted = paymentStatus === "deleted";
 
+    // Idempotency guard against duplicate payments on the same order.
+    // The React re-entrancy guards only stop a same-tick double-click; they do
+    // NOT stop a second confirm when the order re-appears in the payment queue
+    // (a sync race after `getAll` re-pulls it as still-pending, a manual retry,
+    // or another cashier device). The desktop always settles the full order in
+    // one payment, so any existing non-cancelled payment for this order means
+    // the money was already taken — return that row instead of writing a second
+    // one. Cancellation/void records (isConfirmed = false) are not deduped so
+    // the void ledger entry still writes.
+    if (isConfirmed && paymentData.order_id) {
+      const existing = (await readPayments()).find(
+        (p: any) =>
+          String(p.order_id) === String(paymentData.order_id) &&
+          String(p.status || "").toLowerCase() !== "cancelled",
+      );
+      if (existing?.id) {
+        console.warn(
+          "[Payments Create] Order already has a payment; returning existing instead of creating a duplicate",
+          { order_id: paymentData.order_id, existing_payment_id: existing.id },
+        );
+        return {
+          data: {
+            status: "success",
+            data: { payment: existing, id: existing.id, ...existing },
+          },
+          status: 200,
+          statusText: "OK",
+          headers: {},
+          config: {} as any,
+        } as any;
+      }
+    }
+
     // Helper: update local order status after a payment action
     const syncOrderLocally = async (orderId: string, synced: 0 | 1) => {
       if (!orderId) return;
