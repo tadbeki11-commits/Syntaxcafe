@@ -782,6 +782,93 @@ export const settingsAdapter = {
     return safeMap;
   },
 
+  // ── Printer Settings Password ─────────────────────────────────────────────────
+  // Owner sets this branch-scoped password from the web dashboard. Cashiers must
+  // enter it before opening the POS printer settings. The hash is mirrored into
+  // the local system-settings KV by syncAllSystemSettings (on login), so the gate
+  // still works offline. Online we prefer the backend so a freshly-set password
+  // takes effect without waiting for the next login sync.
+
+  /** Read the mirrored printer-settings password hash from the local KV. */
+  getLocalPrinterPasswordHash: async (): Promise<string | null> => {
+    try {
+      const db = await getLocalDb();
+      const rows = await db.select().from(localDbTables.systemSettings as any);
+      const row = rows.find(
+        (r: any) => r.key === "printer_settings_password",
+      );
+      return row?.value ? String(row.value) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Whether a printer-settings password is configured for this branch.
+   *
+   * `determined` reports whether we could establish the answer with confidence.
+   * When online, only a successful server response counts as determined — a
+   * failed request (server down, route missing) leaves it `false` so the caller
+   * can fail closed instead of assuming there is no password. When offline, the
+   * mirrored hash is authoritative (it only exists once a sync has run).
+   */
+  getPrinterPasswordStatus: async (): Promise<{
+    is_set: boolean;
+    determined: boolean;
+  }> => {
+    if (isOnline()) {
+      try {
+        const response = await api.get("/settings/system/printer-password");
+        const data =
+          (response as any)?.data?.data ?? (response as any)?.data ?? {};
+        return { is_set: Boolean(data?.is_set), determined: true };
+      } catch (err) {
+        console.warn(
+          "[settingsApi] Failed to fetch printer password status; failing closed:",
+          err,
+        );
+        // Could not reach the server while online — do NOT fall back to the
+        // (possibly stale/absent) local hash and risk letting someone in.
+        return { is_set: true, determined: false };
+      }
+    }
+    // Offline: rely on the hash mirrored by the last system/all sync.
+    const hash = await settingsAdapter.getLocalPrinterPasswordHash();
+    return { is_set: !!hash, determined: true };
+  },
+
+  /** Verify a typed printer-settings password. Online hits the backend; offline
+   * (or on failure) it falls back to comparing against the mirrored local hash. */
+  verifyPrinterPassword: async (password: string): Promise<boolean> => {
+    if (isOnline()) {
+      try {
+        const response = await api.post(
+          "/settings/system/printer-password/verify",
+          { printer_password: password },
+        );
+        const data =
+          (response as any)?.data?.data ?? (response as any)?.data ?? {};
+        return Boolean(data?.valid);
+      } catch (err) {
+        console.warn(
+          "[settingsApi] Online printer password verify failed, trying local hash:",
+          err,
+        );
+      }
+    }
+    const stored = await settingsAdapter.getLocalPrinterPasswordHash();
+    if (!stored) return false;
+    try {
+      if (stored.startsWith("$2")) {
+        const { compare } = await import("bcryptjs");
+        return compare(password, stored);
+      }
+      return password === stored;
+    } catch {
+      return false;
+    }
+  },
+
   /** Update receipt settings (admin) */
   updateReceiptSettings: async (data: { enable_cashier_receipt: boolean }) => {
     if (!isOnline()) {

@@ -30,6 +30,7 @@ import {
   RoleResponseDto,
   RolesResponseDto,
   CancelPasswordRequestDto,
+  PrinterPasswordRequestDto,
   PrintCopiesRequestDto,
   UserSettingsResponseDto,
 } from "./dto/role.dto";
@@ -463,6 +464,54 @@ export class SettingsController {
     try {
       const data = await this.settingsService.updateSystemCancelPassword(
         body.cancel_password,
+      );
+      return { status: "success", data };
+    } catch (error: any) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @ApiOperation({
+    summary: "Get whether a branch printer-settings password is set",
+  })
+  @Get("system/printer-password")
+  async getPrinterPasswordStatus(@Headers("x-app-client") appClient: string) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    const data = await this.settingsService.getPrinterPasswordStatus();
+    return { status: "success", data };
+  }
+
+  @ApiOperation({ summary: "Verify a typed branch printer-settings password" })
+  @ApiBody({ type: PrinterPasswordRequestDto })
+  @Post("system/printer-password/verify")
+  async verifySystemPrinterPassword(
+    @Headers("x-app-client") appClient: string,
+    @Body() body: PrinterPasswordRequestDto,
+  ) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    const valid = await this.settingsService.verifyPrinterPassword(
+      body.printer_password,
+    );
+    return { status: "success", data: { valid } };
+  }
+
+  @ApiOperation({ summary: "Set the branch printer-settings password (owner)" })
+  @ApiBody({ type: PrinterPasswordRequestDto })
+  @Put("system/printer-password")
+  async updateSystemPrinterPassword(
+    @Headers("x-app-client") appClient: string,
+    @Body() body: PrinterPasswordRequestDto,
+  ) {
+    if (appClient !== "tauri-pos-app") {
+      throw new ForbiddenException("Access denied.");
+    }
+    try {
+      const data = await this.settingsService.updatePrinterPassword(
+        body.printer_password,
       );
       return { status: "success", data };
     } catch (error: any) {

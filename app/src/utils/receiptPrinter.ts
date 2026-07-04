@@ -9,3 +9,5 @@
 export { printStockTransferReceipts } from "./receipt/stock-transfer-receipt";
 export { printInventoryLocationReceipt } from "./receipt/inventory-location-receipt";
 export { printZReport } from "./receipt/z-report-receipt";
+export { printItemsSoldReport } from "./receipt/items-sold-receipt";
+export type { ItemsSoldRow, ItemsSoldReportMeta } from "./receipt/items-sold-receipt";

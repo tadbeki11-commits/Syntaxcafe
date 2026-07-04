@@ -30,6 +30,10 @@ export class CancelPasswordRequestDto {
   cancel_password!: string;
 }
 
+export class PrinterPasswordRequestDto {
+  printer_password!: string;
+}
+
 export class PrintCopiesRequestDto {
   print_copies!: number;
 }

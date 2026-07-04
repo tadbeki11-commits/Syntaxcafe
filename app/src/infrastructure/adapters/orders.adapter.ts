@@ -15,6 +15,7 @@ import {
   getDepartmentStations,
   getActivePrinterName,
   getSimplePrintMode,
+  getTicketShowPrices,
   getPrintCopies,
 } from "@/infrastructure/printing/printer-config";
 import { eq } from "drizzle-orm";
@@ -331,7 +332,22 @@ export const persistServerOrders = async (remoteOrders: any[]) => {
     // the server says it's cancelled/voided, which always wins and stops the
     // local copy from being re-pushed (mapServerOrderToLocal marks it synced).
     if (cached && Number(cached.synced ?? 0) === 0 && !remoteVoided) continue;
-    await upsertOrder(mapServerOrderToLocal(remote, cached));
+
+    // Re-read the freshest local row immediately before writing. `localOrders`
+    // is a snapshot taken above (before this batch's network GET), so its
+    // `is_printed` can be stale: the auto-print engine may have flipped the flag
+    // 0→1 (markPrinted) after a ticket physically printed. Without this re-read,
+    // this stale-snapshot upsert writes is_printed back to 0 and the next poll
+    // re-prints the same order — a duplicate ticket. The printed flag is treated
+    // as sticky (monotonic): once set it never reverts.
+    const fresh = await findById(localDbTables.orders, remote.id);
+    const stickyPrinted =
+      Number(cached?.is_printed) === 1 || Number(fresh?.is_printed) === 1
+        ? 1
+        : Number(cached?.is_printed) || 0;
+    await upsertOrder(
+      mapServerOrderToLocal(remote, { ...cached, is_printed: stickyPrinted }),
+    );
     count += 1;
 
     // Mirror the desktop's own cancel workflow: a voided order's local payments
@@ -961,15 +977,34 @@ const ordersAdapterImpl = {
     const availablePrinters = await listAvailablePrinters();
     const targetPrinter = resolvePrinter(printerName, availablePrinters);
 
-    // Simple printing mode: bypass the per-department / station routing map and
-    // send every ticket to the single active printer — the same target the
-    // "Test print" button resolves. This rescues sites where test prints work
-    // but order tickets route to a department printer that isn't configured /
-    // doesn't exist on this device.
+    // Department routing is the primary path. Simple printing mode is only a
+    // FALLBACK: when a department (or station) has no printer assigned, or its
+    // assigned printer isn't present on this device, we fall back to the single
+    // active printer — but only if simple mode is turned on. If simple mode is
+    // off and there's no usable routed printer, that ticket is not printed.
     const simplePrintMode = getSimplePrintMode();
     const simplePrinter = simplePrintMode
       ? resolvePrinter(printerName || getActivePrinterName(), availablePrinters)
       : "";
+    const showPricesOnTicket = getTicketShowPrices();
+
+    // Pick the printer for one ticket. Prefer the configured printer when it
+    // actually exists on this device (routing "on"); otherwise fall back to the
+    // simple/active printer when simple mode allows it; otherwise null → skip.
+    // `viaFallback` tells callers the ticket printed through simple mode rather
+    // than its own route — the price toggle only applies to those tickets.
+    const pickPrinter = (
+      configured?: string,
+    ): { printer: string; viaFallback: boolean } | null => {
+      const name = String(configured || "").trim();
+      if (name && availablePrinters.includes(name)) {
+        return { printer: name, viaFallback: false };
+      }
+      if (simplePrintMode && simplePrinter) {
+        return { printer: simplePrinter, viaFallback: true };
+      }
+      return null;
+    };
 
     // Group items by main_category (prefer menu.main_category, then item fields)
     const itemsByDept: Record<string, any[]> = {};
@@ -1156,40 +1191,69 @@ const ordersAdapterImpl = {
       }
     };
 
+    const skippedDepartments: string[] = [];
+
     for (const dept of departments) {
       const deptItems = itemsByDept[dept];
-      // Simple mode collapses all routing: one prep ticket per department, every
-      // ticket forced onto the active printer (no station fan-out).
-      const stations = simplePrintMode ? [] : getDepartmentStations(dept);
+      // Department routing is primary; simple mode only fills in when a route is
+      // missing or points at a printer that isn't on this device.
+      const stations = getDepartmentStations(dept);
 
       if (stations.length > 0) {
         // Advanced routing (e.g. butchery): fan the same items out to each
         // station's printer with that station's label, copies and price flag.
         for (const station of stations) {
+          const pick = pickPrinter(station.printer);
+          if (!pick) {
+            skippedDepartments.push(`${dept} (${station.label || "station"})`);
+            continue;
+          }
           const headerLabel = station.label || `DEPT: ${dept.toUpperCase()}`;
-          const blocks = buildTicketBlocks(
-            deptItems,
-            headerLabel,
-            station.showPrices,
-          );
-          await queueTicket(blocks, station.printer, station.copies);
+          // A station keeps its own price flag when it prints on its own route.
+          // If it fell back to simple printing, the simple-print price toggle
+          // takes over.
+          const showPrices = pick.viaFallback
+            ? showPricesOnTicket
+            : station.showPrices;
+          const blocks = buildTicketBlocks(deptItems, headerLabel, showPrices);
+          await queueTicket(blocks, pick.printer, station.copies);
         }
       } else {
-        // Default: a single prep ticket to the department's printer (or the
-        // active printer when simple mode is on). This branch has no per-station
-        // copies, so the global "number of copies" setting is the sole copy
-        // control here — it is applied once, never on top of station copies.
+        // Default: a single prep ticket to the department's printer, or the
+        // active printer via the simple-mode fallback. This branch has no
+        // per-station copies, so the global "number of copies" setting is the
+        // sole copy control here. Department-routed tickets stay price-free;
+        // only simple-print fallback tickets follow the price toggle.
+        const pick = pickPrinter(getPrinterForDepartment(dept));
+        if (!pick) {
+          skippedDepartments.push(dept);
+          continue;
+        }
+        const showPrices = pick.viaFallback ? showPricesOnTicket : false;
         const blocks = buildTicketBlocks(
           deptItems,
           `DEPT: ${dept.toUpperCase()}`,
-          false,
+          showPrices,
         );
-        await queueTicket(
-          blocks,
-          simplePrintMode ? simplePrinter : getPrinterForDepartment(dept),
-          getPrintCopies(),
-        );
+        await queueTicket(blocks, pick.printer, getPrintCopies());
       }
+    }
+
+    // Nothing could be routed and simple-mode fallback wasn't available/allowed.
+    // Surface it to the caller so the print-failure banner shows, rather than
+    // silently reporting success for an order that never printed.
+    if (Object.keys(jobsByPrinter).length === 0) {
+      throw new Error(
+        simplePrintMode
+          ? "No printer is available to print the order ticket. Check that a printer is connected."
+          : "No printer is configured for this order's departments. Assign printers in Printer Settings, or turn on Simple printing mode to use the active printer.",
+      );
+    }
+
+    if (skippedDepartments.length > 0) {
+      console.warn(
+        `[print] Some tickets were not printed (no routed printer, simple fallback ${simplePrintMode ? "unavailable" : "off"}): ${skippedDepartments.join(", ")}`,
+      );
     }
 
     const printJobs = Object.values(jobsByPrinter).map((job: any) =>

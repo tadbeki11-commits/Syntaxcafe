@@ -21,6 +21,7 @@ import CashierCreateOrderAsWaiter from './pages/cashier/CashierCreateOrderAsWait
 import CashierExpenses from './pages/cashier/CashierExpenses';
 import PrinterSettings from './pages/cashier/PrinterSettings';
 import CashierReceipt from './pages/cashier/CashierReceipt';
+import CashierItemsSoldToday from './pages/cashier/CashierItemsSoldToday';
 
 // Import admin management pages
 import TableManagement from './pages/TableManagement/index';
@@ -114,6 +115,7 @@ const DashboardRouter = () => {
         <Route path="cashier/expenses" element={<ProtectedRoute allowedRoles={['cashier']}><CashierExpenses /></ProtectedRoute>} />
         <Route path="cashier/printer-settings" element={<ProtectedRoute allowedRoles={['cashier']}><PrinterSettings /></ProtectedRoute>} />
         <Route path="cashier/receipt" element={<ProtectedRoute allowedRoles={['cashier']}><CashierReceipt /></ProtectedRoute>} />
+        <Route path="cashier/items-sold" element={<ProtectedRoute allowedRoles={['cashier']}><CashierItemsSoldToday /></ProtectedRoute>} />
 
         {/* Organizations — admin manages; cashier access gated by setting inside the pages */}
         <Route path="organizations" element={<ProtectedRoute allowedRoles={['admin']}><OrganizationManagement /></ProtectedRoute>} />

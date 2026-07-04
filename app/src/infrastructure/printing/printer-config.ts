@@ -1,7 +1,8 @@
-export const PRINTER_STORAGE_KEY = 'app_selected_printer';
-export const PRINTER_DEPARTMENT_STORAGE_KEY = 'app_printer_department_map';
-export const PRINT_COPIES_STORAGE_KEY = 'cashier_print_copies';
-export const SIMPLE_PRINT_MODE_STORAGE_KEY = 'app_simple_print_mode';
+export const PRINTER_STORAGE_KEY = "app_selected_printer";
+export const PRINTER_DEPARTMENT_STORAGE_KEY = "app_printer_department_map";
+export const PRINT_COPIES_STORAGE_KEY = "cashier_print_copies";
+export const SIMPLE_PRINT_MODE_STORAGE_KEY = "app_simple_print_mode";
+export const TICKET_SHOW_PRICES_STORAGE_KEY = "app_ticket_show_prices";
 
 /**
  * A single ticket destination for a department. A department with no stations
@@ -30,7 +31,9 @@ export interface DepartmentPrintConfig {
 }
 
 function normalizeDepartment(value: string) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 export function createStationId(): string {
@@ -39,13 +42,13 @@ export function createStationId(): string {
 
 function coerceStation(raw: unknown): DepartmentStation | null {
   const r = (raw ?? {}) as Record<string, unknown>;
-  const printer = String(r.printer || '').trim();
-  const label = String(r.label || '').trim();
+  const printer = String(r.printer || "").trim();
+  const label = String(r.label || "").trim();
   if (!printer && !label) return null;
 
   const copies = Number(r.copies);
   return {
-    id: String(r.id || '').trim() || createStationId(),
+    id: String(r.id || "").trim() || createStationId(),
     label,
     printer,
     copies: Number.isFinite(copies) && copies > 0 ? Math.floor(copies) : 1,
@@ -58,31 +61,34 @@ function coerceStation(raw: unknown): DepartmentStation | null {
  * object format, so existing department→printer maps keep working after upgrade.
  */
 function coerceConfig(raw: unknown): DepartmentPrintConfig {
-  if (typeof raw === 'string') {
+  if (typeof raw === "string") {
     return { printer: raw.trim(), stations: [] };
   }
   const r = (raw ?? {}) as Record<string, unknown>;
-  const printer = String(r.printer || '').trim();
+  const printer = String(r.printer || "").trim();
   const stations = Array.isArray(r.stations)
     ? (r.stations.map(coerceStation).filter(Boolean) as DepartmentStation[])
     : [];
   return { printer, stations };
 }
 
-export function getDepartmentConfigMap(): Record<string, DepartmentPrintConfig> {
-  if (typeof window === 'undefined') return {};
+export function getDepartmentConfigMap(): Record<
+  string,
+  DepartmentPrintConfig
+> {
+  if (typeof window === "undefined") return {};
 
   try {
     const raw = window.localStorage?.getItem(PRINTER_DEPARTMENT_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
 
     return Object.entries(parsed).reduce<Record<string, DepartmentPrintConfig>>(
       (acc, [dept, value]) => {
         const normalizedDept = normalizeDepartment(dept);
         if (!normalizedDept) return acc;
         const config = coerceConfig(value);
-        // Keep a department only if it has something actionable.
         if (config.printer || config.stations.length > 0) {
           acc[normalizedDept] = config;
         }
@@ -96,8 +102,11 @@ export function getDepartmentConfigMap(): Record<string, DepartmentPrintConfig> 
 }
 
 function writeDepartmentConfigMap(map: Record<string, DepartmentPrintConfig>) {
-  if (typeof window === 'undefined') return;
-  window.localStorage?.setItem(PRINTER_DEPARTMENT_STORAGE_KEY, JSON.stringify(map));
+  if (typeof window === "undefined") return;
+  window.localStorage?.setItem(
+    PRINTER_DEPARTMENT_STORAGE_KEY,
+    JSON.stringify(map),
+  );
 }
 
 /**
@@ -106,38 +115,47 @@ function writeDepartmentConfigMap(map: Record<string, DepartmentPrintConfig>) {
  * normalizer as a fresh read, so a backend blob in either format is accepted.
  */
 export function replaceDepartmentConfigMap(map: Record<string, unknown>) {
-  if (typeof window === 'undefined') return;
-  const normalized = Object.entries(map || {}).reduce<Record<string, DepartmentPrintConfig>>(
-    (acc, [dept, value]) => {
-      const slug = normalizeDepartment(dept);
-      if (!slug) return acc;
-      const config = coerceConfig(value);
-      if (config.printer || config.stations.length > 0) acc[slug] = config;
-      return acc;
-    },
-    {},
-  );
+  if (typeof window === "undefined") return;
+  const normalized = Object.entries(map || {}).reduce<
+    Record<string, DepartmentPrintConfig>
+  >((acc, [dept, value]) => {
+    const slug = normalizeDepartment(dept);
+    if (!slug) return acc;
+    const config = coerceConfig(value);
+    if (config.printer || config.stations.length > 0) acc[slug] = config;
+    return acc;
+  }, {});
   writeDepartmentConfigMap(normalized);
 }
 
 export function getDepartmentConfig(department: string): DepartmentPrintConfig {
   const normalizedDepartment = normalizeDepartment(department);
-  return getDepartmentConfigMap()[normalizedDepartment] || { printer: '', stations: [] };
+  return (
+    getDepartmentConfigMap()[normalizedDepartment] || {
+      printer: "",
+      stations: [],
+    }
+  );
 }
 
 export function getDepartmentStations(department: string): DepartmentStation[] {
   return getDepartmentConfig(department).stations;
 }
 
-export function setDepartmentConfig(department: string, config: DepartmentPrintConfig) {
+export function setDepartmentConfig(
+  department: string,
+  config: DepartmentPrintConfig,
+) {
   const normalizedDepartment = normalizeDepartment(department);
   if (!normalizedDepartment) return;
 
   const map = getDepartmentConfigMap();
   const next: DepartmentPrintConfig = {
-    printer: String(config?.printer || '').trim(),
+    printer: String(config?.printer || "").trim(),
     stations: Array.isArray(config?.stations)
-      ? (config.stations.map(coerceStation).filter(Boolean) as DepartmentStation[])
+      ? (config.stations
+          .map(coerceStation)
+          .filter(Boolean) as DepartmentStation[])
       : [],
   };
 
@@ -154,13 +172,12 @@ export function setDepartmentConfig(department: string, config: DepartmentPrintC
  * for callers that only care about the single-printer assignment.
  */
 export function getPrinterDepartmentMap(): Record<string, string> {
-  return Object.entries(getDepartmentConfigMap()).reduce<Record<string, string>>(
-    (acc, [dept, config]) => {
-      if (config.printer) acc[dept] = config.printer;
-      return acc;
-    },
-    {},
-  );
+  return Object.entries(getDepartmentConfigMap()).reduce<
+    Record<string, string>
+  >((acc, [dept, config]) => {
+    if (config.printer) acc[dept] = config.printer;
+    return acc;
+  }, {});
 }
 
 /**
@@ -170,20 +187,21 @@ export function getPrinterDepartmentMap(): Record<string, string> {
  */
 export function setPrinterDepartment(department: string, printerName: string) {
   const normalizedDepartment = normalizeDepartment(department);
-  const selectedPrinter = String(printerName || '').trim();
+  const selectedPrinter = String(printerName || "").trim();
   const map = getDepartmentConfigMap();
 
   if (selectedPrinter) {
     Object.entries(map).forEach(([dept, config]) => {
       if (dept !== normalizedDepartment && config.printer === selectedPrinter) {
-        map[dept] = { ...config, printer: '' };
-        if (!map[dept].printer && map[dept].stations.length === 0) delete map[dept];
+        map[dept] = { ...config, printer: "" };
+        if (!map[dept].printer && map[dept].stations.length === 0)
+          delete map[dept];
       }
     });
   }
 
   if (normalizedDepartment) {
-    const existing = map[normalizedDepartment] || { printer: '', stations: [] };
+    const existing = map[normalizedDepartment] || { printer: "", stations: [] };
     const updated = { ...existing, printer: selectedPrinter };
     if (!updated.printer && updated.stations.length === 0) {
       delete map[normalizedDepartment];
@@ -203,7 +221,7 @@ export function getActivePrinterName(): string {
 
   return (
     localStorage.getItem(PRINTER_STORAGE_KEY) ||
-    String(import.meta.env.VITE_PRINTER_NAME || '').trim()
+    String(import.meta.env.VITE_PRINTER_NAME || "").trim()
   );
 }
 
@@ -214,7 +232,7 @@ export function getPrinterForDepartment(department: string): string {
 
 export function getPrintCopies(): number {
   const raw = localStorage.getItem(PRINT_COPIES_STORAGE_KEY);
-  const n = parseInt(raw || '', 10);
+  const n = parseInt(raw || "", 10);
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
@@ -227,21 +245,49 @@ export function getPrintCopies(): number {
  * test prints succeed but order tickets silently route nowhere.
  */
 export function getSimplePrintMode(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
   try {
-    return window.localStorage?.getItem(SIMPLE_PRINT_MODE_STORAGE_KEY) === '1';
+    return window.localStorage?.getItem(SIMPLE_PRINT_MODE_STORAGE_KEY) === "1";
   } catch {
     return false;
   }
 }
 
 export function setSimplePrintMode(enabled: boolean) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   try {
     if (enabled) {
-      window.localStorage?.setItem(SIMPLE_PRINT_MODE_STORAGE_KEY, '1');
+      window.localStorage?.setItem(SIMPLE_PRINT_MODE_STORAGE_KEY, "1");
     } else {
       window.localStorage?.removeItem(SIMPLE_PRINT_MODE_STORAGE_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Whether department / simple-fallback order tickets carry prices. Off by
+ * default (kitchen/prep tickets stay price-free). This is a global toggle for
+ * the single-ticket paths; advanced station routing keeps its own per-station
+ * `showPrices` flag and is unaffected by this.
+ */
+export function getTicketShowPrices(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage?.getItem(TICKET_SHOW_PRICES_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setTicketShowPrices(enabled: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    if (enabled) {
+      window.localStorage?.setItem(TICKET_SHOW_PRICES_STORAGE_KEY, "1");
+    } else {
+      window.localStorage?.removeItem(TICKET_SHOW_PRICES_STORAGE_KEY);
     }
   } catch {
     /* ignore */

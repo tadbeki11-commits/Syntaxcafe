@@ -53,6 +53,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { name: 'Roles', href: '/dashboard/settings/roles', icon: UserCog, roles: ['admin'], group: 'Settings' },
   { name: 'Cashier Employees', href: '/dashboard/cashier/employees', icon: Users, roles: ['cashier'], group: 'Operations' },
   { name: 'Add Order', href: '/dashboard/cashier/select-waiter', icon: ShoppingBag, roles: ['cashier'], group: 'Operations' },
+  { name: 'Items Sold Today', href: '/dashboard/cashier/items-sold', icon: Receipt, roles: ['cashier'], group: 'Operations' },
   { name: 'Cashier Expenses', href: '/dashboard/cashier/expenses', icon: DollarSign, roles: ['cashier'], group: 'Finance' },
   {name: 'Settings', href: '/dashboard/settings/data-management', icon: Wrench, roles: ['admin'], group: 'Settings' },
   { name: 'Printer Settings', href: '/dashboard/settings/printer-settings', icon: Printer, roles: ['admin'], group: 'Settings' },
